@@ -3,42 +3,154 @@ using UnityEngine;
 
 public class WorldManager : MonoBehaviour
 {
+    // ============================================================
+    // 플레이어
+    // ============================================================
+
     [Header("플레이어")]
     public Transform player;
+
+
+    // ============================================================
+    // 자동화 로봇
+    // ============================================================
 
     [Header("자동화 로봇")]
     public Transform[] bots;
 
-    [Header("청크 프리팹")]
-    public GameObject[] chunkPrefabs;
+
+    // ============================================================
+    // 청크 프리팹 데이터
+    // ============================================================
+
+    [System.Serializable]
+    public class ChunkPrefabData
+    {
+        // 청크 프리팹
+        public GameObject prefab;
+
+        // 등급 안에서 이 청크가 선택될 확률
+        [Range(0f, 100f)]
+        public float probability;
+    }
+
+
+    // ============================================================
+    // 청크 등급
+    // ============================================================
+
+    [System.Serializable]
+    public class ChunkGrade
+    {
+        // 등급 이름
+        public string gradeName;
+
+        // ----------------------------------------
+        // 기본 등급 확률
+        // ----------------------------------------
+
+        [Range(0f, 100f)]
+        public float probability;
+
+
+        // ----------------------------------------
+        // 등급 Pity 설정
+        // ----------------------------------------
+
+        // 몇 번 선택되지 않으면 확률 증가
+        public int pityCount = 10;
+
+        // Pity가 발동할 때마다 증가하는 확률
+        public float probabilityIncrease = 0.1f;
+
+        // 등급 확률의 최대값
+        public float maxProbability = 5f;
+
+
+        // ----------------------------------------
+        // 등급에 포함된 청크
+        // ----------------------------------------
+
+        public ChunkPrefabData[] chunks;
+    }
+
+
+    // ============================================================
+    // 청크 등급 목록
+    // ============================================================
+
+    [Header("청크 등급 설정")]
+    public ChunkGrade[] chunkGrades;
+
+
+    // ============================================================
+    // 등급별 Pity 실패 횟수
+    // ============================================================
+
+    // Key = 등급 번호
+    // Value = 해당 등급이 선택되지 않은 횟수
+
+    private Dictionary<int, int> gradeFailureCounts =
+        new Dictionary<int, int>();
+
+
+    // ============================================================
+    // 청크 설정
+    // ============================================================
 
     [Header("청크 설정")]
+
+    // 청크 한 변의 크기
     public int chunkSize = 32;
 
-    // 플레이어가 주변 몇 칸의 청크를 로딩할지
+    // 플레이어 주변 청크 로딩 거리
     public int playerRenderDistance = 2;
 
-    // 로봇이 주변 몇 칸의 청크를 로딩할지
-    // 0 = 로봇이 있는 청크만
+    // 로봇 주변 청크 로딩 거리
+    //
+    // 0 = 로봇이 현재 있는 청크만
+    //
     public int botRenderDistance = 0;
 
+
+    // ============================================================
+    // 월드 설정
+    // ============================================================
+
     [Header("월드 설정")]
+
     public int worldSeed = 12345;
 
-    // 현재 실제로 생성되어 있는 청크
+
+    // ============================================================
+    // 현재 로딩되어 있는 청크
+    // ============================================================
+
     private Dictionary<Vector2Int, Chunk> loadedChunks =
         new Dictionary<Vector2Int, Chunk>();
 
-    // 청크의 저장 데이터
+
+    // ============================================================
+    // 청크 데이터
+    // ============================================================
+
     private Dictionary<Vector2Int, ChunkData> chunkData =
         new Dictionary<Vector2Int, ChunkData>();
 
+
+    // ============================================================
+    // 시작
+    // ============================================================
 
     void Start()
     {
         UpdateChunks();
     }
 
+
+    // ============================================================
+    // 매 프레임 청크 확인
+    // ============================================================
 
     void Update()
     {
@@ -47,7 +159,7 @@ public class WorldManager : MonoBehaviour
 
 
     // ============================================================
-    // 모든 플레이어와 로봇이 필요한 청크를 확인
+    // 플레이어 + 로봇이 필요한 청크 확인
     // ============================================================
 
     void UpdateChunks()
@@ -57,7 +169,7 @@ public class WorldManager : MonoBehaviour
 
 
         // --------------------------------------------------------
-        // 1. 플레이어가 필요한 청크
+        // 플레이어
         // --------------------------------------------------------
 
         if (player != null)
@@ -74,7 +186,7 @@ public class WorldManager : MonoBehaviour
 
 
         // --------------------------------------------------------
-        // 2. 로봇들이 필요한 청크
+        // 로봇
         // --------------------------------------------------------
 
         if (bots != null)
@@ -88,6 +200,7 @@ public class WorldManager : MonoBehaviour
                 Vector2Int botChunk =
                     GetChunkCoord(bot.position);
 
+
                 AddRequiredChunks(
                     botChunk,
                     botRenderDistance,
@@ -98,7 +211,7 @@ public class WorldManager : MonoBehaviour
 
 
         // --------------------------------------------------------
-        // 3. 필요한 청크가 없다면 종료
+        // 필요한 청크가 없으면 종료
         // --------------------------------------------------------
 
         if (requiredChunks.Count == 0)
@@ -106,7 +219,7 @@ public class WorldManager : MonoBehaviour
 
 
         // --------------------------------------------------------
-        // 4. 필요한 청크 생성
+        // 필요한 청크 생성
         // --------------------------------------------------------
 
         foreach (Vector2Int coord in requiredChunks)
@@ -119,10 +232,12 @@ public class WorldManager : MonoBehaviour
 
 
         // --------------------------------------------------------
-        // 5. 필요하지 않은 청크 삭제
+        // 필요 없는 청크 삭제
         // --------------------------------------------------------
 
-        RemoveUnnecessaryChunks(requiredChunks);
+        RemoveUnnecessaryChunks(
+            requiredChunks
+        );
     }
 
 
@@ -137,18 +252,22 @@ public class WorldManager : MonoBehaviour
                 position.x / chunkSize
             );
 
+
         int z =
             Mathf.FloorToInt(
                 position.z / chunkSize
             );
 
 
-        return new Vector2Int(x, z);
+        return new Vector2Int(
+            x,
+            z
+        );
     }
 
 
     // ============================================================
-    // 특정 중심 청크 주변의 필요한 청크들을 추가
+    // 필요한 청크 추가
     // ============================================================
 
     void AddRequiredChunks(
@@ -182,59 +301,569 @@ public class WorldManager : MonoBehaviour
 
 
     // ============================================================
+    // 1차 : 등급 선택
+    //
+    // 등급 확률에만 Pity 적용
+    // ============================================================
+
+    int SelectGrade(
+        System.Random random)
+    {
+        if (
+            chunkGrades == null ||
+            chunkGrades.Length == 0
+        )
+        {
+            Debug.LogError(
+                "Chunk Grades가 설정되지 않았습니다."
+            );
+
+            return -1;
+        }
+
+
+        float totalProbability = 0f;
+
+
+        // 각 등급의 최종 확률
+        float[] adjustedProbabilities =
+            new float[chunkGrades.Length];
+
+
+        // ========================================================
+        // 각 등급의 Pity 적용 확률 계산
+        // ========================================================
+
+        for (
+            int i = 0;
+            i < chunkGrades.Length;
+            i++
+        )
+        {
+            ChunkGrade grade =
+                chunkGrades[i];
+
+
+            if (grade == null)
+                continue;
+
+
+            // --------------------------------------------
+            // 기본 확률
+            // --------------------------------------------
+
+            float probability =
+                grade.probability;
+
+
+            // --------------------------------------------
+            // 실패 횟수 가져오기
+            // --------------------------------------------
+
+            int failureCount = 0;
+
+
+            if (
+                gradeFailureCounts.ContainsKey(i)
+            )
+            {
+                failureCount =
+                    gradeFailureCounts[i];
+            }
+
+
+            // --------------------------------------------
+            // Pity 적용
+            // --------------------------------------------
+
+            if (
+                grade.pityCount > 0
+            )
+            {
+                int increaseCount =
+                    failureCount /
+                    grade.pityCount;
+
+
+                probability +=
+                    increaseCount *
+                    grade.probabilityIncrease;
+            }
+
+
+            // --------------------------------------------
+            // 최대 확률 제한
+            // --------------------------------------------
+
+            probability =
+                Mathf.Min(
+                    probability,
+                    grade.maxProbability
+                );
+
+
+            adjustedProbabilities[i] =
+                probability;
+
+
+            totalProbability +=
+                probability;
+        }
+
+
+        // ========================================================
+        // 확률이 전부 0인 경우
+        // ========================================================
+
+        if (
+            totalProbability <= 0f
+        )
+        {
+            Debug.LogError(
+                "등급 확률의 합이 0입니다."
+            );
+
+            return -1;
+        }
+
+
+        // ========================================================
+        // 랜덤값 생성
+        // ========================================================
+
+        double randomValue =
+            random.NextDouble() *
+            totalProbability;
+
+
+        float currentProbability = 0f;
+
+
+        // ========================================================
+        // 등급 선택
+        // ========================================================
+
+        for (
+            int i = 0;
+            i < chunkGrades.Length;
+            i++
+        )
+        {
+            if (
+                chunkGrades[i] == null
+            )
+            {
+                continue;
+            }
+
+
+            currentProbability +=
+                adjustedProbabilities[i];
+
+
+            if (
+                randomValue <
+                currentProbability
+            )
+            {
+                // --------------------------------------------
+                // 선택된 등급 Pity 초기화
+                // --------------------------------------------
+
+                gradeFailureCounts[i] = 0;
+
+
+                // --------------------------------------------
+                // 선택되지 않은 등급 Pity 증가
+                // --------------------------------------------
+
+                for (
+                    int j = 0;
+                    j < chunkGrades.Length;
+                    j++
+                )
+                {
+                    if (j == i)
+                        continue;
+
+
+                    if (
+                        chunkGrades[j] == null
+                    )
+                    {
+                        continue;
+                    }
+
+
+                    if (
+                        !gradeFailureCounts.ContainsKey(j)
+                    )
+                    {
+                        gradeFailureCounts[j] = 0;
+                    }
+
+
+                    gradeFailureCounts[j]++;
+                }
+
+
+                return i;
+            }
+        }
+
+
+        return -1;
+    }
+
+
+    // ============================================================
+    // 2차 : 선택된 등급 안에서 청크 선택
+    //
+    // 여기에는 Pity가 없음
+    // ============================================================
+
+    GameObject SelectChunkFromGrade(
+        int gradeIndex,
+        System.Random random)
+    {
+        if (
+            gradeIndex < 0 ||
+            gradeIndex >= chunkGrades.Length
+        )
+        {
+            return null;
+        }
+
+
+        ChunkGrade grade =
+            chunkGrades[gradeIndex];
+
+
+        if (
+            grade == null ||
+            grade.chunks == null ||
+            grade.chunks.Length == 0
+        )
+        {
+            return null;
+        }
+
+
+        float totalProbability = 0f;
+
+
+        // ========================================================
+        // 등급 내부 청크 확률 계산
+        // ========================================================
+
+        foreach (
+            ChunkPrefabData data
+            in grade.chunks
+        )
+        {
+            if (
+                data == null ||
+                data.prefab == null
+            )
+            {
+                continue;
+            }
+
+
+            totalProbability +=
+                data.probability;
+        }
+
+
+        // ========================================================
+        // 청크 확률이 전부 0인 경우
+        // ========================================================
+
+        if (
+            totalProbability <= 0f
+        )
+        {
+            Debug.LogError(
+                "선택된 등급의 청크 확률 합이 0입니다.\n" +
+                "등급: " +
+                grade.gradeName
+            );
+
+            return null;
+        }
+
+
+        // ========================================================
+        // 랜덤값
+        // ========================================================
+
+        double randomValue =
+            random.NextDouble() *
+            totalProbability;
+
+
+        float currentProbability = 0f;
+
+
+        // ========================================================
+        // 청크 선택
+        // ========================================================
+
+        foreach (
+            ChunkPrefabData data
+            in grade.chunks
+        )
+        {
+            if (
+                data == null ||
+                data.prefab == null
+            )
+            {
+                continue;
+            }
+
+
+            currentProbability +=
+                data.probability;
+
+
+            if (
+                randomValue <
+                currentProbability
+            )
+            {
+                return data.prefab;
+            }
+        }
+
+
+        return null;
+    }
+
+
+    // ============================================================
+    // 청크 랜덤 선택
+    //
+    // 1차 : 등급 선택
+    // 2차 : 등급 내부 청크 선택
+    // ============================================================
+
+    GameObject GetRandomChunkPrefab(
+        System.Random random)
+    {
+        // --------------------------------------------------------
+        // 1차 : 등급 선택
+        // --------------------------------------------------------
+
+        int gradeIndex =
+            SelectGrade(random);
+
+
+        if (
+            gradeIndex < 0
+        )
+        {
+            return null;
+        }
+
+
+        // --------------------------------------------------------
+        // 2차 : 등급 내부 청크 선택
+        // --------------------------------------------------------
+
+        return SelectChunkFromGrade(
+            gradeIndex,
+            random
+        );
+    }
+
+
+    // ============================================================
     // 청크 생성
     // ============================================================
 
     void CreateChunk(Vector2Int coord)
     {
-        // --------------------------------------------------------
-        // 1. ChunkData가 없으면 새로 생성
-        // --------------------------------------------------------
+        // ========================================================
+        // 기존 청크 데이터가 있는지 확인
+        // ========================================================
 
-        if (!chunkData.ContainsKey(coord))
+        bool hasData =
+            chunkData.ContainsKey(coord);
+
+
+        // ========================================================
+        // 새로운 청크
+        // ========================================================
+
+        if (!hasData)
         {
+            ChunkData newData =
+                new ChunkData(coord);
+
+
             chunkData.Add(
                 coord,
-                new ChunkData(coord)
+                newData
             );
+
+
+            // ----------------------------------------------------
+            // 청크 좌표 기반 Seed
+            // ----------------------------------------------------
+
+            int seed =
+                worldSeed +
+                coord.x * 73856093 +
+                coord.y * 19349663;
+
+
+            System.Random random =
+                new System.Random(seed);
+
+
+            // ----------------------------------------------------
+            // 등급 → 청크 선택
+            // ----------------------------------------------------
+
+            GameObject selectedPrefab =
+                GetRandomChunkPrefab(random);
+
+
+            if (
+                selectedPrefab == null
+            )
+            {
+                Debug.LogError(
+                    "생성할 청크 프리팹을 선택하지 못했습니다."
+                );
+
+
+                chunkData.Remove(coord);
+
+
+                return;
+            }
+
+
+            // ----------------------------------------------------
+            // 선택된 청크 ID 저장
+            // ----------------------------------------------------
+
+            newData.chunkPrefabId =
+                GetChunkPrefabID(
+                    selectedPrefab
+                );
+
+
+            // ----------------------------------------------------
+            // 0 / 90 / 180 / 270도 중 랜덤 회전
+            // ----------------------------------------------------
+
+            int randomRotation =
+                random.Next(0, 4) * 90;
+
+
+            newData.rotationY =
+                randomRotation;
+
+
+            // ----------------------------------------------------
+            // 청크 생성
+            // ----------------------------------------------------
+
+            GameObject obj =
+                Instantiate(
+                    selectedPrefab,
+                    Vector3.zero,
+                    Quaternion.Euler(
+                        0,
+                        newData.rotationY,
+                        0
+                    )
+                );
+
+
+            SetupChunk(
+                obj,
+                coord
+            );
+
+
+            return;
+        }
+
+
+        // ========================================================
+        // 기존 청크
+        // ========================================================
+
+        ChunkData data =
+            chunkData[coord];
+
+
+        // --------------------------------------------------------
+        // 저장된 프리팹 찾기
+        // --------------------------------------------------------
+
+        GameObject savedPrefab =
+            GetChunkPrefabByID(
+                data.chunkPrefabId
+            );
+
+
+        if (
+            savedPrefab == null
+        )
+        {
+            Debug.LogError(
+                "저장된 청크 프리팹을 찾을 수 없습니다.\n" +
+                "Chunk Prefab ID: " +
+                data.chunkPrefabId
+            );
+
+
+            return;
         }
 
 
         // --------------------------------------------------------
-        // 2. Seed + 청크 좌표로 청크 종류 결정
+        // 저장된 프리팹 + 저장된 회전으로 생성
         // --------------------------------------------------------
 
-        int seed =
-            worldSeed +
-            coord.x * 73856093 +
-            coord.y * 19349663;
-
-
-        System.Random random =
-            new System.Random(seed);
-
-
-        int randomIndex =
-            random.Next(
-                0,
-                chunkPrefabs.Length
+        GameObject savedObj =
+            Instantiate(
+                savedPrefab,
+                Vector3.zero,
+                Quaternion.Euler(
+                    0,
+                    data.rotationY,
+                    0
+                )
             );
 
 
-        GameObject selectedPrefab =
-            chunkPrefabs[randomIndex];
+        SetupChunk(
+            savedObj,
+            coord
+        );
+    }
+
+
+    // ============================================================
+    // 청크 설정
+    // ============================================================
+
+    void SetupChunk(
+        GameObject obj,
+        Vector2Int coord)
+    {
+        if (obj == null)
+            return;
 
 
         // --------------------------------------------------------
-        // 3. 청크 생성
-        // --------------------------------------------------------
-
-        GameObject obj =
-            Instantiate(selectedPrefab);
-
-
-        // --------------------------------------------------------
-        // 4. Chunk 컴포넌트 가져오기
+        // Chunk 컴포넌트
         // --------------------------------------------------------
 
         Chunk chunk =
@@ -244,25 +873,29 @@ public class WorldManager : MonoBehaviour
         if (chunk == null)
         {
             Debug.LogError(
-                "Chunk 프리팹에 Chunk.cs가 없습니다: "
-                + selectedPrefab.name
+                "청크 프리팹에 Chunk.cs가 없습니다: " +
+                obj.name
             );
 
+
             Destroy(obj);
+
 
             return;
         }
 
 
         // --------------------------------------------------------
-        // 5. 청크 초기화
+        // 청크 초기화
         // --------------------------------------------------------
 
-        chunk.Initialize(coord);
+        chunk.Initialize(
+            coord
+        );
 
 
         // --------------------------------------------------------
-        // 6. 현재 로딩된 청크에 등록
+        // 로딩된 청크 등록
         // --------------------------------------------------------
 
         loadedChunks.Add(
@@ -272,13 +905,94 @@ public class WorldManager : MonoBehaviour
 
 
         // --------------------------------------------------------
-        // 7. 저장된 데이터 복구
+        // 저장된 오브젝트 복구
         // --------------------------------------------------------
 
         RestoreChunkData(
             coord,
             chunk
         );
+    }
+
+
+    // ============================================================
+    // 청크 프리팹 ID 가져오기
+    // ============================================================
+
+    string GetChunkPrefabID(
+        GameObject prefab)
+    {
+        if (prefab == null)
+            return null;
+
+
+        return prefab.name;
+    }
+
+
+    // ============================================================
+    // 저장된 ID로 청크 프리팹 찾기
+    // ============================================================
+
+    GameObject GetChunkPrefabByID(
+        string id)
+    {
+        if (
+            string.IsNullOrEmpty(id)
+        )
+        {
+            return null;
+        }
+
+
+        // --------------------------------------------------------
+        // 모든 등급 검색
+        // --------------------------------------------------------
+
+        foreach (
+            ChunkGrade grade
+            in chunkGrades
+        )
+        {
+            if (
+                grade == null ||
+                grade.chunks == null
+            )
+            {
+                continue;
+            }
+
+
+            // ----------------------------------------------------
+            // 등급 안의 모든 청크 검색
+            // ----------------------------------------------------
+
+            foreach (
+                ChunkPrefabData data
+                in grade.chunks
+            )
+            {
+                if (
+                    data == null ||
+                    data.prefab == null
+                )
+                {
+                    continue;
+                }
+
+
+                if (
+                    GetChunkPrefabID(data.prefab)
+                    == id
+                )
+                {
+                    return data.prefab;
+                }
+            }
+        }
+
+
+        return null;
     }
 
 
@@ -290,13 +1004,21 @@ public class WorldManager : MonoBehaviour
         Vector2Int coord,
         Chunk chunk)
     {
-        if (!chunkData.ContainsKey(coord))
+        if (
+            !chunkData.ContainsKey(coord)
+        )
+        {
             return;
+        }
 
 
         ChunkData data =
             chunkData[coord];
 
+
+        // --------------------------------------------------------
+        // 저장된 건물/오브젝트 복구
+        // --------------------------------------------------------
 
         foreach (
             PlacedObjectData objectData
@@ -312,9 +1034,10 @@ public class WorldManager : MonoBehaviour
             if (prefab == null)
             {
                 Debug.LogWarning(
-                    "프리팹을 찾을 수 없습니다: "
-                    + objectData.prefabId
+                    "프리팹을 찾을 수 없습니다: " +
+                    objectData.prefabId
                 );
+
 
                 continue;
             }
@@ -340,17 +1063,52 @@ public class WorldManager : MonoBehaviour
 
 
     // ============================================================
-    // 프리팹 ID로 프리팹 찾기
+    // 건물 프리팹 데이터
     // ============================================================
 
-    GameObject GetPrefabByID(string id)
+    [System.Serializable]
+    public class BuildingPrefabData
     {
+        public string id;
+
+        public GameObject prefab;
+    }
+
+
+    public BuildingPrefabData[] buildingPrefabs;
+
+
+    // ============================================================
+    // 건물 프리팹 ID로 찾기
+    // ============================================================
+
+    GameObject GetPrefabByID(
+        string id)
+    {
+        if (
+            buildingPrefabs == null
+        )
+        {
+            return null;
+        }
+
+
         foreach (
             BuildingPrefabData data
             in buildingPrefabs
         )
         {
-            if (data.id == id)
+            if (
+                data == null
+            )
+            {
+                continue;
+            }
+
+
+            if (
+                data.id == id
+            )
             {
                 return data.prefab;
             }
@@ -381,14 +1139,23 @@ public class WorldManager : MonoBehaviour
                 pair.Key;
 
 
-            // 플레이어 또는 로봇 중
-            // 아무도 필요로 하지 않는 청크
-            if (!requiredChunks.Contains(coord))
+            // 플레이어와 로봇 모두에게
+            // 필요하지 않은 청크
+
+            if (
+                !requiredChunks.Contains(coord)
+            )
             {
-                removeList.Add(coord);
+                removeList.Add(
+                    coord
+                );
             }
         }
 
+
+        // --------------------------------------------------------
+        // 실제 삭제
+        // --------------------------------------------------------
 
         foreach (
             Vector2Int coord
@@ -398,12 +1165,18 @@ public class WorldManager : MonoBehaviour
             // GameObject만 삭제
             //
             // ChunkData는 삭제하지 않는다.
+            //
+            // 따라서 나중에 다시 접근하면
+            // 기존 청크가 복구된다.
+
             Destroy(
                 loadedChunks[coord].gameObject
             );
 
 
-            loadedChunks.Remove(coord);
+            loadedChunks.Remove(
+                coord
+            );
         }
     }
 
@@ -417,7 +1190,17 @@ public class WorldManager : MonoBehaviour
         string prefabId,
         GameObject obj)
     {
-        if (!chunkData.ContainsKey(coord))
+        if (obj == null)
+            return;
+
+
+        // --------------------------------------------------------
+        // 청크 데이터가 없다면 생성
+        // --------------------------------------------------------
+
+        if (
+            !chunkData.ContainsKey(coord)
+        )
         {
             chunkData.Add(
                 coord,
@@ -430,6 +1213,10 @@ public class WorldManager : MonoBehaviour
             chunkData[coord];
 
 
+        // --------------------------------------------------------
+        // 건물 데이터 생성
+        // --------------------------------------------------------
+
         PlacedObjectData objectData =
             new PlacedObjectData(
                 prefabId,
@@ -437,6 +1224,10 @@ public class WorldManager : MonoBehaviour
                 obj.transform.eulerAngles.y
             );
 
+
+        // --------------------------------------------------------
+        // 저장
+        // --------------------------------------------------------
 
         data.placedObjects.Add(
             objectData
@@ -451,7 +1242,9 @@ public class WorldManager : MonoBehaviour
     public ChunkData GetChunkData(
         Vector2Int coord)
     {
-        if (chunkData.ContainsKey(coord))
+        if (
+            chunkData.ContainsKey(coord)
+        )
         {
             return chunkData[coord];
         }
@@ -459,19 +1252,4 @@ public class WorldManager : MonoBehaviour
 
         return null;
     }
-
-
-    // ============================================================
-    // 건물 프리팹 데이터
-    // ============================================================
-
-    [System.Serializable]
-    public class BuildingPrefabData
-    {
-        public string id;
-        public GameObject prefab;
-    }
-
-
-    public BuildingPrefabData[] buildingPrefabs;
 }

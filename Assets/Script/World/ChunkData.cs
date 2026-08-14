@@ -8,6 +8,9 @@ public class ChunkData
     public int x;
     public int z;
 
+    // 청크 자체의 Y축 회전값
+    public float rotationY;
+    public string chunkPrefabId;
     public List<PlacedObjectData> placedObjects
         = new List<PlacedObjectData>();
 
@@ -15,6 +18,10 @@ public class ChunkData
     {
         x = coord.x;
         z = coord.y;
+
+        // 기본 회전값
+        rotationY = 0;
+        chunkPrefabId = "";
     }
 }
 
@@ -27,6 +34,7 @@ public class PlacedObjectData
     public float y;
     public float z;
 
+    // 청크 안에 배치된 오브젝트의 Y축 회전값
     public float rotY;
 
     public PlacedObjectData(
@@ -48,3 +56,4 @@ public class PlacedObjectData
         return new Vector3(x, y, z);
     }
 }
+

@@ -265,13 +265,39 @@ MonoBehaviour:
   - {fileID: 729901416}
   - {fileID: 1300064151}
   - {fileID: 623995982}
-  chunkPrefabs:
-  - {fileID: 8721607262263392924, guid: 90225cff1f9700044bfdd3463d731e15, type: 3}
-  - {fileID: 5361416582778573888, guid: dcecf18d3287bde44a0d9f468be7809c, type: 3}
+  chunkGrades:
+  - gradeName: common
+    probability: 89
+    pityCount: 0
+    probabilityIncrease: 0
+    maxProbability: 100
+    chunks:
+    - prefab: {fileID: 4563129634480738729, guid: 594f10873a67f5c4d9668086d82dd547, type: 3}
+      probability: 100
+  - gradeName: rare
+    probability: 10
+    pityCount: 10
+    probabilityIncrease: 0.1
+    maxProbability: 20
+    chunks:
+    - prefab: {fileID: 3588756349937272017, guid: 999ccbec2b302e84c8071377a1f9231b, type: 3}
+      probability: 10
+    - prefab: {fileID: 3588756349937272017, guid: 994886977fcd24e49a5b9f2ad18fc47d, type: 3}
+      probability: 90
+  - gradeName: epic
+    probability: 0.1
+    pityCount: 10
+    probabilityIncrease: 0.1
+    maxProbability: 5
+    chunks:
+    - prefab: {fileID: 4220707921354375387, guid: 97795608d5af28f42a3d441d85513674, type: 3}
+      probability: 90
+    - prefab: {fileID: 4220707921354375387, guid: 9feb1bbe42132fc4bb7a80b41379f587, type: 3}
+      probability: 10
   chunkSize: 100
   playerRenderDistance: 2
-  botRenderDistance: 0
-  worldSeed: 12345
+  botRenderDistance: 1
+  worldSeed: 1
   buildingPrefabs: []
 --- !u!4 &696689006
 Transform:
@@ -300,6 +326,7 @@ GameObject:
   - component: {fileID: 729901415}
   - component: {fileID: 729901414}
   - component: {fileID: 729901413}
+  - component: {fileID: 729901417}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -400,6 +427,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &729901417
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 729901412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59789b0e856afe548abe5e9404651851, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NewMonoBehaviourScript
+  cube: {fileID: 729901412}
 --- !u!1 &1064866574
 GameObject:
   m_ObjectHideFlags: 0
