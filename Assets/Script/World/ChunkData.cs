@@ -34,13 +34,18 @@ public class PlacedObjectData
     public float y;
     public float z;
 
-    // 청크 안에 배치된 오브젝트의 Y축 회전값
+    // 3축 회전값 (경사면 배치 및 WorldManager 에러 해결)
+    public float rotX;
     public float rotY;
+    public float rotZ;
 
+    // 1. 3축 회전 생성자 (WorldManager 166번 줄 오류 해결)
     public PlacedObjectData(
         string prefabId,
         Vector3 position,
-        float rotationY)
+        float rotX,
+        float rotY,
+        float rotZ)
     {
         this.prefabId = prefabId;
 
@@ -48,7 +53,17 @@ public class PlacedObjectData
         y = position.y;
         z = position.z;
 
-        rotY = rotationY;
+        this.rotX = rotX;
+        this.rotY = rotY;
+        this.rotZ = rotZ;
+    }
+
+    // 2. 기존 Y축 회전 전용 생성자 (하위 호환)
+    public PlacedObjectData(
+        string prefabId,
+        Vector3 position,
+        float rotationY) : this(prefabId, position, 0f, rotationY, 0f)
+    {
     }
 
     public Vector3 GetPosition()
@@ -56,4 +71,3 @@ public class PlacedObjectData
         return new Vector3(x, y, z);
     }
 }
-

@@ -241,6 +241,7 @@ GameObject:
   m_Component:
   - component: {fileID: 696689006}
   - component: {fileID: 696689005}
+  - component: {fileID: 696689007}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -281,24 +282,20 @@ MonoBehaviour:
     maxProbability: 20
     chunks:
     - prefab: {fileID: 3588756349937272017, guid: 999ccbec2b302e84c8071377a1f9231b, type: 3}
-      probability: 10
-    - prefab: {fileID: 3588756349937272017, guid: 994886977fcd24e49a5b9f2ad18fc47d, type: 3}
-      probability: 90
+      probability: 100
   - gradeName: epic
     probability: 0.1
     pityCount: 10
     probabilityIncrease: 0.1
     maxProbability: 5
     chunks:
-    - prefab: {fileID: 4220707921354375387, guid: 97795608d5af28f42a3d441d85513674, type: 3}
-      probability: 90
     - prefab: {fileID: 4220707921354375387, guid: 9feb1bbe42132fc4bb7a80b41379f587, type: 3}
-      probability: 10
+      probability: 100
+  buildingPrefabs: []
   chunkSize: 100
   playerRenderDistance: 2
   botRenderDistance: 1
   worldSeed: 1
-  buildingPrefabs: []
 --- !u!4 &696689006
 Transform:
   m_ObjectHideFlags: 0
@@ -314,6 +311,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &696689007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696689004}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06c15d976b3b70c449242ee905a353e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OreGenerator
+  orePrefabs:
+  - {fileID: 5525485765147278631, guid: eb433b003ac4c284cb461b87c1e41030, type: 3}
+  minOresPerChunk: 1
+  maxOresPerChunk: 3
 --- !u!1 &729901412
 GameObject:
   m_ObjectHideFlags: 0
