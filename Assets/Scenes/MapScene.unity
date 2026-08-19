@@ -323,10 +323,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 06c15d976b3b70c449242ee905a353e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OreGenerator
-  orePrefabs:
-  - {fileID: 5525485765147278631, guid: eb433b003ac4c284cb461b87c1e41030, type: 3}
+  oreList:
+  - oreName: 1
+    prefab: {fileID: 5525485765147278631, guid: eb433b003ac4c284cb461b87c1e41030, type: 3}
+    minChunkDistance: 0
+    maxChunkDistance: 999
+    spawnWeight: 51
+    veinSizeMin: 0
+    veinSizeMax: 3
+  - oreName: 2
+    prefab: {fileID: 5280013513698675512, guid: 1c2e189fc74efdd499904b880c2f413a, type: 3}
+    minChunkDistance: 30
+    maxChunkDistance: 999
+    spawnWeight: 9
+    veinSizeMin: 0
+    veinSizeMax: 3
   minOresPerChunk: 1
   maxOresPerChunk: 3
+  minScale: 0.85
+  maxScale: 1.2
 --- !u!1 &729901412
 GameObject:
   m_ObjectHideFlags: 0
