@@ -278,7 +278,9 @@ public class WorldManager : MonoBehaviour
     {
         bool hasData = chunkData.ContainsKey(coord);
 
+        // ========================================================
         // 1. 신규 청크 생성
+        // ========================================================
         if (!hasData)
         {
             ChunkData newData = new ChunkData(coord);
@@ -298,36 +300,50 @@ public class WorldManager : MonoBehaviour
             newData.chunkPrefabId = selectedPrefab.name;
             newData.rotationY = random.Next(0, 4) * 90;
 
-            Vector3 spawnPosition = new Vector3(
+            // 최종 배치되어야 할 실제 월드 좌표
+            Vector3 targetPosition = new Vector3(
                 (coord.x + 0.5f) * chunkSize,
                 0f,
                 (coord.y + 0.5f) * chunkSize
             );
 
+            // 인스턴스화
             GameObject obj = Instantiate(
                 selectedPrefab,
-                spawnPosition,
+                targetPosition,
                 Quaternion.Euler(0, newData.rotationY, 0)
             );
 
             Chunk chunk = SetupChunk(obj, coord);
 
-            // 신규 청크일 때 OreGenerator를 통해 광물 생성
+            // 신규 청크일 때 광물 스폰
             if (chunk != null && oreGenerator != null)
             {
                 oreGenerator.GenerateOres(coord, chunk, random, SaveObjectToChunk);
             }
 
+            // ----------------------------------------------------
+            // 🌟 [추가] 청크 등장 애니메이션 실행
+            // ----------------------------------------------------
+            ChunkAppearance appearance = obj.GetComponent<ChunkAppearance>();
+            if (appearance == null)
+            {
+                appearance = obj.AddComponent<ChunkAppearance>();
+            }
+            appearance.PlaySpawnAnimation(targetPosition);
+
             return;
         }
 
-        // 2. 기존 청크 복구
+        // ========================================================
+        // 2. 기존 청크 복구 (재방문)
+        // ========================================================
         ChunkData data = chunkData[coord];
         GameObject savedPrefab = GetChunkPrefabByID(data.chunkPrefabId);
 
         if (savedPrefab == null)
         {
-            Debug.LogError("저장된 청크 프리팹을 찾을 수 없습니다.\nChunk Prefab ID: " + data.chunkPrefabId);
+            Debug.LogError("저장된 청크 프리팹을 찾을 수 없습니다: " + data.chunkPrefabId);
             return;
         }
 
@@ -344,6 +360,13 @@ public class WorldManager : MonoBehaviour
         );
 
         SetupChunk(savedObj, coord);
+
+        // 재방문 청크도 솟아오르는 연출을 원하시면 아래 주석을 해제하세요.
+       
+        ChunkAppearance restoreAppearance = savedObj.GetComponent<ChunkAppearance>();
+        if (restoreAppearance == null) restoreAppearance = savedObj.AddComponent<ChunkAppearance>();
+        restoreAppearance.PlaySpawnAnimation(restorePosition);
+    
     }
 
 
