@@ -14,12 +14,12 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
-  m_Fog: 0
-  m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  m_FogMode: 3
+  m_Fog: 1
+  m_FogColor: {r: 0.75, g: 0.85, b: 0.95, a: 1}
+  m_FogMode: 1
   m_FogDensity: 0.01
-  m_LinearFogStart: 0
-  m_LinearFogEnd: 300
+  m_LinearFogStart: 80
+  m_LinearFogEnd: 200
   m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
@@ -352,7 +352,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 1513, y: 686}
+  m_AnchoredPosition: {x: 1487, y: 713}
   m_SizeDelta: {x: 500, y: 500}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &645264788
@@ -401,6 +401,7 @@ GameObject:
   - component: {fileID: 696689006}
   - component: {fileID: 696689005}
   - component: {fileID: 696689007}
+  - component: {fileID: 696689008}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -501,6 +502,20 @@ MonoBehaviour:
   maxOresPerChunk: 3
   minScale: 0.85
   maxScale: 1.2
+--- !u!114 &696689008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696689004}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb049df19d093344db29973e914a65e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WorldFogController
+  fogColor: {r: 0.75, g: 0.85, b: 0.95, a: 1}
+  fogStartRatio: 0.4
 --- !u!1 &729901412
 GameObject:
   m_ObjectHideFlags: 0
@@ -838,7 +853,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1000
+  far clip plane: 240.00002
   field of view: 60
   orthographic: 0
   orthographic size: 5
