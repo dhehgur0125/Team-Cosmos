@@ -16,6 +16,32 @@ public class WorldManager : MonoBehaviour
 
 
     // ============================================================
+    // 월드맵 카메라 연동 (신규 추가)
+    // ============================================================
+
+    [Header("월드맵 카메라 연동")]
+    [Tooltip("지도를 비추는 WorldMap Camera의 Transform")]
+    public Transform worldMapCameraTransform;
+
+    [Tooltip("월드맵 카메라 화면을 채울 기본 청크 반경")]
+    public int mapCameraRenderDistance = 4;
+
+    private bool isMapOpen = false;
+
+
+    // ============================================================
+    // 시작 구역 3x3 평지 청크 설정
+    // ============================================================
+
+    [Header("시작 구역 3x3 평지 청크 설정")]
+    [Tooltip("중심 3x3(-1~1) 구역에 고정 생성될 기본 평지 청크 프리팹")]
+    public GameObject starterFlatChunkPrefab;
+
+    [Tooltip("3x3 시작 구역에도 기본 광물을 스폰할지 여부")]
+    public bool spawnOresInStarterArea = true;
+
+
+    // ============================================================
     // 청크 등급 및 프리팹 (ChunkSelector 통합)
     // ============================================================
 
@@ -77,6 +103,7 @@ public class WorldManager : MonoBehaviour
 
     private Dictionary<Vector2Int, Chunk> loadedChunks = new Dictionary<Vector2Int, Chunk>();
     private Dictionary<Vector2Int, ChunkData> chunkData = new Dictionary<Vector2Int, ChunkData>();
+    private HashSet<Vector2Int> discoveredChunks = new HashSet<Vector2Int>();
 
     private OreGenerator oreGenerator;
 
@@ -102,19 +129,33 @@ public class WorldManager : MonoBehaviour
 
 
     // ============================================================
-    // 청크 로드/언로드 관리
+    // 월드맵 모드 제어
+    // ============================================================
+
+    public void SetMapOpenState(bool open)
+    {
+        isMapOpen = open;
+        UpdateChunks();
+    }
+
+
+    // ============================================================
+    // 청크 로드/언로드 관리 (플레이어 + 봇 + 월드맵 카메라)
     // ============================================================
 
     void UpdateChunks()
     {
         HashSet<Vector2Int> requiredChunks = new HashSet<Vector2Int>();
 
+        // 1. 플레이어 주변 청크 (항상 로드 & 탐험 기록)
         if (player != null)
         {
             Vector2Int playerChunk = GetChunkCoord(player.position);
             AddRequiredChunks(playerChunk, playerRenderDistance, requiredChunks);
+            MarkDiscovered(playerChunk, playerRenderDistance);
         }
 
+        // 2. 자동화 로봇 주변 청크 (항상 로드 & 탐험 기록)
         if (bots != null)
         {
             foreach (Transform bot in bots)
@@ -122,11 +163,33 @@ public class WorldManager : MonoBehaviour
                 if (bot == null) continue;
                 Vector2Int botChunk = GetChunkCoord(bot.position);
                 AddRequiredChunks(botChunk, botRenderDistance, requiredChunks);
+                MarkDiscovered(botChunk, botRenderDistance);
+            }
+        }
+
+        // 3. 🌟 [수정] 월드맵 카메라: '이미 탐험한(discoveredChunks)' 청크만 선별 로드
+        if (isMapOpen && worldMapCameraTransform != null)
+        {
+            Vector2Int mapCamChunk = GetChunkCoord(worldMapCameraTransform.position);
+            
+            for (int x = -mapCameraRenderDistance; x <= mapCameraRenderDistance; x++)
+            {
+                for (int z = -mapCameraRenderDistance; z <= mapCameraRenderDistance; z++)
+                {
+                    Vector2Int targetCoord = new Vector2Int(mapCamChunk.x + x, mapCamChunk.y + z);
+
+                    // 🌟 핵심 조건: 플레이어나 로봇이 가본 적이 있는 청크만 로딩 요구 목록에 포함!
+                    if (discoveredChunks.Contains(targetCoord))
+                    {
+                        requiredChunks.Add(targetCoord);
+                    }
+                }
             }
         }
 
         if (requiredChunks.Count == 0) return;
 
+        // 필요한 청크 생성
         foreach (Vector2Int coord in requiredChunks)
         {
             if (!loadedChunks.ContainsKey(coord))
@@ -135,10 +198,27 @@ public class WorldManager : MonoBehaviour
             }
         }
 
+        // 시야 밖으로 벗어난 청크 언로드
         RemoveUnnecessaryChunks(requiredChunks);
     }
 
-    Vector2Int GetChunkCoord(Vector3 position)
+    void MarkDiscovered(Vector2Int center, int dist)
+    {
+        for (int x = -dist; x <= dist; x++)
+        {
+            for (int z = -dist; z <= dist; z++)
+            {
+                discoveredChunks.Add(new Vector2Int(center.x + x, center.y + z));
+            }
+        }
+    }
+
+    public bool IsInStarterArea(Vector2Int coord)
+    {
+        return Mathf.Abs(coord.x) <= 1 && Mathf.Abs(coord.y) <= 1;
+    }
+
+    public Vector2Int GetChunkCoord(Vector3 position)
     {
         int x = Mathf.FloorToInt(position.x / chunkSize);
         int z = Mathf.FloorToInt(position.z / chunkSize);
@@ -278,9 +358,9 @@ public class WorldManager : MonoBehaviour
     {
         bool hasData = chunkData.ContainsKey(coord);
 
-        // ========================================================
+        // ------------------------------------------------------------
         // 1. 신규 청크 생성
-        // ========================================================
+        // ------------------------------------------------------------
         if (!hasData)
         {
             ChunkData newData = new ChunkData(coord);
@@ -289,7 +369,19 @@ public class WorldManager : MonoBehaviour
             int seed = worldSeed + coord.x * 73856093 + coord.y * 19349663;
             System.Random random = new System.Random(seed);
 
-            GameObject selectedPrefab = GetRandomChunkPrefab(random);
+            GameObject selectedPrefab = null;
+
+            if (IsInStarterArea(coord) && starterFlatChunkPrefab != null)
+            {
+                selectedPrefab = starterFlatChunkPrefab;
+                newData.rotationY = 0;
+            }
+            else
+            {
+                selectedPrefab = GetRandomChunkPrefab(random);
+                newData.rotationY = random.Next(0, 4) * 90;
+            }
+
             if (selectedPrefab == null)
             {
                 Debug.LogError("생성할 청크 프리팹을 선택하지 못했습니다.");
@@ -298,16 +390,13 @@ public class WorldManager : MonoBehaviour
             }
 
             newData.chunkPrefabId = selectedPrefab.name;
-            newData.rotationY = random.Next(0, 4) * 90;
 
-            // 최종 배치되어야 할 실제 월드 좌표
             Vector3 targetPosition = new Vector3(
                 (coord.x + 0.5f) * chunkSize,
                 0f,
                 (coord.y + 0.5f) * chunkSize
             );
 
-            // 인스턴스화
             GameObject obj = Instantiate(
                 selectedPrefab,
                 targetPosition,
@@ -316,28 +405,30 @@ public class WorldManager : MonoBehaviour
 
             Chunk chunk = SetupChunk(obj, coord);
 
-            // 신규 청크일 때 광물 스폰
-            if (chunk != null && oreGenerator != null)
+            bool canSpawnOres = !IsInStarterArea(coord) || spawnOresInStarterArea;
+            if (canSpawnOres && chunk != null && oreGenerator != null)
             {
                 oreGenerator.GenerateOres(coord, chunk, random, SaveObjectToChunk);
             }
 
-            // ----------------------------------------------------
-            // 🌟 [추가] 청크 등장 애니메이션 실행
-            // ----------------------------------------------------
-            ChunkAppearance appearance = obj.GetComponent<ChunkAppearance>();
-            if (appearance == null)
+            // 🌟 [핵심 변경] 월드맵이 켜져 있을 때는 연출 생략, 닫혀 있을 때만 솟아오름 연출 실행
+            if (isMapOpen)
             {
-                appearance = obj.AddComponent<ChunkAppearance>();
+                obj.transform.position = targetPosition; // 즉시 제자리 고정
             }
-            appearance.PlaySpawnAnimation(targetPosition);
+            else
+            {
+                ChunkAppearance appearance = obj.GetComponent<ChunkAppearance>();
+                if (appearance == null) appearance = obj.AddComponent<ChunkAppearance>();
+                appearance.PlaySpawnAnimation(targetPosition);
+            }
 
             return;
         }
 
-        // ========================================================
-        // 2. 기존 청크 복구 (재방문)
-        // ========================================================
+        // ------------------------------------------------------------
+        // 2. 기존 탐험 구역 청크 복구
+        // ------------------------------------------------------------
         ChunkData data = chunkData[coord];
         GameObject savedPrefab = GetChunkPrefabByID(data.chunkPrefabId);
 
@@ -361,12 +452,17 @@ public class WorldManager : MonoBehaviour
 
         SetupChunk(savedObj, coord);
 
-        // 재방문 청크도 솟아오르는 연출을 원하시면 아래 주석을 해제하세요.
-       
-        ChunkAppearance restoreAppearance = savedObj.GetComponent<ChunkAppearance>();
-        if (restoreAppearance == null) restoreAppearance = savedObj.AddComponent<ChunkAppearance>();
-        restoreAppearance.PlaySpawnAnimation(restorePosition);
-    
+        // 🌟 [핵심 변경] 기존 복구 청크도 월드맵 상태에서는 애니메이션 스킵
+        if (isMapOpen)
+        {
+            savedObj.transform.position = restorePosition; // 즉시 제자리 고정
+        }
+        else
+        {
+            ChunkAppearance restoreAppearance = savedObj.GetComponent<ChunkAppearance>();
+            if (restoreAppearance == null) restoreAppearance = savedObj.AddComponent<ChunkAppearance>();
+            restoreAppearance.PlaySpawnAnimation(restorePosition);
+        }
     }
 
 
@@ -402,7 +498,6 @@ public class WorldManager : MonoBehaviour
 
         foreach (PlacedObjectData objectData in data.placedObjects)
         {
-            // 건물 프리팹 검색 -> 없으면 OreGenerator에서 광물 프리팹 검색
             GameObject prefab = GetPrefabByID(objectData.prefabId);
             if (prefab == null && oreGenerator != null)
             {
@@ -432,6 +527,7 @@ public class WorldManager : MonoBehaviour
 
     GameObject GetChunkPrefabByID(string id)
     {
+        if (starterFlatChunkPrefab != null && starterFlatChunkPrefab.name == id) return starterFlatChunkPrefab;
         if (string.IsNullOrEmpty(id) || chunkGrades == null) return null;
 
         foreach (ChunkGrade grade in chunkGrades)
@@ -508,4 +604,6 @@ public class WorldManager : MonoBehaviour
     {
         return chunkData.ContainsKey(coord) ? chunkData[coord] : null;
     }
+
+    public HashSet<Vector2Int> GetDiscoveredChunks() => discoveredChunks;
 }

@@ -60,4 +60,9 @@ public class ChunkAppearance : MonoBehaviour
         transform.position = targetPos;
         transform.localScale = initialScale;
     }
+    public void SetInstantPosition(Vector3 targetPos)
+    {
+        StopAllCoroutines();
+        transform.position = targetPos;
+    }
 }

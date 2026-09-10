@@ -21,25 +21,27 @@ public class ShoulderCamera : MonoBehaviour
     public float maxPitch = 40f;
 
     [Header("Zoom Settings")]
-    public float defaultDistance = 2.0f;       // 시작 거리 (기존 shoulderOffsetZ의 절대값과 같은 개념)
+    public float defaultDistance = 2.0f;
     public float zoomSpeed = 4f;
     public float minDistance = 0.8f;
     public float maxDistance = 4.0f;
     private float currentDistance;
 
     [Header("Wall Collision")]
-    // 카메라가 충돌 검사할 레이어. Player(캐릭터 자신) 레이어는 반드시 빼주세요.
-    // 안 빼면 카메라가 캐릭터 자기 몸에 부딪혀서 계속 확 당겨옵니다.
     public LayerMask collisionMask = ~0;
-    public float collisionRadius = 0.25f;      // SphereCast 반지름 (카메라 두께라고 생각하면 됨)
-    public float collisionBuffer = 0.15f;      // 벽에서 카메라를 얼마나 띄워둘지
-    public float minCollisionDistance = 0.2f;  // 벽에 딱 붙었을 때 최소 거리 (피벗 뚫고 들어가는 것 방지)
+    public float collisionRadius = 0.25f;
+    public float collisionBuffer = 0.15f;
+    public float minCollisionDistance = 0.2f;
 
     [Header("View State")]
     public bool isFirstPerson = false;
     private float pitch = 10f;
     private float yaw = 0f;
     public float GetYaw() => yaw;
+
+    // 🌟 월드맵 등 UI 열림 시 카메라 입력 및 커서 재잠금 차단 플래그
+    [HideInInspector]
+    public bool inputBlocked = false;
 
     void Start()
     {
@@ -55,6 +57,9 @@ public class ShoulderCamera : MonoBehaviour
 
     void Update()
     {
+        // 월드맵이 켜져 있을 땐 마우스 클릭 시 커서 재잠금 방지 & 카메라 입력 무시
+        if (inputBlocked) return;
+
         if (Input.GetKeyDown(KeyCode.Escape)) UnlockCursor();
         if (Cursor.lockState != CursorLockMode.Locked && Input.GetMouseButtonDown(0)) LockCursor();
 
@@ -63,7 +68,6 @@ public class ShoulderCamera : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.Q)) targetShoulderX = -Mathf.Abs(shoulderOffsetX);
             if (Input.GetKeyDown(KeyCode.E)) targetShoulderX = Mathf.Abs(shoulderOffsetX);
 
-            // 마우스 휠 줌: 휠을 위로 올리면(양수) 가까워지고, 내리면 멀어짐
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (Mathf.Abs(scroll) > 0.0001f)
             {
@@ -83,7 +87,8 @@ public class ShoulderCamera : MonoBehaviour
     {
         if (target == null) return;
 
-        if (Cursor.lockState == CursorLockMode.Locked)
+        // 입력이 차단되지 않고 커서가 잠겨 있을 때만 마우스 회전 반영
+        if (!inputBlocked && Cursor.lockState == CursorLockMode.Locked)
         {
             yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
             pitch -= Input.GetAxis("Mouse Y") * mouseSensitivity;
@@ -100,20 +105,13 @@ public class ShoulderCamera : MonoBehaviour
             return;
         }
 
-        // 피벗(어깨 지점): 캐릭터 기준 좌우/높이 오프셋까지만 적용한 지점.
-        // 여기서부터 카메라 방향으로 팔(arm)을 뻗는다고 생각하면 됩니다.
         Vector3 pivotOffset = camRotation * new Vector3(currentShoulderX, shoulderOffsetY, 0f);
         Vector3 pivotPosition = target.position + pivotOffset;
-
-        // 카메라가 뒤로 빠지는 방향 (로컬 -Z를 월드로 변환)
         Vector3 armDirection = camRotation * Vector3.back;
-
         float finalDistance = currentDistance;
 
-        // 피벗에서 카메라 방향으로 SphereCast를 쏴서 중간에 벽이 있는지 검사
         if (Physics.SphereCast(pivotPosition, collisionRadius, armDirection, out RaycastHit hit, currentDistance, collisionMask, QueryTriggerInteraction.Ignore))
         {
-            // 캐릭터 자신의 콜라이더는 무시 (collisionMask에서 Player 레이어를 뺐다면 애초에 안 걸리지만, 이중 안전장치)
             if (hit.transform != target && !hit.transform.IsChildOf(target))
             {
                 finalDistance = Mathf.Clamp(hit.distance - collisionBuffer, minCollisionDistance, currentDistance);
