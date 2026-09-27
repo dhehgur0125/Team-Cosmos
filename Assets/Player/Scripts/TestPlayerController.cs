@@ -1,7 +1,9 @@
 ﻿using UnityEngine;
+using Unity.Netcode; // 🌟 [멀티플레이 추가]
 
 [RequireComponent(typeof(CharacterController))]
-public class TestPlayerController : MonoBehaviour
+// 🌟 [멀티플레이 추가] MonoBehaviour -> NetworkBehaviour 변경
+public class TestPlayerController : NetworkBehaviour 
 {
     private Animator animator;
     private CharacterController controller;
@@ -21,8 +23,6 @@ public class TestPlayerController : MonoBehaviour
     public ShoulderCamera shoulderCam;
 
     [Header("Ground Check (GC-free)")]
-    // Physics.RaycastAll은 호출할 때마다 배열을 새로 할당해서 GC 스파이크를 유발합니다.
-    // 미리 할당해둔 버퍼에 결과를 채우는 RaycastNonAlloc으로 대체했습니다.
     private RaycastHit[] groundHitsBuffer = new RaycastHit[8];
 
     private Quaternion lastStableRotation;
@@ -33,22 +33,37 @@ public class TestPlayerController : MonoBehaviour
         controller = GetComponent<CharacterController>();
         lastStableRotation = transform.rotation;
 
-        // 코드에서도 강제로 꺼서, 실수로 Inspector에서 다시 켜지는 것을 방지합니다.
-        // CharacterController.Move()로 이동/점프를 전부 담당하고 있으므로
-        // 애니메이션은 위치를 절대 건드리지 않아야 카메라가 여러 번 점프하는 것처럼 튀지 않습니다.
         if (animator != null)
         {
             animator.applyRootMotion = false;
         }
+    }
 
-        if (shoulderCam == null && Camera.main != null)
+    // 🌟 [멀티플레이 추가] 플레이어가 스폰될 때 실행되는 네트워크 전용 콜백
+    public override void OnNetworkSpawn()
+    {
+        if (IsOwner)
         {
-            shoulderCam = Camera.main.GetComponent<ShoulderCamera>();
+            if (Camera.main != null)
+            {
+                shoulderCam = Camera.main.GetComponent<ShoulderCamera>();
+            }
+        }
+
+        // 🌟 [추가] 오직 서버(호스트)에서만 스폰 위치의 Y축을 강제로 높여줌
+        if (IsServer)
+        {
+            Vector3 spawnPos = transform.position;
+            spawnPos.y += 5.0f; // 원하는 만큼 높이 추가 (예: 5 미터 위)
+            transform.position = spawnPos;
         }
     }
 
     void Update()
     {
+        // 🌟 [멀티플레이 핵심] 내 캐릭터가 아니면 입력을 받지 않고 그냥 빠져나감 (무시)
+        if (!IsOwner) return;
+
         UpdateGroundedState();
 
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
@@ -118,7 +133,6 @@ public class TestPlayerController : MonoBehaviour
         Vector3 rayOrigin = transform.position + Vector3.up * 0.15f;
         float rayDistance = 0.25f;
 
-        // NonAlloc 버전: 매 프레임 배열을 새로 할당하지 않아 GC 압박이 없습니다.
         int hitCount = Physics.RaycastNonAlloc(
             rayOrigin,
             Vector3.down,
@@ -144,7 +158,6 @@ public class TestPlayerController : MonoBehaviour
             isGrounded = true;
             if (verticalVelocity < 0)
             {
-                // -4f는 다소 과했던 값이라 -2f로 완화했습니다. (지면 밀착 목적이면 이 정도로 충분)
                 verticalVelocity = -2f;
             }
         }

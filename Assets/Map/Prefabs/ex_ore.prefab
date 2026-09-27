@@ -682,6 +682,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2707550749597972116}
   - component: {fileID: 2208090448045485913}
+  - component: {fileID: 6416307895232553253}
   m_Layer: 0
   m_Name: ex_ore
   m_TagString: Untagged
@@ -734,6 +735,33 @@ MonoBehaviour:
   - {fileID: 6869463136349258579}
   - {fileID: 8022750603291552022}
   - {fileID: 7697063013631492837}
+--- !u!114 &6416307895232553253
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3588756349937272017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  m_InScenePlaced: 0
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!1 &3651297304877497081
 GameObject:
   m_ObjectHideFlags: 0

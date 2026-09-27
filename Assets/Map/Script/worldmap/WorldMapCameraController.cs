@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unity.Netcode; // 🌟 [멀티플레이 추가]
 
 [RequireComponent(typeof(Camera))]
 public class WorldMapCameraController : MonoBehaviour
@@ -52,6 +53,16 @@ public class WorldMapCameraController : MonoBehaviour
     {
         isOpen = true;
         mapCam.enabled = true;
+
+        // 🌟 [멀티플레이 추가] 플레이어가 할당되지 않았다면 로컬 플레이어 자동 검색
+        if (player == null && NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        {
+            var localPlayerObj = NetworkManager.Singleton.LocalClient.PlayerObject;
+            if (localPlayerObj != null)
+            {
+                player = localPlayerObj.transform;
+            }
+        }
 
         if (player != null)
         {

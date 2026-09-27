@@ -1,8 +1,10 @@
 ﻿using UnityEngine;
+using Unity.Netcode; // 🌟 [멀티플레이 추가]
 
-public class ShoulderCamera : MonoBehaviour
+public class ShoulderCamera : MonoBehaviour // MonoBehaviour 유지
 {
     [Header("Target Settings")]
+    [Tooltip("멀티플레이에서는 비워두면 자동으로 로컬 플레이어를 찾습니다.")]
     public Transform target;                  // 플레이어 최상위 루트 오브젝트
 
     [Header("Camera Offsets")]
@@ -39,16 +41,14 @@ public class ShoulderCamera : MonoBehaviour
     private float yaw = 0f;
     public float GetYaw() => yaw;
 
-    // 🌟 월드맵 등 UI 열림 시 카메라 입력 및 커서 재잠금 차단 플래그
     [HideInInspector]
     public bool inputBlocked = false;
 
+    private bool isTargetInitialized = false; // 🌟 타겟 초기화 체크용 플래그
+
     void Start()
     {
-        if (target != null)
-        {
-            yaw = target.eulerAngles.y;
-        }
+        // 🌟 Start에서는 타겟이 아직 없을 수 있으므로 yaw 초기화는 LateUpdate로 미룹니다.
         currentShoulderX = shoulderOffsetX;
         targetShoulderX = shoulderOffsetX;
         currentDistance = defaultDistance;
@@ -57,7 +57,6 @@ public class ShoulderCamera : MonoBehaviour
 
     void Update()
     {
-        // 월드맵이 켜져 있을 땐 마우스 클릭 시 커서 재잠금 방지 & 카메라 입력 무시
         if (inputBlocked) return;
 
         if (Input.GetKeyDown(KeyCode.Escape)) UnlockCursor();
@@ -85,9 +84,27 @@ public class ShoulderCamera : MonoBehaviour
 
     void LateUpdate()
     {
-        if (target == null) return;
+        // 🌟 [멀티플레이 추가] 로컬 플레이어 자동 할당 로직
+        if (target == null)
+        {
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+            {
+                var localPlayerObj = NetworkManager.Singleton.LocalClient.PlayerObject;
+                if (localPlayerObj != null)
+                {
+                    target = localPlayerObj.transform;
+                }
+            }
+            if (target == null) return;
+        }
 
-        // 입력이 차단되지 않고 커서가 잠겨 있을 때만 마우스 회전 반영
+        // 🌟 타겟을 처음 찾았을 때 카메라 방향을 플레이어 등짝에 맞춤
+        if (!isTargetInitialized)
+        {
+            yaw = target.eulerAngles.y;
+            isTargetInitialized = true;
+        }
+
         if (!inputBlocked && Cursor.lockState == CursorLockMode.Locked)
         {
             yaw += Input.GetAxis("Mouse X") * mouseSensitivity;

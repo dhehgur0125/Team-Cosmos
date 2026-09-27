@@ -1,31 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Netcode; // 🌟 [멀티플레이 변경] Netcode 네임스페이스 추가
 
 [RequireComponent(typeof(OreGenerator))]
-public class WorldManager : MonoBehaviour
+public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] MonoBehaviour -> NetworkBehaviour로 변경
 {
     // ============================================================
     // 플레이어 & 로봇
     // ============================================================
 
-    [Header("플레이어")]
-    public Transform player;
+    // 🌟 [멀티플레이 변경] 단일 플레이어(Transform player) 변수 삭제
+    // 멀티플레이에서는 NetworkManager를 통해 접속한 모든 유저를 동적으로 추적합니다.
 
     [Header("자동화 로봇")]
     public Transform[] bots;
 
 
     // ============================================================
-    // 월드맵 카메라 연동 (신규 추가)
+    // 월드맵 카메라 연동
     // ============================================================
 
     [Header("월드맵 카메라 연동")]
-    [Tooltip("지도를 비추는 WorldMap Camera의 Transform")]
     public Transform worldMapCameraTransform;
-
-    [Tooltip("월드맵 카메라 화면을 채울 기본 청크 반경")]
     public int mapCameraRenderDistance = 4;
-
     private bool isMapOpen = false;
 
 
@@ -34,15 +31,12 @@ public class WorldManager : MonoBehaviour
     // ============================================================
 
     [Header("시작 구역 3x3 평지 청크 설정")]
-    [Tooltip("중심 3x3(-1~1) 구역에 고정 생성될 기본 평지 청크 프리팹")]
     public GameObject starterFlatChunkPrefab;
-
-    [Tooltip("3x3 시작 구역에도 기본 광물을 스폰할지 여부")]
     public bool spawnOresInStarterArea = true;
 
 
     // ============================================================
-    // 청크 등급 및 프리팹 (ChunkSelector 통합)
+    // 청크 등급 및 프리팹
     // ============================================================
 
     [System.Serializable]
@@ -119,11 +113,16 @@ public class WorldManager : MonoBehaviour
 
     void Start()
     {
-        UpdateChunks();
+        // 🌟 [멀티플레이 변경] Start에서는 아무것도 하지 않습니다. 
+        // 네트워크 연결(OnNetworkSpawn) 이후에 업데이트가 시작되어야 합니다.
     }
 
     void Update()
     {
+        // 🌟 [멀티플레이 변경] 호스트(서버)가 아니면 청크 계산 로직을 돌리지 않고 종료!
+        // 오직 방장 컴퓨터에서만 맵을 생성하고 관리합니다.
+        if (!IsServer) return; 
+
         UpdateChunks();
     }
 
@@ -135,27 +134,33 @@ public class WorldManager : MonoBehaviour
     public void SetMapOpenState(bool open)
     {
         isMapOpen = open;
-        UpdateChunks();
+        if (IsServer) UpdateChunks(); // 서버일 때만 갱신
     }
 
 
     // ============================================================
-    // 청크 로드/언로드 관리 (플레이어 + 봇 + 월드맵 카메라)
+    // 청크 로드/언로드 관리 (플레이어 다수 + 봇 + 월드맵 카메라)
     // ============================================================
 
     void UpdateChunks()
     {
         HashSet<Vector2Int> requiredChunks = new HashSet<Vector2Int>();
 
-        // 1. 플레이어 주변 청크 (항상 로드 & 탐험 기록)
-        if (player != null)
+        // 🌟 [멀티플레이 변경] 1. 접속한 '모든' 플레이어의 주변 청크를 계산
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
         {
-            Vector2Int playerChunk = GetChunkCoord(player.position);
-            AddRequiredChunks(playerChunk, playerRenderDistance, requiredChunks);
-            MarkDiscovered(playerChunk, playerRenderDistance);
+            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+            {
+                if (client.PlayerObject != null)
+                {
+                    Vector2Int playerChunk = GetChunkCoord(client.PlayerObject.transform.position);
+                    AddRequiredChunks(playerChunk, playerRenderDistance, requiredChunks);
+                    MarkDiscovered(playerChunk, playerRenderDistance);
+                }
+            }
         }
 
-        // 2. 자동화 로봇 주변 청크 (항상 로드 & 탐험 기록)
+        // 2. 자동화 로봇 주변 청크
         if (bots != null)
         {
             foreach (Transform bot in bots)
@@ -167,7 +172,7 @@ public class WorldManager : MonoBehaviour
             }
         }
 
-        // 3. 🌟 [수정] 월드맵 카메라: '이미 탐험한(discoveredChunks)' 청크만 선별 로드
+        // 3. 월드맵 카메라 구역 (서버 기준 글로벌 탐험 기록 공유)
         if (isMapOpen && worldMapCameraTransform != null)
         {
             Vector2Int mapCamChunk = GetChunkCoord(worldMapCameraTransform.position);
@@ -177,8 +182,6 @@ public class WorldManager : MonoBehaviour
                 for (int z = -mapCameraRenderDistance; z <= mapCameraRenderDistance; z++)
                 {
                     Vector2Int targetCoord = new Vector2Int(mapCamChunk.x + x, mapCamChunk.y + z);
-
-                    // 🌟 핵심 조건: 플레이어나 로봇이 가본 적이 있는 청크만 로딩 요구 목록에 포함!
                     if (discoveredChunks.Contains(targetCoord))
                     {
                         requiredChunks.Add(targetCoord);
@@ -238,106 +241,73 @@ public class WorldManager : MonoBehaviour
 
 
     // ============================================================
-    // 청크 선택 로직 (Pity 및 등급 가중치)
+    // 청크 선택 로직
     // ============================================================
 
     int SelectGrade(System.Random random)
     {
-        if (chunkGrades == null || chunkGrades.Length == 0)
-        {
-            Debug.LogError("Chunk Grades가 설정되지 않았습니다.");
-            return -1;
-        }
-
+        // (기존 확률 및 천장 로직 동일 유지)
+        if (chunkGrades == null || chunkGrades.Length == 0) return -1;
         float totalProbability = 0f;
         float[] adjustedProbabilities = new float[chunkGrades.Length];
-
         for (int i = 0; i < chunkGrades.Length; i++)
         {
             ChunkGrade grade = chunkGrades[i];
             if (grade == null) continue;
-
             float probability = grade.probability;
             int failureCount = gradeFailureCounts.ContainsKey(i) ? gradeFailureCounts[i] : 0;
-
             if (grade.pityCount > 0)
             {
                 int increaseCount = failureCount / grade.pityCount;
                 probability += increaseCount * grade.probabilityIncrease;
             }
-
             probability = Mathf.Min(probability, grade.maxProbability);
             adjustedProbabilities[i] = probability;
             totalProbability += probability;
         }
 
-        if (totalProbability <= 0f)
-        {
-            Debug.LogError("등급 확률의 합이 0입니다.");
-            return -1;
-        }
-
+        if (totalProbability <= 0f) return -1;
         double randomValue = random.NextDouble() * totalProbability;
         float currentProbability = 0f;
-
         for (int i = 0; i < chunkGrades.Length; i++)
         {
             if (chunkGrades[i] == null) continue;
-
             currentProbability += adjustedProbabilities[i];
-
             if (randomValue < currentProbability)
             {
                 gradeFailureCounts[i] = 0;
-
                 for (int j = 0; j < chunkGrades.Length; j++)
                 {
                     if (j == i || chunkGrades[j] == null) continue;
                     if (!gradeFailureCounts.ContainsKey(j)) gradeFailureCounts[j] = 0;
                     gradeFailureCounts[j]++;
                 }
-
                 return i;
             }
         }
-
         return -1;
     }
 
     GameObject SelectChunkFromGrade(int gradeIndex, System.Random random)
     {
         if (gradeIndex < 0 || gradeIndex >= chunkGrades.Length) return null;
-
         ChunkGrade grade = chunkGrades[gradeIndex];
         if (grade == null || grade.chunks == null || grade.chunks.Length == 0) return null;
-
         float totalProbability = 0f;
         foreach (ChunkPrefabData data in grade.chunks)
         {
             if (data == null || data.prefab == null) continue;
             totalProbability += data.probability;
         }
-
-        if (totalProbability <= 0f)
-        {
-            Debug.LogError("선택된 등급의 청크 확률 합이 0입니다.\n등급: " + grade.gradeName);
-            return null;
-        }
-
+        if (totalProbability <= 0f) return null;
         double randomValue = random.NextDouble() * totalProbability;
         float currentProbability = 0f;
-
         foreach (ChunkPrefabData data in grade.chunks)
         {
             if (data == null || data.prefab == null) continue;
-
             currentProbability += data.probability;
-            if (randomValue < currentProbability)
-            {
-                return data.prefab;
-            }
+            if (randomValue < currentProbability) return data.prefab;
         }
-
         return null;
     }
 
@@ -345,7 +315,6 @@ public class WorldManager : MonoBehaviour
     {
         int gradeIndex = SelectGrade(random);
         if (gradeIndex < 0) return null;
-
         return SelectChunkFromGrade(gradeIndex, random);
     }
 
@@ -384,24 +353,22 @@ public class WorldManager : MonoBehaviour
 
             if (selectedPrefab == null)
             {
-                Debug.LogError("생성할 청크 프리팹을 선택하지 못했습니다.");
                 chunkData.Remove(coord);
                 return;
             }
 
             newData.chunkPrefabId = selectedPrefab.name;
+            Vector3 targetPosition = new Vector3((coord.x + 0.5f) * chunkSize, 0f, (coord.y + 0.5f) * chunkSize);
 
-            Vector3 targetPosition = new Vector3(
-                (coord.x + 0.5f) * chunkSize,
-                0f,
-                (coord.y + 0.5f) * chunkSize
-            );
-
-            GameObject obj = Instantiate(
-                selectedPrefab,
-                targetPosition,
-                Quaternion.Euler(0, newData.rotationY, 0)
-            );
+            // 서버에서 오브젝트 생성
+            GameObject obj = Instantiate(selectedPrefab, targetPosition, Quaternion.Euler(0, newData.rotationY, 0));
+            
+            // 🌟 [멀티플레이 변경] 생성된 청크를 모든 클라이언트에게 전송(동기화)
+            NetworkObject netObj = obj.GetComponent<NetworkObject>();
+            if (netObj != null) 
+                netObj.Spawn();
+            else 
+                Debug.LogWarning($"[경고] {selectedPrefab.name} 프리팹에 NetworkObject 컴포넌트가 없습니다!");
 
             Chunk chunk = SetupChunk(obj, coord);
 
@@ -411,18 +378,7 @@ public class WorldManager : MonoBehaviour
                 oreGenerator.GenerateOres(coord, chunk, random, SaveObjectToChunk);
             }
 
-            // 🌟 [핵심 변경] 월드맵이 켜져 있을 때는 연출 생략, 닫혀 있을 때만 솟아오름 연출 실행
-            if (isMapOpen)
-            {
-                obj.transform.position = targetPosition; // 즉시 제자리 고정
-            }
-            else
-            {
-                ChunkAppearance appearance = obj.GetComponent<ChunkAppearance>();
-                if (appearance == null) appearance = obj.AddComponent<ChunkAppearance>();
-                appearance.PlaySpawnAnimation(targetPosition);
-            }
-
+            PlayChunkAppearance(obj, targetPosition);
             return;
         }
 
@@ -431,37 +387,32 @@ public class WorldManager : MonoBehaviour
         // ------------------------------------------------------------
         ChunkData data = chunkData[coord];
         GameObject savedPrefab = GetChunkPrefabByID(data.chunkPrefabId);
+        if (savedPrefab == null) return;
 
-        if (savedPrefab == null)
-        {
-            Debug.LogError("저장된 청크 프리팹을 찾을 수 없습니다: " + data.chunkPrefabId);
-            return;
-        }
-
-        Vector3 restorePosition = new Vector3(
-            (coord.x + 0.5f) * chunkSize,
-            0f,
-            (coord.y + 0.5f) * chunkSize
-        );
-
-        GameObject savedObj = Instantiate(
-            savedPrefab,
-            restorePosition,
-            Quaternion.Euler(0, data.rotationY, 0)
-        );
+        Vector3 restorePosition = new Vector3((coord.x + 0.5f) * chunkSize, 0f, (coord.y + 0.5f) * chunkSize);
+        GameObject savedObj = Instantiate(savedPrefab, restorePosition, Quaternion.Euler(0, data.rotationY, 0));
+        
+        // 🌟 [멀티플레이 변경] 복구된 청크도 네트워크에 스폰
+        NetworkObject savedNetObj = savedObj.GetComponent<NetworkObject>();
+        if (savedNetObj != null) 
+            savedNetObj.Spawn();
 
         SetupChunk(savedObj, coord);
-
-        // 🌟 [핵심 변경] 기존 복구 청크도 월드맵 상태에서는 애니메이션 스킵
+        PlayChunkAppearance(savedObj, restorePosition);
+    }
+    
+    // 연출 분리용 헬퍼 함수
+    private void PlayChunkAppearance(GameObject obj, Vector3 targetPosition)
+    {
         if (isMapOpen)
         {
-            savedObj.transform.position = restorePosition; // 즉시 제자리 고정
+            obj.transform.position = targetPosition;
         }
         else
         {
-            ChunkAppearance restoreAppearance = savedObj.GetComponent<ChunkAppearance>();
-            if (restoreAppearance == null) restoreAppearance = savedObj.AddComponent<ChunkAppearance>();
-            restoreAppearance.PlaySpawnAnimation(restorePosition);
+            ChunkAppearance appearance = obj.GetComponent<ChunkAppearance>();
+            if (appearance == null) appearance = obj.AddComponent<ChunkAppearance>();
+            appearance.PlaySpawnAnimation(targetPosition);
         }
     }
 
@@ -473,50 +424,41 @@ public class WorldManager : MonoBehaviour
     Chunk SetupChunk(GameObject obj, Vector2Int coord)
     {
         if (obj == null) return null;
-
         Chunk chunk = obj.GetComponent<Chunk>();
         if (chunk == null)
         {
-            Debug.LogError("청크 프리팹에 Chunk.cs가 없습니다: " + obj.name);
             Destroy(obj);
             return null;
         }
-
         chunk.Initialize(coord);
         loadedChunks.Add(coord, chunk);
-
         RestoreChunkData(coord, chunk);
-
         return chunk;
     }
 
     void RestoreChunkData(Vector2Int coord, Chunk chunk)
     {
         if (!chunkData.ContainsKey(coord)) return;
-
         ChunkData data = chunkData[coord];
 
         foreach (PlacedObjectData objectData in data.placedObjects)
         {
             GameObject prefab = GetPrefabByID(objectData.prefabId);
-            if (prefab == null && oreGenerator != null)
-            {
-                prefab = oreGenerator.GetOrePrefabByID(objectData.prefabId);
-            }
+            if (prefab == null && oreGenerator != null) prefab = oreGenerator.GetOrePrefabByID(objectData.prefabId);
+            if (prefab == null) continue;
 
-            if (prefab == null)
-            {
-                Debug.LogWarning("프리팹을 찾을 수 없습니다: " + objectData.prefabId);
-                continue;
-            }
+            GameObject obj = Instantiate(prefab, objectData.GetPosition(), Quaternion.Euler(objectData.rotX, objectData.rotY, objectData.rotZ));
+            
+            // 🌟 [멀티플레이 변경] 복구된 건물/광물 오브젝트 네트워크 스폰
+            NetworkObject netObj = obj.GetComponent<NetworkObject>();
+            if (netObj != null) netObj.Spawn();
 
-            GameObject obj = Instantiate(
-                prefab,
-                objectData.GetPosition(),
-                Quaternion.Euler(objectData.rotX, objectData.rotY, objectData.rotZ)
-            );
-
-            obj.transform.SetParent(chunk.transform);
+            // 주의: 네트워크 객체는 부모(Parent)를 지정할 때 특별한 제약이 있을 수 있습니다.
+            // NetworkObject의 부모 설정은 NetworkObject.TrySetParent()를 사용하는 것이 좋습니다.
+            if (netObj != null && chunk.GetComponent<NetworkObject>() != null)
+                netObj.TrySetParent(chunk.transform);
+            else
+                obj.transform.SetParent(chunk.transform);
         }
     }
 
@@ -529,35 +471,24 @@ public class WorldManager : MonoBehaviour
     {
         if (starterFlatChunkPrefab != null && starterFlatChunkPrefab.name == id) return starterFlatChunkPrefab;
         if (string.IsNullOrEmpty(id) || chunkGrades == null) return null;
-
         foreach (ChunkGrade grade in chunkGrades)
         {
             if (grade == null || grade.chunks == null) continue;
-
             foreach (ChunkPrefabData data in grade.chunks)
             {
-                if (data != null && data.prefab != null && data.prefab.name == id)
-                {
-                    return data.prefab;
-                }
+                if (data != null && data.prefab != null && data.prefab.name == id) return data.prefab;
             }
         }
-
         return null;
     }
 
     GameObject GetPrefabByID(string id)
     {
         if (buildingPrefabs == null) return null;
-
         foreach (BuildingPrefabData data in buildingPrefabs)
         {
-            if (data != null && data.id == id)
-            {
-                return data.prefab;
-            }
+            if (data != null && data.id == id) return data.prefab;
         }
-
         return null;
     }
 
@@ -569,7 +500,6 @@ public class WorldManager : MonoBehaviour
     void RemoveUnnecessaryChunks(HashSet<Vector2Int> requiredChunks)
     {
         List<Vector2Int> removeList = new List<Vector2Int>();
-
         foreach (var pair in loadedChunks)
         {
             if (!requiredChunks.Contains(pair.Key))
@@ -580,7 +510,19 @@ public class WorldManager : MonoBehaviour
 
         foreach (Vector2Int coord in removeList)
         {
-            Destroy(loadedChunks[coord].gameObject);
+            GameObject chunkObj = loadedChunks[coord].gameObject;
+            
+            // 🌟 [멀티플레이 변경] 단순 Destroy 대신 NetworkObject.Despawn 호출 (서버가 클라이언트들에게 파괴 명령)
+            NetworkObject netObj = chunkObj.GetComponent<NetworkObject>();
+            if (netObj != null && netObj.IsSpawned)
+            {
+                netObj.Despawn(); 
+            }
+            else
+            {
+                Destroy(chunkObj);
+            }
+            
             loadedChunks.Remove(coord);
         }
     }
@@ -588,22 +530,11 @@ public class WorldManager : MonoBehaviour
     public void SaveObjectToChunk(Vector2Int coord, string prefabId, GameObject obj)
     {
         if (obj == null) return;
-
-        if (!chunkData.ContainsKey(coord))
-        {
-            chunkData.Add(coord, new ChunkData(coord));
-        }
-
+        if (!chunkData.ContainsKey(coord)) chunkData.Add(coord, new ChunkData(coord));
         Vector3 rot = obj.transform.eulerAngles;
-        chunkData[coord].placedObjects.Add(
-            new PlacedObjectData(prefabId, obj.transform.position, rot.x, rot.y, rot.z)
-        );
+        chunkData[coord].placedObjects.Add(new PlacedObjectData(prefabId, obj.transform.position, rot.x, rot.y, rot.z));
     }
 
-    public ChunkData GetChunkData(Vector2Int coord)
-    {
-        return chunkData.ContainsKey(coord) ? chunkData[coord] : null;
-    }
-
+    public ChunkData GetChunkData(Vector2Int coord) => chunkData.ContainsKey(coord) ? chunkData[coord] : null;
     public HashSet<Vector2Int> GetDiscoveredChunks() => discoveredChunks;
 }

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Netcode; // 🌟 [멀티플레이 변경] Netcode 네임스페이스 추가
 
-public class OreGenerator : MonoBehaviour
+// 🌟 [멀티플레이 변경] MonoBehaviour -> NetworkBehaviour로 변경
+public class OreGenerator : NetworkBehaviour 
 {
     // ============================================================
     // 광물 데이터 정의
@@ -15,9 +17,7 @@ public class OreGenerator : MonoBehaviour
         public GameObject prefab;
 
         [Header("등장 거리 조건 (청크 거리 단위)")]
-        [Tooltip("원점(0,0)으로부터 최소 몇 청크 떨어져야 등장하는지")]
         public float minChunkDistance = 0f;
-        [Tooltip("최대 몇 청크 거리까지 등장하는지 (999는 무제한)")]
         public float maxChunkDistance = 999f;
 
         [Header("가중치 (높을수록 잘 나옴)")]
@@ -42,7 +42,7 @@ public class OreGenerator : MonoBehaviour
 
 
     // ============================================================
-    // 메인 광물 생성 함수
+    // 메인 광물 생성 함수 (WorldManager의 서버 로직에서만 호출됨)
     // ============================================================
 
     public void GenerateOres(Vector2Int coord, Chunk chunk, System.Random random, Action<Vector2Int, string, GameObject> onSaveOre)
@@ -66,14 +66,11 @@ public class OreGenerator : MonoBehaviour
         // 3. 광맥(Cluster) 단위로 순회 스폰
         while (currentSpawned < targetSpawnCount && availablePoints.Count > 0)
         {
-            // 가중치 기반 단일 광물 추첨
             OreData chosenOre = PickWeightedOre(eligibleOres, random);
             if (chosenOre == null || chosenOre.prefab == null) break;
 
-            // 광맥 크기 결정
             int veinSize = random.Next(chosenOre.veinSizeMin, chosenOre.veinSizeMax + 1);
 
-            // 광맥의 시작 중심 포인트 선택
             int startIdx = random.Next(0, availablePoints.Count);
             Transform currentPoint = availablePoints[startIdx];
             availablePoints.RemoveAt(startIdx);
@@ -81,7 +78,6 @@ public class OreGenerator : MonoBehaviour
             SpawnSingleOre(coord, chunk, chosenOre, currentPoint, random, onSaveOre);
             currentSpawned++;
 
-            // 광맥(Vein) 추가 생성: 시작 포인트와 물리적으로 가장 가까운 주변 포인트를 연속 선택
             for (int v = 1; v < veinSize; v++)
             {
                 if (availablePoints.Count == 0 || currentSpawned >= targetSpawnCount) break;
@@ -92,28 +88,51 @@ public class OreGenerator : MonoBehaviour
 
                 SpawnSingleOre(coord, chunk, chosenOre, nearestPoint, random, onSaveOre);
                 currentSpawned++;
-                currentPoint = nearestPoint; // 다음 광맥 확장의 기준점
+                currentPoint = nearestPoint; 
             }
         }
     }
 
 
     // ============================================================
-    // 개별 광물 인스턴스화 (랜덤 스케일 및 회전 편차 적용)
+    // 개별 광물 인스턴스화 (랜덤 스케일 및 회전 편차 적용 + 네트워크 스폰)
     // ============================================================
 
     private void SpawnSingleOre(Vector2Int coord, Chunk chunk, OreData oreData, Transform point, System.Random random, Action<Vector2Int, string, GameObject> onSaveOre)
     {
-        // Y축 랜덤 회전 편차 (자연스러운 외형)
+        // Y축 랜덤 회전 편차 및 스케일 계산
         float randomYAngle = (float)(random.NextDouble() * 360.0);
         Quaternion finalRotation = point.rotation * Quaternion.Euler(0f, randomYAngle, 0f);
-
-        // 스케일 편차
         float randomScale = (float)(minScale + random.NextDouble() * (maxScale - minScale));
 
+        // 1. 서버 메모리상에 오브젝트 생성
         GameObject oreObj = Instantiate(oreData.prefab, point.position, finalRotation);
         oreObj.transform.localScale = Vector3.one * randomScale;
-        oreObj.transform.SetParent(chunk.transform);
+
+        // 🌟 [멀티플레이 변경] 생성된 광물을 클라이언트들에게 동기화(Spawn) 및 부모 설정
+        NetworkObject netObj = oreObj.GetComponent<NetworkObject>();
+        if (netObj != null)
+        {
+            // 클라이언트 화면에 나타나도록 네트워크 스폰 명령
+            netObj.Spawn();
+
+            // NGO에서는 NetworkObject가 붙은 오브젝트끼리 부모/자식 관계를 맺을 때 TrySetParent를 사용해야 합니다.
+            NetworkObject chunkNetObj = chunk.GetComponent<NetworkObject>();
+            if (chunkNetObj != null && chunkNetObj.IsSpawned)
+            {
+                netObj.TrySetParent(chunk.transform);
+            }
+            else
+            {
+                // Fallback (예외 상황 처리)
+                oreObj.transform.SetParent(chunk.transform);
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[경고] {oreData.prefab.name} 프리팹에 NetworkObject 컴포넌트가 없습니다! 동기화되지 않습니다.");
+            oreObj.transform.SetParent(chunk.transform);
+        }
 
         // 세이브 데이터에 등록
         onSaveOre?.Invoke(coord, oreData.prefab.name, oreObj);
@@ -121,7 +140,7 @@ public class OreGenerator : MonoBehaviour
 
 
     // ============================================================
-    // 거리(티어) 필터링 & 가중치 추첨
+    // 거리(티어) 필터링 & 가중치 추첨 (이하 로직은 기존과 동일)
     // ============================================================
 
     private List<OreData> GetEligibleOres(float distance)
