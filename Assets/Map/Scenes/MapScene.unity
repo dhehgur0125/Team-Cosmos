@@ -937,7 +937,7 @@ Camera:
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 55
+    m_Bits: 183
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -1038,6 +1038,9 @@ MonoBehaviour:
   collisionRadius: 0.25
   collisionBuffer: 0.15
   minCollisionDistance: 0.2
+  firstPersonVisibleLayers:
+    serializedVersion: 2
+    m_Bits: 128
   isFirstPerson: 0
   inputBlocked: 0
 --- !u!1 &1101913165
