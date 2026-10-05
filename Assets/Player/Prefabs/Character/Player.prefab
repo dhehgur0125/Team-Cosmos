@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1085117291072153899
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 451449637656137570}
+  m_Layer: 7
+  m_Name: MuzzlePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &451449637656137570
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1085117291072153899}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: -0.0591, y: 0.4936, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2534285733839206894}
+  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
 --- !u!1 &7324993910276128119
 GameObject:
   m_ObjectHideFlags: 0
@@ -29,7 +60,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 4148373317934200004}
+  - {fileID: 2534285733839206894}
   m_Father: {fileID: 8326479883422566157}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7621213699471952816
@@ -48,6 +79,7 @@ GameObject:
   - component: {fileID: 7066000733860863459}
   - component: {fileID: 1610080536174897483}
   - component: {fileID: 7379277698884072478}
+  - component: {fileID: 5184736941399935301}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -224,7 +256,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponSlot
   ShowTopMostFoldoutHeaderGroup: 1
   slots:
-  - {fileID: 7768763786913196380}
+  - {fileID: 8508817582977545166}
   - {fileID: 0}
   - {fileID: 0}
 --- !u!114 &7379277698884072478
@@ -244,6 +276,26 @@ MonoBehaviour:
   hipSpread: 3
   shoulderSpread: 1
   precisionSpread: 0.2
+--- !u!114 &5184736941399935301
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7621213699471952816}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f5d634171dac354cb6f5807a4672992, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GunFire
+  ShowTopMostFoldoutHeaderGroup: 1
+  muzzlePoint: {fileID: 451449637656137570}
+  roundsPerMinute: 600
+  maxDistance: 200
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  tracerPrefab: {fileID: 3278156858547463519, guid: e55fa60c4417aa94fb9646d5d69e51b0, type: 3}
 --- !u!1 &7768763786913196380
 GameObject:
   m_ObjectHideFlags: 0
@@ -256,12 +308,12 @@ GameObject:
   - component: {fileID: 5880379572291053238}
   - component: {fileID: 622885927210803639}
   m_Layer: 7
-  m_Name: Slot1_PrimaryWeapon
+  m_Name: Model
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &4148373317934200004
 Transform:
   m_ObjectHideFlags: 0
@@ -270,12 +322,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7768763786913196380}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.039, y: 0.209, z: 0}
-  m_LocalScale: {x: 0.11443, y: 0.57268, z: 0.067297}
+  m_LocalRotation: {x: -0.000000033527602, y: 0.000000004656611, z: 0.000000013184031, w: 1}
+  m_LocalPosition: {x: -0.039000116, y: 0.20899999, z: 0}
+  m_LocalScale: {x: 0.11443, y: 0.57268, z: 0.06729699}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4315604905847817640}
+  m_Father: {fileID: 2534285733839206894}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &5880379572291053238
 MeshFilter:
@@ -334,6 +386,39 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &8508817582977545166
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2534285733839206894}
+  m_Layer: 7
+  m_Name: AutomaticRifle
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &2534285733839206894
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8508817582977545166}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 4148373317934200004}
+  - {fileID: 451449637656137570}
+  m_Father: {fileID: 4315604905847817640}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &3688577858548787336
 PrefabInstance:
   m_ObjectHideFlags: 0
