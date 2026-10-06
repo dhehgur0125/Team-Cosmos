@@ -1,43 +1,21 @@
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Netcode; // 🌟 [멀티플레이 변경] Netcode 네임스페이스 추가
+using Unity.Netcode;
 
 [RequireComponent(typeof(OreGenerator))]
-public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] MonoBehaviour -> NetworkBehaviour로 변경
+public class WorldManager : NetworkBehaviour
 {
-    // ============================================================
-    // 플레이어 & 로봇
-    // ============================================================
-
-    // 🌟 [멀티플레이 변경] 단일 플레이어(Transform player) 변수 삭제
-    // 멀티플레이에서는 NetworkManager를 통해 접속한 모든 유저를 동적으로 추적합니다.
-
     [Header("자동화 로봇")]
     public Transform[] bots;
-
-
-    // ============================================================
-    // 월드맵 카메라 연동
-    // ============================================================
 
     [Header("월드맵 카메라 연동")]
     public Transform worldMapCameraTransform;
     public int mapCameraRenderDistance = 4;
     private bool isMapOpen = false;
 
-
-    // ============================================================
-    // 시작 구역 3x3 평지 청크 설정
-    // ============================================================
-
     [Header("시작 구역 3x3 평지 청크 설정")]
     public GameObject starterFlatChunkPrefab;
     public bool spawnOresInStarterArea = true;
-
-
-    // ============================================================
-    // 청크 등급 및 프리팹
-    // ============================================================
 
     [System.Serializable]
     public class ChunkPrefabData
@@ -62,11 +40,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
 
     private Dictionary<int, int> gradeFailureCounts = new Dictionary<int, int>();
 
-
-    // ============================================================
-    // 건물 프리팹 데이터
-    // ============================================================
-
     [System.Serializable]
     public class BuildingPrefabData
     {
@@ -77,76 +50,99 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
     [Header("건물 프리팹")]
     public BuildingPrefabData[] buildingPrefabs;
 
-
-    // ============================================================
-    // 청크 및 월드 설정
-    // ============================================================
-
-    [Header("청크 설정")]
+    [Header("청크 및 월드 설정")]
     public int chunkSize = 32;
     public int playerRenderDistance = 2;
     public int botRenderDistance = 0;
-
-    [Header("월드 설정")]
     public int worldSeed = 12345;
 
-
-    // ============================================================
-    // 내부 데이터 & 컴포넌트 참조
-    // ============================================================
+    // 🌟 [추가됨] 고정 맵 크기 설정
+    [Header("고정 맵 설정")]
+    [Tooltip("맵의 반경 (예: 50이면 -50~50까지 총 100x100 맵 생성)")]
+    public int mapRadius = 50;
 
     private Dictionary<Vector2Int, Chunk> loadedChunks = new Dictionary<Vector2Int, Chunk>();
     private Dictionary<Vector2Int, ChunkData> chunkData = new Dictionary<Vector2Int, ChunkData>();
     private HashSet<Vector2Int> discoveredChunks = new HashSet<Vector2Int>();
 
+    // 🌟 [추가됨] 미리 계산된 맵 데이터를 저장할 딕셔너리
+    private Dictionary<Vector2Int, string> precalculatedMap = new Dictionary<Vector2Int, string>();
+
     private OreGenerator oreGenerator;
-
-
-    // ============================================================
-    // 유니티 생명주기
-    // ============================================================
 
     void Awake()
     {
         oreGenerator = GetComponent<OreGenerator>();
     }
 
-    void Start()
+    // 🌟 [수정됨] 네트워크가 활성화되고 서버(방장)로 지정되었을 때 맵 데이터를 미리 계산합니다.
+    public override void OnNetworkSpawn()
     {
-        // 🌟 [멀티플레이 변경] Start에서는 아무것도 하지 않습니다. 
-        // 네트워크 연결(OnNetworkSpawn) 이후에 업데이트가 시작되어야 합니다.
+        if (IsServer)
+        {
+            PrecalculateMapData();
+        }
     }
 
     void Update()
     {
-        // 🌟 [멀티플레이 변경] 호스트(서버)가 아니면 청크 계산 로직을 돌리지 않고 종료!
-        // 오직 방장 컴퓨터에서만 맵을 생성하고 관리합니다.
         if (!IsServer) return; 
 
         UpdateChunks();
     }
 
-
-    // ============================================================
-    // 월드맵 모드 제어
-    // ============================================================
-
     public void SetMapOpenState(bool open)
     {
         isMapOpen = open;
-        if (IsServer) UpdateChunks(); // 서버일 때만 갱신
+        if (IsServer) UpdateChunks();
     }
 
+    // ============================================================
+    // 🌟 [신규 추가] 맵 데이터 사전 계산
+    // ============================================================
+    private void PrecalculateMapData()
+    {
+        Debug.Log("[WorldManager] 고정 맵 데이터 생성 시작...");
+        
+        // 맵 전체를 순회할 단 하나의 Random 객체. (이 덕분에 시드와 천장 시스템이 완벽히 고정됨)
+        System.Random globalRandom = new System.Random(worldSeed);
+        
+        // 왼쪽 위부터 오른쪽 아래까지 순서대로 훑으며 미리 확률을 계산합니다.
+        for (int x = -mapRadius; x <= mapRadius; x++)
+        {
+            for (int z = -mapRadius; z <= mapRadius; z++)
+            {
+                Vector2Int coord = new Vector2Int(x, z);
+
+                // 시작 구역 평지 처리는 고정
+                if (IsInStarterArea(coord) && starterFlatChunkPrefab != null)
+                {
+                    precalculatedMap.Add(coord, starterFlatChunkPrefab.name);
+                    continue;
+                }
+
+                // 천장 시스템이 적용된 전역 Random으로 청크 뽑기
+                int gradeIndex = SelectGrade(globalRandom);
+                GameObject selectedPrefab = SelectChunkFromGrade(gradeIndex, globalRandom);
+
+                if (selectedPrefab != null)
+                {
+                    // 생성된 프리팹의 '이름'만 가볍게 저장
+                    precalculatedMap.Add(coord, selectedPrefab.name);
+                }
+            }
+        }
+        
+        Debug.Log($"[WorldManager] 총 {precalculatedMap.Count}개의 청크 데이터가 표에 저장되었습니다.");
+    }
 
     // ============================================================
-    // 청크 로드/언로드 관리 (플레이어 다수 + 봇 + 월드맵 카메라)
+    // 청크 로드/언로드 관리
     // ============================================================
-
     void UpdateChunks()
     {
         HashSet<Vector2Int> requiredChunks = new HashSet<Vector2Int>();
 
-        // 🌟 [멀티플레이 변경] 1. 접속한 '모든' 플레이어의 주변 청크를 계산
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
         {
             foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
@@ -160,7 +156,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
             }
         }
 
-        // 2. 자동화 로봇 주변 청크
         if (bots != null)
         {
             foreach (Transform bot in bots)
@@ -172,7 +167,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
             }
         }
 
-        // 3. 월드맵 카메라 구역 (서버 기준 글로벌 탐험 기록 공유)
         if (isMapOpen && worldMapCameraTransform != null)
         {
             Vector2Int mapCamChunk = GetChunkCoord(worldMapCameraTransform.position);
@@ -192,7 +186,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
 
         if (requiredChunks.Count == 0) return;
 
-        // 필요한 청크 생성
         foreach (Vector2Int coord in requiredChunks)
         {
             if (!loadedChunks.ContainsKey(coord))
@@ -201,7 +194,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
             }
         }
 
-        // 시야 밖으로 벗어난 청크 언로드
         RemoveUnnecessaryChunks(requiredChunks);
     }
 
@@ -239,14 +231,11 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
         }
     }
 
-
     // ============================================================
     // 청크 선택 로직
     // ============================================================
-
     int SelectGrade(System.Random random)
     {
-        // (기존 확률 및 천장 로직 동일 유지)
         if (chunkGrades == null || chunkGrades.Length == 0) return -1;
         float totalProbability = 0f;
         float[] adjustedProbabilities = new float[chunkGrades.Length];
@@ -311,59 +300,45 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
         return null;
     }
 
-    GameObject GetRandomChunkPrefab(System.Random random)
-    {
-        int gradeIndex = SelectGrade(random);
-        if (gradeIndex < 0) return null;
-        return SelectChunkFromGrade(gradeIndex, random);
-    }
-
-
     // ============================================================
-    // 청크 생성
+    // 🌟 [수정됨] 청크 생성 로직
     // ============================================================
-
     void CreateChunk(Vector2Int coord)
     {
+        // 1. 맵 반경(mapRadius)을 벗어난 좌표라면 아예 생성하지 않음 (맵의 끝부분 처리)
+        if (Mathf.Abs(coord.x) > mapRadius || Mathf.Abs(coord.y) > mapRadius)
+            return;
+
         bool hasData = chunkData.ContainsKey(coord);
 
         // ------------------------------------------------------------
-        // 1. 신규 청크 생성
+        // 신규 청크 생성
         // ------------------------------------------------------------
         if (!hasData)
         {
+            // 확률 계산을 돌리지 않고, 미리 계산해둔 표에서 프리팹 이름을 가져옵니다.
+            if (!precalculatedMap.ContainsKey(coord)) return;
+            
+            string prefabNameToSpawn = precalculatedMap[coord];
+            GameObject selectedPrefab = GetChunkPrefabByID(prefabNameToSpawn);
+
+            if (selectedPrefab == null) return;
+
             ChunkData newData = new ChunkData(coord);
             chunkData.Add(coord, newData);
 
-            int seed = worldSeed + coord.x * 73856093 + coord.y * 19349663;
-            System.Random random = new System.Random(seed);
+            // 해당 좌표의 시드를 고정하여 회전값과 광물 생성이 매번 똑같이 되도록 설정
+            int coordSeed = worldSeed + coord.x * 73856093 + coord.y * 19349663;
+            System.Random rotRandom = new System.Random(coordSeed);
+            newData.rotationY = rotRandom.Next(0, 4) * 90;
 
-            GameObject selectedPrefab = null;
-
-            if (IsInStarterArea(coord) && starterFlatChunkPrefab != null)
-            {
-                selectedPrefab = starterFlatChunkPrefab;
-                newData.rotationY = 0;
-            }
-            else
-            {
-                selectedPrefab = GetRandomChunkPrefab(random);
-                newData.rotationY = random.Next(0, 4) * 90;
-            }
-
-            if (selectedPrefab == null)
-            {
-                chunkData.Remove(coord);
-                return;
-            }
+            if (IsInStarterArea(coord)) newData.rotationY = 0;
 
             newData.chunkPrefabId = selectedPrefab.name;
             Vector3 targetPosition = new Vector3((coord.x + 0.5f) * chunkSize, 0f, (coord.y + 0.5f) * chunkSize);
 
-            // 서버에서 오브젝트 생성
+            // 서버에서 오브젝트 생성 및 동기화
             GameObject obj = Instantiate(selectedPrefab, targetPosition, Quaternion.Euler(0, newData.rotationY, 0));
-            
-            // 🌟 [멀티플레이 변경] 생성된 청크를 모든 클라이언트에게 전송(동기화)
             NetworkObject netObj = obj.GetComponent<NetworkObject>();
             if (netObj != null) 
                 netObj.Spawn();
@@ -375,7 +350,9 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
             bool canSpawnOres = !IsInStarterArea(coord) || spawnOresInStarterArea;
             if (canSpawnOres && chunk != null && oreGenerator != null)
             {
-                oreGenerator.GenerateOres(coord, chunk, random, SaveObjectToChunk);
+                // 광물 생성도 고정된 coordSeed를 사용하여 똑같은 위치에 나오게 함
+                System.Random oreRandom = new System.Random(coordSeed);
+                oreGenerator.GenerateOres(coord, chunk, oreRandom, SaveObjectToChunk);
             }
 
             PlayChunkAppearance(obj, targetPosition);
@@ -383,7 +360,7 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
         }
 
         // ------------------------------------------------------------
-        // 2. 기존 탐험 구역 청크 복구
+        // 기존 탐험 구역 청크 복구
         // ------------------------------------------------------------
         ChunkData data = chunkData[coord];
         GameObject savedPrefab = GetChunkPrefabByID(data.chunkPrefabId);
@@ -392,7 +369,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
         Vector3 restorePosition = new Vector3((coord.x + 0.5f) * chunkSize, 0f, (coord.y + 0.5f) * chunkSize);
         GameObject savedObj = Instantiate(savedPrefab, restorePosition, Quaternion.Euler(0, data.rotationY, 0));
         
-        // 🌟 [멀티플레이 변경] 복구된 청크도 네트워크에 스폰
         NetworkObject savedNetObj = savedObj.GetComponent<NetworkObject>();
         if (savedNetObj != null) 
             savedNetObj.Spawn();
@@ -401,7 +377,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
         PlayChunkAppearance(savedObj, restorePosition);
     }
     
-    // 연출 분리용 헬퍼 함수
     private void PlayChunkAppearance(GameObject obj, Vector3 targetPosition)
     {
         if (isMapOpen)
@@ -415,11 +390,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
             appearance.PlaySpawnAnimation(targetPosition);
         }
     }
-
-
-    // ============================================================
-    // 청크 셋업 & 데이터 복원
-    // ============================================================
 
     Chunk SetupChunk(GameObject obj, Vector2Int coord)
     {
@@ -449,23 +419,15 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
 
             GameObject obj = Instantiate(prefab, objectData.GetPosition(), Quaternion.Euler(objectData.rotX, objectData.rotY, objectData.rotZ));
             
-            // 🌟 [멀티플레이 변경] 복구된 건물/광물 오브젝트 네트워크 스폰
             NetworkObject netObj = obj.GetComponent<NetworkObject>();
             if (netObj != null) netObj.Spawn();
 
-            // 주의: 네트워크 객체는 부모(Parent)를 지정할 때 특별한 제약이 있을 수 있습니다.
-            // NetworkObject의 부모 설정은 NetworkObject.TrySetParent()를 사용하는 것이 좋습니다.
             if (netObj != null && chunk.GetComponent<NetworkObject>() != null)
                 netObj.TrySetParent(chunk.transform);
             else
                 obj.transform.SetParent(chunk.transform);
         }
     }
-
-
-    // ============================================================
-    // 프리팹 탐색
-    // ============================================================
 
     GameObject GetChunkPrefabByID(string id)
     {
@@ -492,11 +454,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
         return null;
     }
 
-
-    // ============================================================
-    // 청크 언로드 및 데이터 저장
-    // ============================================================
-
     void RemoveUnnecessaryChunks(HashSet<Vector2Int> requiredChunks)
     {
         List<Vector2Int> removeList = new List<Vector2Int>();
@@ -512,7 +469,6 @@ public class WorldManager : NetworkBehaviour // 🌟 [멀티플레이 변경] Mo
         {
             GameObject chunkObj = loadedChunks[coord].gameObject;
             
-            // 🌟 [멀티플레이 변경] 단순 Destroy 대신 NetworkObject.Despawn 호출 (서버가 클라이언트들에게 파괴 명령)
             NetworkObject netObj = chunkObj.GetComponent<NetworkObject>();
             if (netObj != null && netObj.IsSpawned)
             {

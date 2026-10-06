@@ -27,7 +27,7 @@ using Unity.Netcode;
 public class WeaponSlot : NetworkBehaviour
 {
     [Header("Weapon Slots")]
-    [SerializeField] private GameObject[] slots = new GameObject[3];
+    [SerializeField] private GameObject[] slots = new GameObject[4];
 
     // 0 = 맨손 / 1~3 = 무기 슬롯
     private NetworkVariable<int> currentSlot = new(
@@ -61,6 +61,9 @@ public class WeaponSlot : NetworkBehaviour
 
         else if (Input.GetKeyDown(KeyCode.Alpha3))
             ToggleSlot(3);
+            
+        else if (Input.GetKeyDown(KeyCode.C))
+            ToggleSlot(4);
 
         else if (Input.GetKeyDown(KeyCode.X))
             currentSlot.Value = 0;
