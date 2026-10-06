@@ -1,30 +1,30 @@
-/*
-    [ ÄÚµå ¼³¸í ]
+ï»¿/*
+    [ ì½”ë“œ ì„¤ëª… ]
 
-    ÁÖ¹«±âÀÇ Á¶ÁØ »óÅÂ¸¦ ´ã´çÇÏ´Â ½ºÅ©¸³Æ®ÀÔ´Ï´Ù.
+    ì£¼ë¬´ê¸°ì˜ ì¡°ì¤€ ìƒíƒœë¥¼ ë‹´ë‹¹í•˜ëŠ” ìŠ¤í¬ë¦½íŠ¸ì…ë‹ˆë‹¤.
 
-    ±âº» »óÅÂ
-    ¡æ Hip »óÅÂ
-    ¡æ ÁıÅº·üÀÌ °¡Àå ³·À½
+    ê¸°ë³¸ ìƒíƒœ
+    â†’ Hip ìƒíƒœ
+    â†’ ì§‘íƒ„ë¥ ì´ ê°€ì¥ ë‚®ìŒ
 
-    ¿ìÅ¬¸¯ À¯Áö
-    ¡æ Shoulder »óÅÂ
-    ¡æ 3ÀÎÄª °ßÂø
-    ¡æ ÁıÅº·ü »ó½Â
+    ìš°í´ë¦­ ìœ ì§€
+    â†’ Shoulder ìƒíƒœ
+    â†’ 3ì¸ì¹­ ê²¬ì°©
+    â†’ ì§‘íƒ„ë¥  ìƒìŠ¹
 
-    ¿ìÅ¬¸¯ ºü¸£°Ô µÎ ¹ø
-    ¡æ Precision »óÅÂ ÁøÀÔ
-    ¡æ Á¤¹Ğ Á¶ÁØ
-    ¡æ ÁıÅº·üÀÌ °¡Àå ³ôÀ½
+    ìš°í´ë¦­ ë¹ ë¥´ê²Œ ë‘ ë²ˆ
+    â†’ Precision ìƒíƒœ ì§„ì…
+    â†’ ì •ë°€ ì¡°ì¤€
+    â†’ ì§‘íƒ„ë¥ ì´ ê°€ì¥ ë†’ìŒ
 
-    Á¤¹Ğ Á¶ÁØ »óÅÂ¿¡¼­ ¿ìÅ¬¸¯ ÇÑ ¹ø
-    ¡æ Á¤¹Ğ Á¶ÁØ Áï½Ã ÇØÁ¦
-    ¡æ ¿ø·¡ ½ÃÁ¡À¸·Î º¹±Í
+    ì •ë°€ ì¡°ì¤€ ìƒíƒœì—ì„œ ìš°í´ë¦­ í•œ ë²ˆ
+    â†’ ì •ë°€ ì¡°ì¤€ ì¦‰ì‹œ í•´ì œ
+    â†’ ì›ë˜ ì‹œì ìœ¼ë¡œ ë³µê·€
 
-    1¹ø ÁÖ¹«±â¸¦ µé°í ÀÖÀ» ¶§¸¸ Á¶ÁØÇÒ ¼ö ÀÖ½À´Ï´Ù.
+    1ë²ˆ ì£¼ë¬´ê¸°ë¥¼ ë“¤ê³  ìˆì„ ë•Œë§Œ ì¡°ì¤€í•  ìˆ˜ ìˆìŠµë‹ˆë‹¤.
 
-    ÀÌ ½ºÅ©¸³Æ®´Â Ä«¸Ş¶ó¸¦ Á÷Á¢ ¿òÁ÷ÀÌÁö ¾Ê°í
-    ÇöÀç Á¶ÁØ »óÅÂ¿Í ÁıÅº·ü¸¸ °ü¸®ÇÕ´Ï´Ù.
+    ì´ ìŠ¤í¬ë¦½íŠ¸ëŠ” ì¹´ë©”ë¼ë¥¼ ì§ì ‘ ì›€ì§ì´ì§€ ì•Šê³ 
+    í˜„ì¬ ì¡°ì¤€ ìƒíƒœì™€ ì§‘íƒ„ë¥ ë§Œ ê´€ë¦¬í•©ë‹ˆë‹¤.
 */
 
 using UnityEngine;
@@ -52,8 +52,8 @@ public class GunAim : NetworkBehaviour
     private float lastRightClickTime = -10f;
     private bool precisionAim = false;
 
-    // Á¤¹Ğ Á¶ÁØÀ» ÇØÁ¦ÇÑ Å¬¸¯ÀÌ
-    // ¹Ù·Î °ßÂøÀ¸·Î ÀÌ¾îÁö´Â °ÍÀ» ¹æÁö
+    // ì •ë°€ ì¡°ì¤€ì„ í•´ì œí•œ í´ë¦­ì´
+    // ë°”ë¡œ ê²¬ì°©ìœ¼ë¡œ ì´ì–´ì§€ëŠ” ê²ƒì„ ë°©ì§€
     private bool waitForRightClickRelease = false;
 
     public AimMode CurrentMode { get; private set; } = AimMode.Hip;
@@ -84,7 +84,7 @@ public class GunAim : NetworkBehaviour
         if (!IsOwner || weaponSlot == null)
             return;
 
-        // 1¹ø ÁÖ¹«±â¸¦ µé°í ÀÖÁö ¾ÊÀ¸¸é Á¶ÁØ ÇØÁ¦
+        // 1ë²ˆ ì£¼ë¬´ê¸°ë¥¼ ë“¤ê³  ìˆì§€ ì•Šìœ¼ë©´ ì¡°ì¤€ í•´ì œ
         if (weaponSlot.CurrentSlot != 1)
         {
             ResetAim();
@@ -93,15 +93,15 @@ public class GunAim : NetworkBehaviour
 
         HandlePrecisionAim();
 
-        // Á¤¹Ğ Á¶ÁØ »óÅÂ
+        // ì •ë°€ ì¡°ì¤€ ìƒíƒœ
         if (precisionAim)
         {
             CurrentMode = AimMode.Precision;
             return;
         }
 
-        // Á¤¹Ğ Á¶ÁØ ÇØÁ¦ Á÷ÈÄ¿¡´Â
-        // ¿ìÅ¬¸¯À» ¿ÏÀüÈ÷ ³õÀ» ¶§±îÁö °ßÂøÇÏÁö ¾ÊÀ½
+        // ì •ë°€ ì¡°ì¤€ í•´ì œ ì§í›„ì—ëŠ”
+        // ìš°í´ë¦­ì„ ì™„ì „íˆ ë†“ì„ ë•Œê¹Œì§€ ê²¬ì°©í•˜ì§€ ì•ŠìŒ
         if (waitForRightClickRelease)
         {
             CurrentMode = AimMode.Hip;
@@ -112,7 +112,7 @@ public class GunAim : NetworkBehaviour
             return;
         }
 
-        // ÀÏ¹İ °ßÂø
+        // ì¼ë°˜ ê²¬ì°©
         CurrentMode = Input.GetMouseButton(1)
             ? AimMode.Shoulder
             : AimMode.Hip;
@@ -123,7 +123,7 @@ public class GunAim : NetworkBehaviour
         if (!Input.GetMouseButtonDown(1))
             return;
 
-        // Á¤¹Ğ Á¶ÁØ Áß¿¡´Â ¿ìÅ¬¸¯ ÇÑ ¹øÀ¸·Î ÇØÁ¦
+        // ì •ë°€ ì¡°ì¤€ ì¤‘ì—ëŠ” ìš°í´ë¦­ í•œ ë²ˆìœ¼ë¡œ í•´ì œ
         if (precisionAim)
         {
             precisionAim = false;
@@ -135,7 +135,7 @@ public class GunAim : NetworkBehaviour
 
         float currentTime = Time.unscaledTime;
 
-        // ºü¸£°Ô µÎ ¹ø ´­·¶À¸¸é Á¤¹Ğ Á¶ÁØ ÁøÀÔ
+        // ë¹ ë¥´ê²Œ ë‘ ë²ˆ ëˆŒë €ìœ¼ë©´ ì •ë°€ ì¡°ì¤€ ì§„ì…
         if (currentTime - lastRightClickTime <= doubleClickTime)
         {
             precisionAim = true;
@@ -144,7 +144,7 @@ public class GunAim : NetworkBehaviour
             return;
         }
 
-        // Ã¹ ¹øÂ° ¿ìÅ¬¸¯ ½Ã°£ ÀúÀå
+        // ì²« ë²ˆì§¸ ìš°í´ë¦­ ì‹œê°„ ì €ì¥
         lastRightClickTime = currentTime;
     }
 

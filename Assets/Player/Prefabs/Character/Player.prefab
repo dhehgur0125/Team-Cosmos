@@ -80,6 +80,7 @@ GameObject:
   - component: {fileID: 1610080536174897483}
   - component: {fileID: 7379277698884072478}
   - component: {fileID: 5184736941399935301}
+  - component: {fileID: 6617578352280372390}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -296,6 +297,30 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   tracerPrefab: {fileID: 3278156858547463519, guid: e55fa60c4417aa94fb9646d5d69e51b0, type: 3}
+--- !u!114 &6617578352280372390
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7621213699471952816}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dad1ec66844f47647ba3566b213f86d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARRecoil
+  ShowTopMostFoldoutHeaderGroup: 1
+  verticalShotCount: 5
+  maxVerticalRecoil: 15
+  horizontalStep: 0.35
+  maxHorizontalRecoil: 9
+  verticalSprayJitter: 1.2
+  horizontalJitter: 0.25
+  shoulderMultiplier: 0.7
+  precisionMultiplier: 0.4
+  recoilMoveSpeed: 60
+  returnDelay: 0.15
+  returnSpeed: 50
 --- !u!1 &7768763786913196380
 GameObject:
   m_ObjectHideFlags: 0

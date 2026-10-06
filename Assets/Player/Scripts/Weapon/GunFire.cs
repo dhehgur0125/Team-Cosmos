@@ -8,17 +8,17 @@
 
     1번 주무기를 들고 있을 때만 발사할 수 있습니다.
 
-    현재 GunAim의 집탄률을 가져와
-    Hip / Shoulder / Precision 상태에 따라
-    총알이 퍼지는 정도를 다르게 적용합니다.
+    GunAim의 현재 집탄률을 가져와
+    일반 / 견착 / 정밀 조준에 따라
+    탄 퍼짐 정도를 다르게 적용합니다.
 
-    실제 명중 판정은 서버에서 Raycast로 처리합니다.
+    한 발 발사할 때마다 ARRecoil에 알려
+    자동소총의 T자형 반동이 발생하도록 합니다.
 
-    카메라 중앙을 기준으로 조준하지만,
-    총알 궤적은 실제 MuzzlePoint에서 시작합니다.
+    실제 명중 판정은 서버에서 Raycast로 처리하고,
+    MuzzlePoint에서 명중 지점까지 Tracer를 표시합니다.
 
-    이 스크립트는 데미지나 피격 이펙트를 처리하지 않고
-    발사와 명중 위치 계산만 담당합니다.
+    이 스크립트는 데미지나 피격 파편은 처리하지 않습니다.
 */
 
 using UnityEngine;
@@ -39,6 +39,8 @@ public class GunFire : NetworkBehaviour
 
     private WeaponSlot weaponSlot;
     private GunAim gunAim;
+    private ARRecoil arRecoil;
+
     private Camera playerCamera;
 
     private float nextLocalFireTime;
@@ -51,6 +53,7 @@ public class GunFire : NetworkBehaviour
     {
         weaponSlot = GetComponent<WeaponSlot>();
         gunAim = GetComponent<GunAim>();
+        arRecoil = GetComponent<ARRecoil>();
 
         if (IsOwner)
             playerCamera = Camera.main;
@@ -72,14 +75,14 @@ public class GunFire : NetworkBehaviour
             return;
         }
 
-        // 현재는 1번 주무기 = 자동소총
+        // 현재 1번 슬롯만 자동소총으로 사용
         if (weaponSlot.CurrentSlot != 1)
             return;
 
-        // 마우스가 게임 화면에 잡혀 있을 때만 발사
         if (Cursor.lockState != CursorLockMode.Locked)
             return;
 
+        // 좌클릭을 누르고 있으면 자동 연사
         if (Input.GetMouseButton(0) &&
             Time.time >= nextLocalFireTime)
         {
@@ -92,9 +95,11 @@ public class GunFire : NetworkBehaviour
 
     private void Fire()
     {
+        // 자동소총 반동 적용
+        arRecoil?.ApplyShot();
+
         float spread = gunAim.CurrentSpread;
 
-        // 카메라 기준으로 상하좌우 오차를 적용
         Quaternion spreadRotation =
             Quaternion.Euler(
                 Random.Range(-spread, spread),
@@ -109,23 +114,24 @@ public class GunFire : NetworkBehaviour
 
         FireRequestRpc(
             playerCamera.transform.position,
-            fireDirection.normalized,
-            muzzlePoint.position
+            fireDirection.normalized
         );
     }
 
-    [Rpc(SendTo.Server, RequireOwnership = true)]
+    [Rpc(
+        SendTo.Server,
+        InvokePermission = RpcInvokePermission.Owner
+    )]
     private void FireRequestRpc(
         Vector3 cameraOrigin,
-        Vector3 cameraDirection,
-        Vector3 muzzlePosition)
+        Vector3 cameraDirection)
     {
-        // 서버에서도 현재 자동소총을 들고 있는지 확인
         if (weaponSlot == null)
             weaponSlot = GetComponent<WeaponSlot>();
 
         if (weaponSlot == null ||
-            weaponSlot.CurrentSlot != 1)
+            weaponSlot.CurrentSlot != 1 ||
+            muzzlePoint == null)
         {
             return;
         }
@@ -137,12 +143,14 @@ public class GunFire : NetworkBehaviour
         nextServerFireTime =
             Time.time + FireInterval;
 
+        Vector3 muzzlePosition =
+            muzzlePoint.position;
+
         Vector3 aimPoint =
             cameraOrigin +
             cameraDirection * maxDistance;
 
-        // 1차 Raycast:
-        // 카메라가 실제로 바라보는 지점 계산
+        // 카메라 기준 목표 지점 계산
         if (Physics.Raycast(
             cameraOrigin,
             cameraDirection,
@@ -165,8 +173,7 @@ public class GunFire : NetworkBehaviour
 
         Vector3 finalPoint = aimPoint;
 
-        // 2차 Raycast:
-        // 총구 앞에 벽이 있으면 벽을 뚫고 쏘지 못하게 함
+        // 총구 앞에 장애물이 있으면 그곳에 명중
         if (Physics.Raycast(
             muzzlePosition,
             muzzleDirection,
@@ -178,14 +185,14 @@ public class GunFire : NetworkBehaviour
             finalPoint = muzzleHit.point;
         }
 
-        PlayShotRpc(
+        PlayTracerRpc(
             muzzlePosition,
             finalPoint
         );
     }
 
     [Rpc(SendTo.Everyone)]
-    private void PlayShotRpc(
+    private void PlayTracerRpc(
         Vector3 start,
         Vector3 end)
     {
