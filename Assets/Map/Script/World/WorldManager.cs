@@ -5,6 +5,8 @@ using Unity.Netcode;
 [RequireComponent(typeof(OreGenerator))]
 public class WorldManager : NetworkBehaviour
 {
+    public static WorldManager Instance { get; private set; }
+
     [Header("자동화 로봇")]
     public Transform[] bots;
 
@@ -56,7 +58,6 @@ public class WorldManager : NetworkBehaviour
     public int botRenderDistance = 0;
     public int worldSeed = 12345;
 
-    // 🌟 [추가됨] 고정 맵 크기 설정
     [Header("고정 맵 설정")]
     [Tooltip("맵의 반경 (예: 50이면 -50~50까지 총 100x100 맵 생성)")]
     public int mapRadius = 50;
@@ -65,17 +66,19 @@ public class WorldManager : NetworkBehaviour
     private Dictionary<Vector2Int, ChunkData> chunkData = new Dictionary<Vector2Int, ChunkData>();
     private HashSet<Vector2Int> discoveredChunks = new HashSet<Vector2Int>();
 
-    // 🌟 [추가됨] 미리 계산된 맵 데이터를 저장할 딕셔너리
     private Dictionary<Vector2Int, string> precalculatedMap = new Dictionary<Vector2Int, string>();
 
     private OreGenerator oreGenerator;
+    private float chunkUpdateTimer = 0f;
 
     void Awake()
     {
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+
         oreGenerator = GetComponent<OreGenerator>();
     }
 
-    // 🌟 [수정됨] 네트워크가 활성화되고 서버(방장)로 지정되었을 때 맵 데이터를 미리 계산합니다.
     public override void OnNetworkSpawn()
     {
         if (IsServer)
@@ -88,7 +91,12 @@ public class WorldManager : NetworkBehaviour
     {
         if (!IsServer) return; 
 
-        UpdateChunks();
+        chunkUpdateTimer += Time.deltaTime;
+        if (chunkUpdateTimer >= 0.5f)
+        {
+            chunkUpdateTimer = 0f;
+            UpdateChunks();
+        }
     }
 
     public void SetMapOpenState(bool open)
@@ -97,37 +105,29 @@ public class WorldManager : NetworkBehaviour
         if (IsServer) UpdateChunks();
     }
 
-    // ============================================================
-    // 🌟 [신규 추가] 맵 데이터 사전 계산
-    // ============================================================
     private void PrecalculateMapData()
     {
         Debug.Log("[WorldManager] 고정 맵 데이터 생성 시작...");
         
-        // 맵 전체를 순회할 단 하나의 Random 객체. (이 덕분에 시드와 천장 시스템이 완벽히 고정됨)
         System.Random globalRandom = new System.Random(worldSeed);
         
-        // 왼쪽 위부터 오른쪽 아래까지 순서대로 훑으며 미리 확률을 계산합니다.
         for (int x = -mapRadius; x <= mapRadius; x++)
         {
             for (int z = -mapRadius; z <= mapRadius; z++)
             {
                 Vector2Int coord = new Vector2Int(x, z);
 
-                // 시작 구역 평지 처리는 고정
                 if (IsInStarterArea(coord) && starterFlatChunkPrefab != null)
                 {
                     precalculatedMap.Add(coord, starterFlatChunkPrefab.name);
                     continue;
                 }
 
-                // 천장 시스템이 적용된 전역 Random으로 청크 뽑기
                 int gradeIndex = SelectGrade(globalRandom);
                 GameObject selectedPrefab = SelectChunkFromGrade(gradeIndex, globalRandom);
 
                 if (selectedPrefab != null)
                 {
-                    // 생성된 프리팹의 '이름'만 가볍게 저장
                     precalculatedMap.Add(coord, selectedPrefab.name);
                 }
             }
@@ -136,9 +136,6 @@ public class WorldManager : NetworkBehaviour
         Debug.Log($"[WorldManager] 총 {precalculatedMap.Count}개의 청크 데이터가 표에 저장되었습니다.");
     }
 
-    // ============================================================
-    // 청크 로드/언로드 관리
-    // ============================================================
     void UpdateChunks()
     {
         HashSet<Vector2Int> requiredChunks = new HashSet<Vector2Int>();
@@ -231,9 +228,6 @@ public class WorldManager : NetworkBehaviour
         }
     }
 
-    // ============================================================
-    // 청크 선택 로직
-    // ============================================================
     int SelectGrade(System.Random random)
     {
         if (chunkGrades == null || chunkGrades.Length == 0) return -1;
@@ -300,23 +294,15 @@ public class WorldManager : NetworkBehaviour
         return null;
     }
 
-    // ============================================================
-    // 🌟 [수정됨] 청크 생성 로직
-    // ============================================================
     void CreateChunk(Vector2Int coord)
     {
-        // 1. 맵 반경(mapRadius)을 벗어난 좌표라면 아예 생성하지 않음 (맵의 끝부분 처리)
         if (Mathf.Abs(coord.x) > mapRadius || Mathf.Abs(coord.y) > mapRadius)
             return;
 
         bool hasData = chunkData.ContainsKey(coord);
 
-        // ------------------------------------------------------------
-        // 신규 청크 생성
-        // ------------------------------------------------------------
         if (!hasData)
         {
-            // 확률 계산을 돌리지 않고, 미리 계산해둔 표에서 프리팹 이름을 가져옵니다.
             if (!precalculatedMap.ContainsKey(coord)) return;
             
             string prefabNameToSpawn = precalculatedMap[coord];
@@ -327,7 +313,6 @@ public class WorldManager : NetworkBehaviour
             ChunkData newData = new ChunkData(coord);
             chunkData.Add(coord, newData);
 
-            // 해당 좌표의 시드를 고정하여 회전값과 광물 생성이 매번 똑같이 되도록 설정
             int coordSeed = worldSeed + coord.x * 73856093 + coord.y * 19349663;
             System.Random rotRandom = new System.Random(coordSeed);
             newData.rotationY = rotRandom.Next(0, 4) * 90;
@@ -337,7 +322,6 @@ public class WorldManager : NetworkBehaviour
             newData.chunkPrefabId = selectedPrefab.name;
             Vector3 targetPosition = new Vector3((coord.x + 0.5f) * chunkSize, 0f, (coord.y + 0.5f) * chunkSize);
 
-            // 서버에서 오브젝트 생성 및 동기화
             GameObject obj = Instantiate(selectedPrefab, targetPosition, Quaternion.Euler(0, newData.rotationY, 0));
             NetworkObject netObj = obj.GetComponent<NetworkObject>();
             if (netObj != null) 
@@ -350,7 +334,6 @@ public class WorldManager : NetworkBehaviour
             bool canSpawnOres = !IsInStarterArea(coord) || spawnOresInStarterArea;
             if (canSpawnOres && chunk != null && oreGenerator != null)
             {
-                // 광물 생성도 고정된 coordSeed를 사용하여 똑같은 위치에 나오게 함
                 System.Random oreRandom = new System.Random(coordSeed);
                 oreGenerator.GenerateOres(coord, chunk, oreRandom, SaveObjectToChunk);
             }
@@ -359,9 +342,6 @@ public class WorldManager : NetworkBehaviour
             return;
         }
 
-        // ------------------------------------------------------------
-        // 기존 탐험 구역 청크 복구
-        // ------------------------------------------------------------
         ChunkData data = chunkData[coord];
         GameObject savedPrefab = GetChunkPrefabByID(data.chunkPrefabId);
         if (savedPrefab == null) return;
@@ -483,6 +463,111 @@ public class WorldManager : NetworkBehaviour
         }
     }
 
+    private HashSet<ulong> reservedOres = new HashSet<ulong>();
+
+    public bool ReserveOre(OreNode ore)
+    {
+        if (!IsServer || ore == null || ore.isDestroyed) return false;
+        
+        ulong netId = ore.GetComponent<NetworkObject>().NetworkObjectId;
+        if (reservedOres.Contains(netId))
+        {
+            return false;
+        }
+
+        reservedOres.Add(netId);
+        return true;
+    }
+
+    public void ReleaseOreReservation(OreNode ore)
+    {
+        if (!IsServer || ore == null) return;
+        
+        ulong netId = ore.GetComponent<NetworkObject>().NetworkObjectId;
+        if (reservedOres.Contains(netId))
+        {
+            reservedOres.Remove(netId);
+        }
+    }
+
+    public void OnOreDestroyed(OreNode destroyedOre)
+    {
+        if (!IsServer) return;
+
+        ReleaseOreReservation(destroyedOre);
+
+        Vector2Int coord = destroyedOre.parentChunkCoord;
+        Vector3 destroyedPos = destroyedOre.transform.position; // 🌟 파괴된 광물의 정확한 좌표 저장
+        
+        if (chunkData.ContainsKey(coord))
+        {
+            ChunkData data = chunkData[coord];
+            int removeIndex = data.placedObjects.FindIndex(o => 
+                o.prefabId == destroyedOre.oreId && 
+                Vector3.Distance(o.GetPosition(), destroyedPos) < 0.1f);
+
+            if (removeIndex >= 0)
+            {
+                data.placedObjects.RemoveAt(removeIndex);
+            }
+        }
+
+        // 🌟 [추가됨] 모든 클라이언트의 스캐너에게 해당 좌표의 빨간 구슬 마커를 지우라고 신호(Event) 발생!
+        OreScanner.ClearMarkerOnAllClients(destroyedPos);
+
+        // 리젠 코루틴 가동
+        StartCoroutine(RespawnOreRoutine(coord, destroyedOre.oreId, destroyedPos, destroyedOre.transform.eulerAngles));
+    }
+
+    // 🌟 [신규 추가] 30초 뒤에 광물을 그 자리에 다시 생성하는 코루틴
+    private System.Collections.IEnumerator RespawnOreRoutine(Vector2Int coord, string oreId, Vector3 pos, Vector3 rot)
+    {
+        Debug.Log($"[WorldManager] {oreId} 광물이 파괴되었습니다. 30초 후 리젠됩니다...");
+        
+        yield return new WaitForSeconds(10f);
+
+        if (!IsChunkLoaded(coord))
+        {
+            if (!chunkData.ContainsKey(coord)) chunkData.Add(coord, new ChunkData(coord));
+            chunkData[coord].placedObjects.Add(new PlacedObjectData(oreId, pos, rot.x, rot.y, rot.z));
+            yield break;
+        }
+
+        Chunk chunk = GetLoadedChunk(coord);
+        if (chunk == null) yield break;
+
+        GameObject prefab = GetPrefabByID(oreId);
+        if (prefab == null && oreGenerator != null) prefab = oreGenerator.GetOrePrefabByID(oreId);
+        if (prefab == null) yield break;
+
+        GameObject obj = Instantiate(prefab, pos, Quaternion.Euler(rot));
+        
+        // 🌟 1. 크기 문제 해결: 처음 생성될 때처럼 0.85 ~ 1.2배 사이의 무작위 원래 크기로 뻥튀기!
+        float randomScale = UnityEngine.Random.Range(5f, 6f);
+        obj.transform.localScale = Vector3.one * randomScale;
+
+        NetworkObject netObj = obj.GetComponent<NetworkObject>();
+        if (netObj != null) 
+        {
+            netObj.Spawn();
+            netObj.TrySetParent(chunk.transform);
+        }
+        else
+        {
+            obj.transform.SetParent(chunk.transform);
+        }
+
+        // 🌟 2. 무한 리젠 해결: 새로 태어난 광물에게 좌표와 ID를 다시 주입 (Initialize)
+        OreNode newOreNode = obj.GetComponent<OreNode>();
+        if (newOreNode != null)
+        {
+            newOreNode.Initialize(coord, oreId);
+        }
+
+        SaveObjectToChunk(coord, oreId, obj);
+        Debug.Log($"[WorldManager] {oreId} 광물 리젠 성공! (무한 리젠 활성화)");
+    }
+
     public void SaveObjectToChunk(Vector2Int coord, string prefabId, GameObject obj)
     {
         if (obj == null) return;
@@ -493,4 +578,7 @@ public class WorldManager : NetworkBehaviour
 
     public ChunkData GetChunkData(Vector2Int coord) => chunkData.ContainsKey(coord) ? chunkData[coord] : null;
     public HashSet<Vector2Int> GetDiscoveredChunks() => discoveredChunks;
+
+    public bool IsChunkLoaded(Vector2Int coord) => loadedChunks.ContainsKey(coord);
+    public Chunk GetLoadedChunk(Vector2Int coord) => loadedChunks.ContainsKey(coord) ? loadedChunks[coord] : null;
 }

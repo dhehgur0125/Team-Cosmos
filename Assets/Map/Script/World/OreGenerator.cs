@@ -116,6 +116,13 @@ public class OreGenerator : NetworkBehaviour
             // 클라이언트 화면에 나타나도록 네트워크 스폰 명령
             netObj.Spawn();
 
+            // 🌟 [추가된 부분] 파괴 및 리젠 추적을 위해 광물에 좌표와 ID 주입
+            OreNode oreNode = oreObj.GetComponent<OreNode>();
+            if (oreNode != null)
+            {
+                oreNode.Initialize(coord, oreData.prefab.name);
+            }
+
             // NGO에서는 NetworkObject가 붙은 오브젝트끼리 부모/자식 관계를 맺을 때 TrySetParent를 사용해야 합니다.
             NetworkObject chunkNetObj = chunk.GetComponent<NetworkObject>();
             if (chunkNetObj != null && chunkNetObj.IsSpawned)

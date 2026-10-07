@@ -77,7 +77,7 @@ public class TestPlayerController : NetworkBehaviour
         if (IsServer)
         {
             Vector3 spawnPos = transform.position;
-            spawnPos.y += 5f;
+            spawnPos.y += 20f;
 
             transform.position = spawnPos;
         }

@@ -747,7 +747,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 0
+  GlobalObjectIdHash: 2168731779
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -1488,6 +1488,10 @@ PrefabInstance:
     - target: {fileID: 199614, guid: 7db5325ec8a9e7b48a7e10a7a453d1e4, type: 3}
       propertyPath: m_Name
       value: CPT_Terrain_L_d_06
+      objectReference: {fileID: 0}
+    - target: {fileID: 199614, guid: 7db5325ec8a9e7b48a7e10a7a453d1e4, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 482502, guid: 7db5325ec8a9e7b48a7e10a7a453d1e4, type: 3}
       propertyPath: m_LocalScale.x

@@ -66,7 +66,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 0
+  GlobalObjectIdHash: 2837639483
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -92,6 +92,10 @@ PrefabInstance:
     - target: {fileID: 100000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
       propertyPath: m_Name
       value: Cloud_01 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 100000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
       propertyPath: m_LocalScale.x
@@ -201,6 +205,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: CPT_Terrain_L_d_14
       objectReference: {fileID: 0}
+    - target: {fileID: 118274, guid: 002d5f00226af2a4ea6219e8496b6b6b, type: 3}
+      propertyPath: m_Layer
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 409466, guid: 002d5f00226af2a4ea6219e8496b6b6b, type: 3}
       propertyPath: m_LocalPosition.x
       value: -50
@@ -266,6 +274,10 @@ PrefabInstance:
     - target: {fileID: 100000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
       propertyPath: m_Name
       value: Cloud_01
+      objectReference: {fileID: 0}
+    - target: {fileID: 100000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
       propertyPath: m_LocalScale.x
@@ -374,6 +386,10 @@ PrefabInstance:
     - target: {fileID: 100000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
       propertyPath: m_Name
       value: Cloud_01 (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 100000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
       propertyPath: m_LocalScale.x
@@ -487,6 +503,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cloud_02
       objectReference: {fileID: 0}
+    - target: {fileID: 100000, guid: 3adb8157df719454d9b74ff0e2be442d, type: 3}
+      propertyPath: m_Layer
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 3adb8157df719454d9b74ff0e2be442d, type: 3}
       propertyPath: m_LocalScale.x
       value: 3
@@ -599,6 +619,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cloud_01 (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 100000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
+      propertyPath: m_Layer
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: d8d9708e685dc80458956601c9e649f2, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.22764002
@@ -706,6 +730,10 @@ PrefabInstance:
     - target: {fileID: 100000, guid: 0ee3b849d7768ed49876a8f700ddfb66, type: 3}
       propertyPath: m_Name
       value: Cloud_03
+      objectReference: {fileID: 0}
+    - target: {fileID: 100000, guid: 0ee3b849d7768ed49876a8f700ddfb66, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 0ee3b849d7768ed49876a8f700ddfb66, type: 3}
       propertyPath: m_LocalScale.x

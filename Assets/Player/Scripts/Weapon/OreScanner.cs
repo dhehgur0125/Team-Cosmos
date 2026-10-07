@@ -7,15 +7,16 @@
     → 스캐너 장착 상태 토글 (isScannerEquipped)
 
     스캐너 장착 중 좌클릭
-    → 레이캐스트를 쏴서 맞은 오브젝트가 "Ore" 태그일 때만 좌표를 기록하고 트레이서 발사
+    → 레이캐스트를 쏴서 맞은 오브젝트가 "Ore" 태그일 때만 좌표를 기록, 트레이서 발사, 그리고 관제탑(TaskManager)에 작업 하달
 
     스캐너 장착 중 우클릭
-    → 지정된 좌표를 해제하며, 기존 좌표를 향해 트레이서 발사 (허공에 대고 우클릭해도 무조건 해제됨)
+    → 로컬 스캐너의 지정 좌표 해제
 */
 
 using UnityEngine;
 using Unity.Netcode;
 using System;
+using System.Collections.Generic;
 
 public class OreScanner : NetworkBehaviour
 {
@@ -39,13 +40,15 @@ public class OreScanner : NetworkBehaviour
     // 스캐너 장착 상태 플래그
     private bool isScannerEquipped = false;
 
-    // 외부(로봇 등)에서 지정된 좌표를 구독할 수 있는 이벤트
+    // 로컬 UI 등에서 구독할 수 있는 이벤트 (로봇은 더 이상 이 이벤트를 직접 듣지 않음)
     public static event Action<Vector3> OnOrePositionSelected;
     public static event Action OnOrePositionCleared;
 
-    // 현재 지정된 광물 좌표 (외부 참조용 프로퍼티)
     private Vector3? currentTargetPosition = null;
     public Vector3? CurrentTargetPosition => currentTargetPosition;
+
+    private List<Vector3> localTaskQueue = new List<Vector3>();
+    private List<GameObject> visualMarkers = new List<GameObject>();
 
     public override void OnNetworkSpawn()
     {
@@ -58,26 +61,21 @@ public class OreScanner : NetworkBehaviour
 
     private void Update()
     {
-        // 내 캐릭터가 아니면 입력 무시
         if (!IsOwner)
             return;
 
-        // 1. C키를 누를 때 스캐너 장착/해제 토글
         if (Input.GetKeyDown(KeyCode.C))
         {
             isScannerEquipped = !isScannerEquipped;
             Debug.Log($"[OreScanner] 스캐너 장착 상태: {isScannerEquipped}");
         }
 
-        // 2. 스캐너가 장착된 상태일 때만 마우스 입력 감지
         if (isScannerEquipped)
         {
-            // 좌클릭: 광물("Ore" 태그) 좌표 지정
             if (Input.GetMouseButtonDown(0))
             {
                 TrySelectOrePosition();
             }
-            // 우클릭: 좌표 해제
             else if (Input.GetMouseButtonDown(1))
             {
                 ClearOrePosition();
@@ -97,51 +95,76 @@ public class OreScanner : NetworkBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, maxScanDistance, targetLayer, QueryTriggerInteraction.Ignore))
         {
-            // 👇 맞춘 오브젝트의 태그가 "Ore"인지 확인하는 조건 추가
-            if (hit.collider.CompareTag("Ore"))
-            {
-                currentTargetPosition = hit.point;
-                
-                Debug.Log($"[OreScanner] 광물(Ore) 좌표 지정 완료: {currentTargetPosition.Value}");
-                
-                OnOrePositionSelected?.Invoke(currentTargetPosition.Value);
-                ScannerTracerRequestRpc(hit.point);
-            }
-            else
-            {
-                // Ore 태그가 아닌 엉뚱한 땅이나 나무를 맞췄을 때의 디버그
-                Debug.Log($"[OreScanner] 지정 실패: 맞춘 오브젝트({hit.collider.name})가 'Ore' 태그가 아닙니다.");
-            }
+            OreNode ore = hit.collider.GetComponentInParent<OreNode>();
+                if (ore == null) return;
+
+                Vector3 exactPos = ore.transform.position;
+
+                // 이미 대기열에 들어간 광물인지 중복 검사
+                if (!localTaskQueue.Contains(exactPos))
+                {
+                    localTaskQueue.Add(exactPos);
+                    
+                    // 시각적 피드백: 광물 머리 위에 임시 마커(빨간 구슬) 띄우기
+                    GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    marker.transform.position = exactPos + Vector3.up * 20f; 
+                    marker.transform.localScale = Vector3.one * 0.7f;
+                    marker.GetComponent<Collider>().enabled = false;
+                    marker.GetComponent<Renderer>().material.color = Color.red;
+                    visualMarkers.Add(marker);
+
+                    Debug.Log($"[OreScanner] 광물 예약 추가! 현재 대기열: {localTaskQueue.Count}개");
+                    
+                    ScannerTracerRequestRpc(hit.point);
+                    SendTaskToServerRpc(exactPos);
+                }
+                else
+                {
+                    Debug.Log("[OreScanner] 이미 예약 대기열에 있는 광물입니다.");
+                }
         }
         else
         {
-            // 사거리 내에 아무것도 안 맞았을 때의 디버그
             Debug.Log("[OreScanner] 지정 실패: 사거리 내에 맞은 오브젝트가 없습니다.");
         }
     }
 
     private void ClearOrePosition()
     {
-        if (currentTargetPosition != null)
+        if (localTaskQueue.Count > 0)
         {
-            //ScannerTracerRequestRpc(currentTargetPosition.Value);
-
-            currentTargetPosition = null;
+            int lastIndex = localTaskQueue.Count - 1;
+            Vector3 targetToCancel = localTaskQueue[lastIndex];
             
-            Debug.Log("[OreScanner] 광물 좌표 지정 해제됨");
+            CancelTaskOnServerRpc(targetToCancel);
             
+            // 시각적 마커 삭제 및 리스트에서 제거
+            Destroy(visualMarkers[lastIndex]);
+            visualMarkers.RemoveAt(lastIndex);
+            localTaskQueue.RemoveAt(lastIndex);
+            
+            Debug.Log($"[OreScanner] 마지막 예약 취소됨. 남은 예약: {localTaskQueue.Count}개");
             OnOrePositionCleared?.Invoke();
         }
         else
         {
-            // 지정된 좌표가 없는데 우클릭을 눌렀을 때의 디버그 (우클릭 무반응 원인 파악용)
-            Debug.Log("[OreScanner] 해제 실패: 현재 지정된 광물 좌표가 없습니다.");
+            Debug.Log("[OreScanner] 취소할 예약이 없습니다.");
         }
     }
 
     // --------------------------------------------------------
-    // 동기화된 트레이서 발사 로직
+    // 동기화 및 서버 요청 로직
     // --------------------------------------------------------
+
+    // 🌟 [추가됨] 클라이언트가 스캔한 좌표를 서버의 관제탑 작업 대기열에 넣으라고 요청함
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+    private void SendTaskToServerRpc(Vector3 targetPos)
+    {
+        if (RobotTaskManager.Instance != null)
+        {
+            RobotTaskManager.Instance.AddMiningTask(targetPos);
+        }
+    }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
     private void ScannerTracerRequestRpc(Vector3 targetPoint)
@@ -168,6 +191,60 @@ public class OreScanner : NetworkBehaviour
         if (tracer != null)
         {
             tracer.Play(start, end);
+        }
+    }
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+    private void CancelTaskOnServerRpc(Vector3 targetPos)
+    {
+        if (RobotTaskManager.Instance != null)
+        {
+            RobotTaskManager.Instance.CancelTask(targetPos);
+        }
+    }
+
+    // ========================================================
+    // 🌟 [수정됨] 채굴 완료 시 빨간 구슬 마커 삭제 로직
+    // ========================================================
+
+    public static void ClearMarkerOnAllClients(Vector3 destroyedPos)
+    {
+        OreScanner[] allScanners = FindObjectsOfType<OreScanner>();
+        
+        foreach (OreScanner scanner in allScanners)
+        {
+            // 🌟 break; 삭제! 씬에 있는 '모든' 스캐너에게 신호를 쏴야 
+            // 각자 자기 화면(IsOwner)에 있는 마커를 정상적으로 지울 수 있습니다.
+            if (scanner.IsSpawned)
+            {
+                scanner.RemoveCompletedMarkerClientRpc(destroyedPos);
+            }
+        }
+    }
+
+    [Rpc(SendTo.Everyone)]
+    private void RemoveCompletedMarkerClientRpc(Vector3 destroyedPos)
+    {
+        if (!IsOwner) return;
+
+        // 리스트를 거꾸로 뒤지면서, 파괴된 광물의 좌표와 일치하는 마커를 찾아 삭제
+        for (int i = localTaskQueue.Count - 1; i >= 0; i--)
+        {
+            float dist = Vector3.Distance(localTaskQueue[i], destroyedPos);
+            
+            // 🌟 혹시 모를 좌표 오차를 대비해 1.0f -> 2.5f 로 넉넉하게 변경
+            if (dist < 2.5f)
+            {
+                if (visualMarkers[i] != null)
+                {
+                    Destroy(visualMarkers[i]); // 빨간 구슬 오브젝트 파괴
+                }
+                
+                visualMarkers.RemoveAt(i);
+                localTaskQueue.RemoveAt(i);
+                
+                Debug.Log($"[OreScanner] 🔴 로봇이 광물을 부숴서 마커를 정상 삭제했습니다! (남은 대기열: {localTaskQueue.Count}개)");
+                return; // 하나 지우고 함수 종료
+            }
         }
     }
 }
