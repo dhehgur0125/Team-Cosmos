@@ -81,6 +81,7 @@ public class GunAim : NetworkBehaviour
 
     private void Update()
     {
+
         if (!IsOwner || weaponSlot == null)
             return;
 

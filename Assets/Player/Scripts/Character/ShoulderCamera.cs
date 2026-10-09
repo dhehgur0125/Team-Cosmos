@@ -100,6 +100,8 @@ public class ShoulderCamera : MonoBehaviour
     private bool lastFirstPersonState;
 
     public float GetYaw() => yaw;
+    // 게임에 접속한 후에만 커서 잠금 허용
+    private bool cursorLockEnabled = false;
 
     private void Start()
     {
@@ -111,10 +113,14 @@ public class ShoulderCamera : MonoBehaviour
         currentShoulderX = shoulderOffsetX;
         targetShoulderX = shoulderOffsetX;
 
+         // 게임 시작 시 항상 3인칭으로 설정
+        isFirstPerson = false;
+
+
         currentDistance = defaultDistance;
         displayDistance = defaultDistance;
 
-        LockCursor();
+        UnlockCursor();
     }
 
     private void Update()
@@ -124,9 +130,7 @@ public class ShoulderCamera : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Escape))
             UnlockCursor();
-
-        if (Cursor.lockState != CursorLockMode.Locked &&
-            Input.GetMouseButtonDown(0))
+        if (Cursor.lockState != CursorLockMode.Locked && Input.GetMouseButtonDown(0) && cursorLockEnabled )
         {
             LockCursor();
         }
@@ -186,8 +190,19 @@ public class ShoulderCamera : MonoBehaviour
 
         if (!isTargetInitialized)
         {
+             // 새 로컬 플레이어를 찾았을 때 기본 시점을 3인칭으로 설정
+            isFirstPerson = false;
+
             yaw = target.eulerAngles.y;
+            pitch = 10f;
+
+            // 카메라 초기화
             isTargetInitialized = true;
+
+            Debug.Log(
+                $"[ShoulderCamera] 초기 시점 설정 완료 | " +
+                $"isFirstPerson={isFirstPerson}"
+            );
         }
 
         UpdateRotation();
@@ -206,19 +221,12 @@ public class ShoulderCamera : MonoBehaviour
         UpdateVisibility(useFirstPerson);
         UpdateFov(aimMode);
 
-        // ARRecoil에서 현재 반동값 가져오기
         float recoilPitch =
-            arRecoil != null
-                ? arRecoil.PitchOffset
-                : 0f;
+            arRecoil != null ? arRecoil.PitchOffset : 0f;
 
         float recoilYaw =
-            arRecoil != null
-                ? arRecoil.YawOffset
-                : 0f;
+            arRecoil != null ? arRecoil.YawOffset : 0f;
 
-        // 수직 반동은 위쪽으로,
-        // 수평 반동은 좌우로 적용
         Quaternion cameraRotation =
             Quaternion.Euler(
                 pitch - recoilPitch,
@@ -232,10 +240,7 @@ public class ShoulderCamera : MonoBehaviour
             return;
         }
 
-        UpdateThirdPerson(
-            cameraRotation,
-            aimMode
-        );
+        UpdateThirdPerson(cameraRotation, aimMode);
     }
 
     private void FindLocalPlayer()
@@ -250,12 +255,25 @@ public class ShoulderCamera : MonoBehaviour
         }
 
         NetworkObject player =
-            NetworkManager.Singleton
-                .LocalClient
-                .PlayerObject;
+            NetworkManager.Singleton.LocalClient.PlayerObject;
 
         if (player != null)
+        {
             target = player.transform;
+
+            Debug.Log(
+                $"[ShoulderCamera] 카메라 대상 설정 | " +
+                $"Player={target.name}, " +
+                $"OwnerClientId={player.OwnerClientId}, " +
+                $"LocalClientId={NetworkManager.Singleton.LocalClientId}"
+            );
+        }
+        else
+        {
+            Debug.LogWarning(
+                "[ShoulderCamera] LocalClient.PlayerObject가 아직 없습니다."
+            );
+        }
     }
 
     private void FindPlayerSystems()
@@ -472,5 +490,28 @@ public class ShoulderCamera : MonoBehaviour
             CursorLockMode.None;
 
         Cursor.visible = true;
+    }
+    public void EnableGameCursorLock()
+    {
+        cursorLockEnabled = true;
+        LockCursor();
+    }
+
+    private Vector3 GetSpawnPosition(ulong clientId)
+    {
+        // 호스트
+        if (clientId == NetworkManager.ServerClientId)
+        {
+            return new Vector3(250f, 20f, 250f);
+        }
+
+        // 참가자마다 4m씩 옆으로 배치
+        int participantIndex = (int)clientId;
+
+        return new Vector3(
+            250f + participantIndex * 4f,
+            20f,
+            250f
+        );
     }
 }

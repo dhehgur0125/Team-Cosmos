@@ -28,10 +28,12 @@ public class RealtimeWorldMapUI : MonoBehaviour
 
     void Update()
     {
+
         if (Input.GetKeyDown(toggleKey))
         {
             ToggleMap();
         }
+        
     }
 
     public void ToggleMap()

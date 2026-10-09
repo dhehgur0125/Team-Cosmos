@@ -70,6 +70,7 @@ public class WorldManager : NetworkBehaviour
 
     private OreGenerator oreGenerator;
     private float chunkUpdateTimer = 0f;
+    public bool IsInitialChunksReady { get; private set; } = false;
 
     void Awake()
     {
@@ -81,10 +82,29 @@ public class WorldManager : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        if (IsServer)
+        if (!IsServer)
+            return;
+
+        PrecalculateMapData();
+
+        // 시작 구역 청크를 먼저 생성
+        for (int x = -1; x <= 1; x++)
         {
-            PrecalculateMapData();
+            for (int z = -1; z <= 1; z++)
+            {
+                Vector2Int coord = new Vector2Int(x, z);
+
+                if (!loadedChunks.ContainsKey(coord))
+                {
+                    CreateChunk(coord);
+                }
+            }
         }
+
+        // 청크 생성 여부 확인
+        IsInitialChunksReady = true;
+
+        Debug.Log("[WorldManager] 시작 구역 3x3 청크 생성 완료");
     }
 
     void Update()

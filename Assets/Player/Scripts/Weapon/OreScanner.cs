@@ -59,6 +59,16 @@ public class OreScanner : NetworkBehaviour
             playerCamera = Camera.main;
     }
 
+    public void EnableisScannerEquipped()
+    {
+        isScannerEquipped = true;
+    }
+
+    public void disableisScannerEquipped()
+    {
+        isScannerEquipped = false;
+    }
+
     private void Update()
     {
         if (!IsOwner)

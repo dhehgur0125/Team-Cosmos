@@ -36,6 +36,13 @@ public class WeaponSlot : NetworkBehaviour
         NetworkVariableWritePermission.Owner
     );
 
+    OreScanner oreScanner;
+
+    private void Start()
+    {
+        oreScanner = GetComponent<OreScanner>();
+    }
+
     public int CurrentSlot => currentSlot.Value;
 
     public override void OnNetworkSpawn()
@@ -66,7 +73,11 @@ public class WeaponSlot : NetworkBehaviour
             ToggleSlot(4);
 
         else if (Input.GetKeyDown(KeyCode.X))
+        {
+            oreScanner.disableisScannerEquipped();
             currentSlot.Value = 0;
+        }
+            
     }
 
     private void ToggleSlot(int slot)

@@ -87,6 +87,7 @@ public class WorldMapCameraController : MonoBehaviour
 
     void Update()
     {
+
         if (!isOpen) return;
 
         HandleZoom();

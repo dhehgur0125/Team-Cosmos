@@ -24,6 +24,7 @@
 
 using UnityEngine;
 using Unity.Netcode;
+using System.Collections;
 
 [RequireComponent(typeof(CharacterController))]
 public class TestPlayerController : NetworkBehaviour
@@ -51,6 +52,24 @@ public class TestPlayerController : NetworkBehaviour
     private RaycastHit[] groundHitsBuffer = new RaycastHit[8];
 
     private Quaternion lastStableRotation;
+    private bool canMove = false;
+    private bool spawnInitialized = false;
+    private NetworkVariable<bool> networkSpawnInitialized =
+    new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
+    [Header("Spawn Settings")]
+    [SerializeField]
+    private Vector3[] spawnPositions =
+    {
+        new Vector3(250f, 20f, 250f), // 호스트
+        new Vector3(254f, 20f, 250f), // 참가자 1
+        new Vector3(250f, 20f, 254f), // 참가자 2
+        new Vector3(246f, 20f, 250f)  // 참가자 3
+    };
 
     private void Start()
     {
@@ -66,28 +85,178 @@ public class TestPlayerController : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        // 자신의 캐릭터만 카메라를 연결
+        canMove = false;
+        spawnInitialized = false;
+
+        networkSpawnInitialized.OnValueChanged += OnSpawnInitializedChanged;
+
         if (IsOwner)
         {
             if (Camera.main != null)
+            {
                 shoulderCam = Camera.main.GetComponent<ShoulderCamera>();
+            }
         }
 
-        // 서버에서 스폰 위치를 위로 이동
         if (IsServer)
         {
-            Vector3 spawnPos = transform.position;
-            spawnPos.y += 20f;
-
-            transform.position = spawnPos;
+            StartCoroutine(WaitForInitialChunks());
         }
+
+        // 이미 서버에서 초기화된 플레이어라면 즉시 반영
+        if (networkSpawnInitialized.Value)
+        {
+            ApplySpawnInitialized();
+        }
+    }
+
+    private void OnSpawnInitializedChanged(bool previousValue, bool newValue)
+    {
+        if (newValue)
+        {
+            ApplySpawnInitialized();
+        }
+    }
+
+    private void ApplySpawnInitialized()
+    {
+        spawnInitialized = true;
+        canMove = true;
+
+        Debug.Log(
+            $"[Player] 이동 활성화 | " +
+            $"OwnerClientId={OwnerClientId}, IsOwner={IsOwner}"
+        );
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        networkSpawnInitialized.OnValueChanged -= OnSpawnInitializedChanged;
+        base.OnNetworkDespawn();
+    }
+
+    private Vector3 GetSpawnPosition(ulong clientId)
+    {
+        int spawnIndex = (int)clientId;
+
+        if (spawnPositions == null || spawnPositions.Length == 0)
+        {
+            Debug.LogError("[Player] 스폰 위치 배열이 비어 있습니다.");
+            return new Vector3(250f, 20f, 250f);
+        }
+
+        if (spawnIndex < 0 || spawnIndex >= spawnPositions.Length)
+        {
+            Debug.LogWarning(
+                $"[Player] ClientId {clientId}에 해당하는 스폰 위치가 없습니다."
+            );
+
+            return spawnPositions[0];
+        }
+
+        return spawnPositions[spawnIndex];
+    }
+
+    [ClientRpc]
+    private void SetSpawnPositionClientRpc(
+        Vector3 spawnPosition,
+        ClientRpcParams clientRpcParams = default)
+    {
+        // 이 RPC는 지정된 클라이언트에만 전송한다.
+        // 해당 플레이어의 소유 클라이언트에서만 위치를 적용한다.
+        if (!IsOwner)
+            return;
+
+        CharacterController cc = GetComponent<CharacterController>();
+
+        if (cc != null)
+            cc.enabled = false;
+
+        transform.position = spawnPosition;
+
+        if (cc != null)
+            cc.enabled = true;
+
+        verticalVelocity = 0f;
+        isGrounded = false;
+
+        Debug.Log(
+            $"[Player] 스폰 위치 적용 | " +
+            $"ClientId={OwnerClientId}, " +
+            $"Position={transform.position}"
+        );
+    }
+
+    private IEnumerator WaitForInitialChunks()
+    {
+        // 월드가 준비될 때까지 대기
+        while (WorldManager.Instance == null ||
+            !WorldManager.Instance.IsInitialChunksReady)
+        {
+            yield return null;
+        }
+
+        // 서버에서 해당 플레이어의 스폰 위치 결정
+        Vector3 spawnPosition = GetSpawnPosition(OwnerClientId);
+
+        // 서버 자신의 플레이어는 직접 위치 변경
+        if (IsOwner)
+        {
+            CharacterController cc = GetComponent<CharacterController>();
+
+            if (cc != null)
+                cc.enabled = false;
+
+            transform.position = spawnPosition;
+
+            if (cc != null)
+                cc.enabled = true;
+
+            verticalVelocity = 0f;
+            isGrounded = false;
+        }
+        else
+        {
+            // 플레이어 소유 클라이언트에만 스폰 위치 전달
+            ClientRpcParams rpcParams = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams
+                {
+                    TargetClientIds = new[] { OwnerClientId }
+                }
+            };
+
+            SetSpawnPositionClientRpc(spawnPosition, rpcParams);
+        }
+
+        // 서버에서 초기화 완료 상태를 네트워크로 전달
+        networkSpawnInitialized.Value = true;
+
+        ApplySpawnInitialized();
+
+        Debug.Log(
+            $"[Player] 스폰 위치 결정 | " +
+            $"ClientId={OwnerClientId}, " +
+            $"Position={spawnPosition}"
+        );
     }
 
     private void Update()
     {
-        // 다른 플레이어 캐릭터의 입력은 받지 않음
+
         if (!IsOwner)
             return;
+
+        if (!spawnInitialized || !canMove)
+        {
+            Debug.Log(
+                $"[Player Movement Blocked] " +
+                $"spawnInitialized={spawnInitialized}, " +
+                $"canMove={canMove}"
+            );
+
+            return;
+        }
 
         UpdateGroundedState();
 
