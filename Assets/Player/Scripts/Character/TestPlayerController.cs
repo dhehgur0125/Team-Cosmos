@@ -12,14 +12,31 @@
     Space
     → 점프
 
-    카메라 방향을 기준으로 캐릭터가 이동하고 회전합니다.
+    평상시 이동
+    → 이동 방향을 바라봄
+
+    견착 / 정밀 조준 중
+    → 카메라의 수평 방향을 바라봄
+
+    자동소총 발사 버튼을 누르는 중
+    → 캐릭터가 크로스헤어 방향으로 부드럽게 회전
+
+    캐릭터 몸과 크로스헤어 방향 차이가
+    Fire Angle Tolerance 이하가 되면
+    → 실제 총 발사 허용
+
+    따라서 캐릭터가 앞을 보고 있는데
+    총알만 등 뒤로 발사되는 현상을 방지합니다.
 
     견착 또는 정밀 조준 중
     → Shift를 눌러도 달릴 수 없음
-    → 자동으로 걷기 속도로 이동
+    → 걷기 속도로 이동
 
     멀티플레이에서는
     자신의 캐릭터만 입력을 받을 수 있습니다.
+
+    서버는 월드 초기 청크 준비 후
+    플레이어별 스폰 위치를 지정합니다.
 */
 
 using UnityEngine;
@@ -31,12 +48,21 @@ public class TestPlayerController : NetworkBehaviour
 {
     private Animator animator;
     private CharacterController controller;
+
     private GunAim gunAim;
+    private GunFire gunFire;
 
     [Header("Movement Settings")]
     public float walkSpeed = 3.5f;
     public float runSpeed = 7.5f;
     public float rotationSpeed = 14f;
+
+    [Header("Combat Rotation")]
+    [Tooltip("조준 또는 사격 중 카메라 방향으로 회전하는 속도(도/초)")]
+    [SerializeField] private float combatTurnSpeed = 360f;
+
+    [Tooltip("몸과 카메라 방향 차이가 이 각도 이하일 때 사격 허용")]
+    [SerializeField] private float fireAngleTolerance = 25f;
 
     [Header("Jump & Gravity Settings")]
     public float jumpHeight = 1.3f;
@@ -52,14 +78,16 @@ public class TestPlayerController : NetworkBehaviour
     private RaycastHit[] groundHitsBuffer = new RaycastHit[8];
 
     private Quaternion lastStableRotation;
+
     private bool canMove = false;
     private bool spawnInitialized = false;
+
     private NetworkVariable<bool> networkSpawnInitialized =
-    new NetworkVariable<bool>(
-        false,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server
-    );
+        new NetworkVariable<bool>(
+            false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
 
     [Header("Spawn Settings")]
     [SerializeField]
@@ -75,7 +103,9 @@ public class TestPlayerController : NetworkBehaviour
     {
         animator = GetComponent<Animator>();
         controller = GetComponent<CharacterController>();
+
         gunAim = GetComponent<GunAim>();
+        gunFire = GetComponent<GunFire>();
 
         lastStableRotation = transform.rotation;
 
@@ -88,13 +118,15 @@ public class TestPlayerController : NetworkBehaviour
         canMove = false;
         spawnInitialized = false;
 
-        networkSpawnInitialized.OnValueChanged += OnSpawnInitializedChanged;
+        networkSpawnInitialized.OnValueChanged +=
+            OnSpawnInitializedChanged;
 
         if (IsOwner)
         {
             if (Camera.main != null)
             {
-                shoulderCam = Camera.main.GetComponent<ShoulderCamera>();
+                shoulderCam =
+                    Camera.main.GetComponent<ShoulderCamera>();
             }
         }
 
@@ -110,7 +142,9 @@ public class TestPlayerController : NetworkBehaviour
         }
     }
 
-    private void OnSpawnInitializedChanged(bool previousValue, bool newValue)
+    private void OnSpawnInitializedChanged(
+        bool previousValue,
+        bool newValue)
     {
         if (newValue)
         {
@@ -131,7 +165,9 @@ public class TestPlayerController : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        networkSpawnInitialized.OnValueChanged -= OnSpawnInitializedChanged;
+        networkSpawnInitialized.OnValueChanged -=
+            OnSpawnInitializedChanged;
+
         base.OnNetworkDespawn();
     }
 
@@ -139,13 +175,22 @@ public class TestPlayerController : NetworkBehaviour
     {
         int spawnIndex = (int)clientId;
 
-        if (spawnPositions == null || spawnPositions.Length == 0)
+        if (spawnPositions == null ||
+            spawnPositions.Length == 0)
         {
-            Debug.LogError("[Player] 스폰 위치 배열이 비어 있습니다.");
-            return new Vector3(250f, 20f, 250f);
+            Debug.LogError(
+                "[Player] 스폰 위치 배열이 비어 있습니다."
+            );
+
+            return new Vector3(
+                250f,
+                20f,
+                250f
+            );
         }
 
-        if (spawnIndex < 0 || spawnIndex >= spawnPositions.Length)
+        if (spawnIndex < 0 ||
+            spawnIndex >= spawnPositions.Length)
         {
             Debug.LogWarning(
                 $"[Player] ClientId {clientId}에 해당하는 스폰 위치가 없습니다."
@@ -162,12 +207,12 @@ public class TestPlayerController : NetworkBehaviour
         Vector3 spawnPosition,
         ClientRpcParams clientRpcParams = default)
     {
-        // 이 RPC는 지정된 클라이언트에만 전송한다.
-        // 해당 플레이어의 소유 클라이언트에서만 위치를 적용한다.
+        // 지정된 플레이어의 소유 클라이언트에서만 위치 적용
         if (!IsOwner)
             return;
 
-        CharacterController cc = GetComponent<CharacterController>();
+        CharacterController cc =
+            GetComponent<CharacterController>();
 
         if (cc != null)
             cc.enabled = false;
@@ -191,18 +236,20 @@ public class TestPlayerController : NetworkBehaviour
     {
         // 월드가 준비될 때까지 대기
         while (WorldManager.Instance == null ||
-            !WorldManager.Instance.IsInitialChunksReady)
+               !WorldManager.Instance.IsInitialChunksReady)
         {
             yield return null;
         }
 
         // 서버에서 해당 플레이어의 스폰 위치 결정
-        Vector3 spawnPosition = GetSpawnPosition(OwnerClientId);
+        Vector3 spawnPosition =
+            GetSpawnPosition(OwnerClientId);
 
         // 서버 자신의 플레이어는 직접 위치 변경
         if (IsOwner)
         {
-            CharacterController cc = GetComponent<CharacterController>();
+            CharacterController cc =
+                GetComponent<CharacterController>();
 
             if (cc != null)
                 cc.enabled = false;
@@ -217,19 +264,25 @@ public class TestPlayerController : NetworkBehaviour
         }
         else
         {
-            // 플레이어 소유 클라이언트에만 스폰 위치 전달
-            ClientRpcParams rpcParams = new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams
+            // 해당 플레이어의 소유 클라이언트에만 전달
+            ClientRpcParams rpcParams =
+                new ClientRpcParams
                 {
-                    TargetClientIds = new[] { OwnerClientId }
-                }
-            };
+                    Send =
+                        new ClientRpcSendParams
+                        {
+                            TargetClientIds =
+                                new[] { OwnerClientId }
+                        }
+                };
 
-            SetSpawnPositionClientRpc(spawnPosition, rpcParams);
+            SetSpawnPositionClientRpc(
+                spawnPosition,
+                rpcParams
+            );
         }
 
-        // 서버에서 초기화 완료 상태를 네트워크로 전달
+        // 서버에서 초기화 완료 상태 전달
         networkSpawnInitialized.Value = true;
 
         ApplySpawnInitialized();
@@ -243,11 +296,11 @@ public class TestPlayerController : NetworkBehaviour
 
     private void Update()
     {
-
         if (!IsOwner)
             return;
 
-        if (!spawnInitialized || !canMove)
+        if (!spawnInitialized ||
+            !canMove)
         {
             Debug.Log(
                 $"[Player Movement Blocked] " +
@@ -266,13 +319,20 @@ public class TestPlayerController : NetworkBehaviour
 
     private void HandleJump()
     {
-        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
+        if (Input.GetKeyDown(KeyCode.Space) &&
+            isGrounded)
         {
             verticalVelocity =
-                Mathf.Sqrt(jumpHeight * -2f * gravity);
+                Mathf.Sqrt(
+                    jumpHeight *
+                    -2f *
+                    gravity
+                );
 
             isGrounded = false;
-            lastStableRotation = transform.rotation;
+
+            lastStableRotation =
+                transform.rotation;
 
             if (animator != null)
             {
@@ -282,25 +342,47 @@ public class TestPlayerController : NetworkBehaviour
         }
 
         if (!isGrounded)
-            verticalVelocity += gravity * Time.deltaTime;
+        {
+            verticalVelocity +=
+                gravity *
+                Time.deltaTime;
+        }
     }
 
     private void HandleMovement()
     {
-        float h = Input.GetAxisRaw("Horizontal");
-        float v = Input.GetAxisRaw("Vertical");
+        float h =
+            Input.GetAxisRaw("Horizontal");
+
+        float v =
+            Input.GetAxisRaw("Vertical");
 
         Vector3 inputDir =
-            new Vector3(h, 0f, v).normalized;
+            new Vector3(
+                h,
+                0f,
+                v
+            ).normalized;
 
-        bool isMoving = inputDir.magnitude > 0f;
+        bool isMoving =
+            inputDir.magnitude > 0f;
 
         // 견착 또는 정밀 조준 중인지 확인
         bool isAiming =
             gunAim != null &&
-            gunAim.CurrentMode != GunAim.AimMode.Hip;
+            gunAim.CurrentMode !=
+            GunAim.AimMode.Hip;
 
-        // 조준 중에는 Shift를 눌러도 달리지 못함
+        // 자동소총 발사 버튼을 누르고 있는지 확인
+        bool isFiring =
+            gunFire != null &&
+            gunFire.IsFiring;
+
+        // 조준 / 사격 중에는 카메라 방향으로 몸 회전
+        bool useCombatRotation =
+            isAiming || isFiring;
+
+        // 조준 중에는 달리기 불가능
         bool isRunning =
             !isAiming &&
             isMoving &&
@@ -310,47 +392,87 @@ public class TestPlayerController : NetworkBehaviour
         float targetAnimSpeed = 0f;
         float moveSpeed = 0f;
 
-        Vector3 moveDir = Vector3.zero;
+        Vector3 moveDir =
+            Vector3.zero;
 
-        if (isMoving && shoulderCam != null)
+        if (isMoving &&
+            shoulderCam != null)
         {
             targetAnimSpeed =
                 isRunning ? 1f : 0.5f;
 
             moveSpeed =
-                isRunning ? runSpeed : walkSpeed;
+                isRunning
+                    ? runSpeed
+                    : walkSpeed;
 
-            float camYaw = shoulderCam.GetYaw();
+            float camYaw =
+                shoulderCam.GetYaw();
 
             Quaternion camYawRotation =
-                Quaternion.Euler(0f, camYaw, 0f);
+                Quaternion.Euler(
+                    0f,
+                    camYaw,
+                    0f
+                );
 
             moveDir =
-                camYawRotation * inputDir;
+                camYawRotation *
+                inputDir;
+        }
 
+        // --------------------------------
+        // 조준 / 사격 중
+        // 카메라 방향으로 부드럽게 회전
+        // --------------------------------
+        if (useCombatRotation &&
+            shoulderCam != null)
+        {
+            RotateTowardsCamera();
+        }
+
+        // --------------------------------
+        // 평상시 이동
+        // 이동 방향으로 회전
+        // --------------------------------
+        else if (isMoving &&
+                 moveDir.sqrMagnitude > 0.001f)
+        {
             Quaternion targetRotation =
-                Quaternion.LookRotation(moveDir);
+                Quaternion.LookRotation(
+                    moveDir
+                );
 
             transform.rotation =
                 Quaternion.Slerp(
                     transform.rotation,
                     targetRotation,
-                    rotationSpeed * Time.deltaTime
+                    rotationSpeed *
+                    Time.deltaTime
                 );
 
-            lastStableRotation = transform.rotation;
+            lastStableRotation =
+                transform.rotation;
         }
+
+        // --------------------------------
+        // 아무 입력도 없으면
+        // 마지막 방향 유지
+        // --------------------------------
         else
         {
-            transform.rotation = lastStableRotation;
+            transform.rotation =
+                lastStableRotation;
         }
 
         Vector3 finalVelocity =
             (moveDir * moveSpeed) +
-            (Vector3.up * verticalVelocity);
+            (Vector3.up *
+             verticalVelocity);
 
         controller.Move(
-            finalVelocity * Time.deltaTime
+            finalVelocity *
+            Time.deltaTime
         );
 
         if (animator != null)
@@ -364,6 +486,61 @@ public class TestPlayerController : NetworkBehaviour
         }
     }
 
+    private void RotateTowardsCamera()
+    {
+        if (shoulderCam == null)
+            return;
+
+        float cameraYaw =
+            shoulderCam.GetYaw();
+
+        Quaternion targetRotation =
+            Quaternion.Euler(
+                0f,
+                cameraYaw,
+                0f
+            );
+
+        // 순간 회전하지 않고
+        // 초당 일정한 각도로 부드럽게 회전
+        transform.rotation =
+            Quaternion.RotateTowards(
+                transform.rotation,
+                targetRotation,
+                combatTurnSpeed *
+                Time.deltaTime
+            );
+
+        lastStableRotation =
+            transform.rotation;
+    }
+
+    public bool CanFireTowardsCamera()
+    {
+        if (!IsOwner ||
+            shoulderCam == null)
+        {
+            return false;
+        }
+
+        Quaternion targetRotation =
+            Quaternion.Euler(
+                0f,
+                shoulderCam.GetYaw(),
+                0f
+            );
+
+        float angleDifference =
+            Quaternion.Angle(
+                transform.rotation,
+                targetRotation
+            );
+
+        // 몸이 크로스헤어 방향에 충분히 가까워졌을 때만 사격 허용
+        return angleDifference <=
+               fireAngleTolerance;
+    }
+
     private void UpdateGroundedState()
     {
         if (verticalVelocity > 0.1f)
@@ -374,9 +551,11 @@ public class TestPlayerController : NetworkBehaviour
 
         Vector3 rayOrigin =
             transform.position +
-            Vector3.up * 0.15f;
+            Vector3.up *
+            0.15f;
 
-        float rayDistance = 0.25f;
+        float rayDistance =
+            0.25f;
 
         int hitCount =
             Physics.RaycastNonAlloc(
@@ -388,15 +567,21 @@ public class TestPlayerController : NetworkBehaviour
                 QueryTriggerInteraction.Ignore
             );
 
-        bool foundGround = false;
+        bool foundGround =
+            false;
 
-        for (int i = 0; i < hitCount; i++)
+        for (int i = 0;
+             i < hitCount;
+             i++)
         {
             Transform hitTransform =
-                groundHitsBuffer[i].transform;
+                groundHitsBuffer[i]
+                    .transform;
 
             if (hitTransform != transform &&
-                !hitTransform.IsChildOf(transform))
+                !hitTransform.IsChildOf(
+                    transform
+                ))
             {
                 foundGround = true;
                 break;
