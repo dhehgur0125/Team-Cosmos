@@ -10,7 +10,7 @@
     → 달리기
 
     Space
-    → 점프
+    → 점프 (NetworkAnimator를 통해 다른 플레이어에게 동기화)
 
     평상시 이동
     → 이동 방향을 바라봄
@@ -41,12 +41,14 @@
 
 using UnityEngine;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using System.Collections;
 
 [RequireComponent(typeof(CharacterController))]
 public class TestPlayerController : NetworkBehaviour
 {
     private Animator animator;
+    private NetworkAnimator networkAnimator;
     private CharacterController controller;
 
     private GunAim gunAim;
@@ -102,6 +104,7 @@ public class TestPlayerController : NetworkBehaviour
     private void Start()
     {
         animator = GetComponent<Animator>();
+        networkAnimator = GetComponent<NetworkAnimator>();
         controller = GetComponent<CharacterController>();
 
         gunAim = GetComponent<GunAim>();
@@ -334,11 +337,11 @@ public class TestPlayerController : NetworkBehaviour
             lastStableRotation =
                 transform.rotation;
 
-            if (animator != null)
-            {
-                animator.ResetTrigger("Jump");
+            // 네트워크 애니메이터를 통해 점프 트리거 동기화
+            if (networkAnimator != null)
+                networkAnimator.SetTrigger("Jump");
+            else if (animator != null)
                 animator.SetTrigger("Jump");
-            }
         }
 
         if (!isGrounded)
