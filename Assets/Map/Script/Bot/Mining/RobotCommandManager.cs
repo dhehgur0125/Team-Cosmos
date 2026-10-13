@@ -64,9 +64,9 @@ public class RobotCommandManager : NetworkBehaviour
         }
     }
 
-    private IEnumerator RegisterToManagerSafe()
+    private System.Collections.IEnumerator RegisterToManagerSafe()
     {
-        while (RobotTaskManager.Instance == null)
+        while (RobotTaskManager.Instance == null || !RobotTaskManager.Instance.IsSpawned)
         {
             yield return null;
         }
