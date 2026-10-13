@@ -147,6 +147,7 @@ GameObject:
   - component: {fileID: 5184736941399935301}
   - component: {fileID: 6617578352280372390}
   - component: {fileID: 1336984847077187395}
+  - component: {fileID: 2466805133127757818}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -289,7 +290,7 @@ MonoBehaviour:
   RotationInterpolationType: 0
   ScaleInterpolationType: 0
   PositionLerpSmoothing: 1
-  PositionMaxInterpolationTime: 0.1
+  PositionMaxInterpolationTime: 0.15
   RotationLerpSmoothing: 1
   RotationMaxInterpolationTime: 0.1
   ScaleLerpSmoothing: 1
@@ -414,6 +415,46 @@ MonoBehaviour:
   maxScanDistance: 100
   scannerMuzzle: {fileID: 8368400097140641491}
   tracerPrefab: {fileID: 3278156858547463519, guid: c7b737a6892c6f74cb3fbcc7df7f6139, type: 3}
+--- !u!114 &2466805133127757818
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7621213699471952816}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkAnimatorExpanded: 0
+  AuthorityMode: 1
+  m_Animator: {fileID: 8010303249706514178}
+  TransitionStateInfoList: []
+  AnimatorParameterEntries:
+    ParameterEntries:
+    - name: Blend
+      NameHash: 1784438316
+      Synchronize: 1
+      ParameterType: 1
+    - name: isMoving
+      NameHash: -27727268
+      Synchronize: 1
+      ParameterType: 4
+    - name: isRunning
+      NameHash: 1239866031
+      Synchronize: 1
+      ParameterType: 4
+    - name: Speed
+      NameHash: -823668238
+      Synchronize: 1
+      ParameterType: 1
+    - name: Jump
+      NameHash: 125937960
+      Synchronize: 1
+      ParameterType: 9
+  AnimatorParametersExpanded: 0
 --- !u!1 &7768763786913196380
 GameObject:
   m_ObjectHideFlags: 0
