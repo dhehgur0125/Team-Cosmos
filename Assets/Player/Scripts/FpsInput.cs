@@ -20,6 +20,7 @@ namespace VoidLast.Player
         public bool Jump { get; private set; }
         public bool Interact { get; private set; }
         public bool Drop { get; private set; }
+        public bool Reload { get; private set; }
         public bool HalveHealth { get; private set; }
         public int Slot { get; private set; }
         public bool ReleaseCursor { get; private set; }
@@ -44,6 +45,7 @@ namespace VoidLast.Player
                 Jump = keyboard.spaceKey.wasPressedThisFrame;
                 Interact = keyboard.fKey.wasPressedThisFrame;
                 Drop = keyboard.qKey.wasPressedThisFrame;
+                Reload = keyboard.rKey.wasPressedThisFrame;
                 HalveHealth = keyboard.hKey.wasPressedThisFrame;
                 Slot = (keyboard.digit1Key.wasPressedThisFrame || keyboard.numpad1Key.wasPressedThisFrame) ? 1 : (keyboard.digit2Key.wasPressedThisFrame || keyboard.numpad2Key.wasPressedThisFrame) ? 2 : (keyboard.digit3Key.wasPressedThisFrame || keyboard.numpad3Key.wasPressedThisFrame) ? 3 : (keyboard.digit4Key.wasPressedThisFrame || keyboard.numpad4Key.wasPressedThisFrame) ? 4 : (keyboard.digit5Key.wasPressedThisFrame || keyboard.numpad5Key.wasPressedThisFrame) ? 5 : (keyboard.digit6Key.wasPressedThisFrame || keyboard.numpad6Key.wasPressedThisFrame) ? 6 : 0;
             }
@@ -70,6 +72,7 @@ namespace VoidLast.Player
             Jump = Input.GetKeyDown(KeyCode.Space);
             Interact = Input.GetKeyDown(KeyCode.F);
             Drop = Input.GetKeyDown(KeyCode.Q);
+            Reload = Input.GetKeyDown(KeyCode.R);
             HalveHealth = Input.GetKeyDown(KeyCode.H);
             Slot = (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) ? 1 : (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) ? 2 : (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) ? 3 : (Input.GetKeyDown(KeyCode.Alpha4) || Input.GetKeyDown(KeyCode.Keypad4)) ? 4 : (Input.GetKeyDown(KeyCode.Alpha5) || Input.GetKeyDown(KeyCode.Keypad5)) ? 5 : (Input.GetKeyDown(KeyCode.Alpha6) || Input.GetKeyDown(KeyCode.Keypad6)) ? 6 : 0;
 #endif
@@ -80,7 +83,7 @@ namespace VoidLast.Player
         {
             Move = Look = Vector2.zero;
             Sprint = Crouch = Aim = Attack = Jump = ReleaseCursor = CaptureCursor = false;
-            Interact = Drop = HalveHealth = false;
+            Interact = Drop = Reload = HalveHealth = false;
             AttackHeld = AimPressed = false;
             Slot = 0;
         }

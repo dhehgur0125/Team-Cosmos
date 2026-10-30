@@ -21,7 +21,7 @@
 
 기존 Pistol Idle·장착 애니메이션은 유지하며, `FpsHeldItemPose`가 상체 레이어의 손 IK를 사용해 권총 양손 그립과 주사기 오른손 그립을 보정합니다. 손가락은 기존 우주복 본에서 얻은 굽힌 자세를 사용합니다. 이동과 점프 하체 레이어는 유지합니다. 손가락이 펌프를 실제로 누르는 별도 애니메이션은 없습니다.
 
-Unity 기본 [OnAnimatorIK](https://docs.unity3d.com/6000.4/Documentation/ScriptReference/MonoBehaviour.OnAnimatorIK.html)와 [SetBoneLocalRotation](https://docs.unity3d.com/6000.4/Documentation/ScriptReference/Animator.SetBoneLocalRotation.html)을 사용하며 추가 패키지가 필요하지 않습니다.
+Unity 기본 `OnAnimatorIK`를 사용하며 추가 패키지가 필요하지 않습니다. Humanoid IK 축과 원본 손목 축의 차이를 한 번 보정하고, 손가락은 IK 계산 뒤 원본 본의 로컬 회전으로 그립을 적용합니다.
 
 ## 적용 및 검증
 
@@ -29,4 +29,4 @@ Unity 메뉴 `VOID LAST > Player > 7 - Update Hand Grips and World Item`은 현�
 
 검증 메뉴는 `VOID LAST > Player > 3 - Run Play Mode Validation`입니다. 양손 목표 도달, 손목 좌우 순서, 주사기 오른손 부착, 카메라별 중복 숨김, 외부 펌프 진행률을 검사하고 관찰 화면을 저장합니다.
 
-새 그립 작업은 Unity MCP 연결 복구 후 실제 적용·Play Mode·육안 검증이 필요합니다. 이전 UI/체력/파밍 검증 통과 기록과 이번 추가 작업의 완료 상태를 혼동하지 않습니다.
+Unity MCP 연결을 복구하여 프리팹에 적용했습니다. 최종 실행 결과는 `Validation/PlayModeResults.txt`, 실제 외부 모습은 `Pistol_Hip_Observer.png`, `Pistol_Grip_Observer.png`, `Syringe_Grip_Observer.png`에서 확인합니다. 네트워크 플레이 검증은 포함하지 않습니다.

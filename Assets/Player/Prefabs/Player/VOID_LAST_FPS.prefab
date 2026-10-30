@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 101202275934569732}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7386845, y: 0.6587349, z: -0.12708539, w: -0.0652912}
-  m_LocalPosition: {x: 0.14771242, y: -0.03496522, z: -0.047784213}
+  m_LocalPosition: {x: 0.111377634, y: -0.026547868, z: -0.0015464078}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1001,6 +1001,7 @@ GameObject:
   - component: {fileID: 5623530900887374054}
   - component: {fileID: 8894219459614087428}
   - component: {fileID: 893101056516047871}
+  - component: {fileID: 6058082756904572691}
   m_Layer: 0
   m_Name: VOID_LAST_FPS
   m_TagString: Untagged
@@ -1207,6 +1208,7 @@ MonoBehaviour:
   aimTransitionSpeed: 12
   equipDuration: 0.3
   equipOffset: {x: 0, y: -0.35, z: -0.08}
+  reloadOffset: {x: 0, y: -0.4, z: -0.08}
 --- !u!114 &6931633867374507815
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1269,9 +1271,9 @@ MonoBehaviour:
   itemRoot: {fileID: 3944130264746018055}
   pump: {fileID: 96344897252019459}
   handGrip: {fileID: 1675276877252956905}
-  handPosition: {x: 0, y: -0.018, z: -0.035}
+  handPosition: {x: 0, y: 0.005, z: -0.015}
   handEuler: {x: 0, y: 0, z: 0}
-  handScale: 0.85
+  handScale: 0.9
   worldItem: {fileID: 5512554330277555668}
   worldPump: {fileID: 7624290710928737847}
   pumpPressedOffset: {x: 0, y: 0, z: 0.055}
@@ -1282,6 +1284,10 @@ MonoBehaviour:
   otherUsePosition: {x: 0.12, y: -0.22, z: 0.46}
   otherUseEuler: {x: 0, y: 0, z: -20}
   modelScale: 1.1
+  equipDuration: 0.4
+  equipOffset: {x: 0, y: -0.35, z: -0.08}
+  uniqueItemRoot: {fileID: 0}
+  uniqueHeldPosition: {x: 0.2, y: -0.18, z: 0.4}
 --- !u!114 &893101056516047871
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1312,8 +1318,108 @@ MonoBehaviour:
   syringeIcon: {fileID: 21300000, guid: a22ecf75391d9fc43bc7cdb559a57ae4, type: 3}
   healthBarWidth: 400
   contextLabel: {fileID: 828930297481520908}
+  ammoLabel: {fileID: 6485482983540141405}
   visibleSeconds: 3
   fadeSeconds: 0.5
+--- !u!114 &6058082756904572691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4874269986630254310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 276119fa8a390d548b76999d901a210c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsPistol
+  viewCamera: {fileID: 628056177216943509}
+  bulletMarkPrefab: {fileID: 2550820544791290943, guid: 0eeeea6421bc9f94a80e56deff80c386, type: 3}
+  magazineCapacity: 10
+  startingMagazine: 10
+  startingReserve: 30
+  shotInterval: 0.18
+  range: 100
+  reloadDuration: 1.5
+--- !u!1 &5023782149386011162
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3051459949125481279}
+  - component: {fileID: 914376724102335895}
+  - component: {fileID: 6485482983540141405}
+  m_Layer: 0
+  m_Name: Ammo
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &3051459949125481279
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5023782149386011162}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1214219083719905075}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 1, y: 0}
+  m_AnchorMax: {x: 1, y: 0}
+  m_AnchoredPosition: {x: -30, y: 35}
+  m_SizeDelta: {x: 220, y: 44}
+  m_Pivot: {x: 1, y: 0}
+--- !u!222 &914376724102335895
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5023782149386011162}
+  m_CullTransparentMesh: 1
+--- !u!114 &6485482983540141405
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5023782149386011162}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_FontSize: 28
+    m_FontStyle: 0
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 5
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+    m_LineSpacing: 1
+  m_Text: 10 / 30
 --- !u!1 &6422283798855473423
 GameObject:
   m_ObjectHideFlags: 0
@@ -2005,6 +2111,7 @@ RectTransform:
   - {fileID: 6108887769442387905}
   - {fileID: 8332807023295039152}
   - {fileID: 7391175525891724049}
+  - {fileID: 3051459949125481279}
   m_Father: {fileID: 3203973901369466343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}

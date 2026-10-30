@@ -94,6 +94,12 @@ namespace VoidLast.Player.Editor
             Require(!weapon.IsVisible && !itemView.IsVisible && !interactor.TryDrop(), "Rapid equip cancellation and melee Q do not create items", report);
             equipment.Process(3, false, false); Require(!interactor.TryDrop(), "Unique item slot cannot Q-drop", report);
             equipment.Process(4, false, false); health.TakeDamage(50);
+            float itemLowY = itemView.ItemRoot.localPosition.y;
+            Require(!inventory.TryStartUse(), "Item use is blocked at start of equip", report);
+            itemView.Refresh(0.2f);
+            Require(!itemView.CanUse && !inventory.TryStartUse(), "Item use is blocked halfway through equip", report);
+            itemView.Refresh(0.2f);
+            Require(itemView.CanUse && itemView.ItemRoot.localPosition.y > itemLowY + 0.3f, "Item rises and becomes usable after its separate 0.4-second equip", report);
             Require(inventory.TryStartUse() && !inventory.TryStartUse() && !interactor.TryDrop(), "Use starts once; duplicate use and Q are blocked", report);
             for (float time = 0; time < 0.5f; time += Time.deltaTime) { inventory.TickUse(Time.deltaTime, true, false); yield return null; }
             equipment.Process(5, false, false);
@@ -120,7 +126,7 @@ namespace VoidLast.Player.Editor
             yield return null;
             Require(!itemView.IsVisible, "Consumed syringe disappears from FPS view", report);
             Require(itemView.PumpProgress == 0 && pump.localPosition.sqrMagnitude < 0.000001f, "Consumption resets pump for the next syringe", report);
-            equipment.Process(4, false, false); Require(inventory.TryStartUse(), "Second syringe use starts at 80 HP", report);
+            equipment.Process(4, false, false); itemView.Refresh(0.5f); Require(inventory.TryStartUse(), "Second syringe use starts at 80 HP", report);
             while (inventory.IsUsing) { inventory.TickUse(Time.deltaTime, true, false); yield return null; }
             Require(health.Current == 100 && inventory.ItemAt(0) == FarmingItemKind.None && inventory.ItemAt(2) == FarmingItemKind.Syringe, "80 HP plus syringe clamps to 100 and consumes one", report);
             Require(inventory.TryAdd(FarmingItemKind.Syringe) && inventory.TryAdd(FarmingItemKind.Syringe), "New pickups fill earlier empty slots first", report);
@@ -184,7 +190,7 @@ namespace VoidLast.Player.Editor
             Require(dot.anchorMin == Vector2.one * 0.5f && dot.anchorMax == dot.anchorMin && dot.anchoredPosition == Vector2.zero && dot.GetComponent<Image>().sprite != null, "White dot is anchored to exact screen center with circle sprite", report);
             var hpRect = player.transform.Find("FPS HUD/Health").GetComponent<RectTransform>();
             Require(hpRect.anchorMin == new Vector2(0, 1) && player.GetComponentInChildren<CanvasScaler>().uiScaleMode == CanvasScaler.ScaleMode.ScaleWithScreenSize, "HP remains top-left and HUD scales with resolution", report);
-            health.TakeDamage(50); Require(inventory.TryStartUse(), "Death-cancellation test starts a syringe", report);
+            itemView.Refresh(0.5f); health.TakeDamage(50); Require(inventory.TryStartUse(), "Death-cancellation test starts a syringe", report);
             health.TakeDamage(10000); inventory.TickUse(0, true, false); yield return null;
             Require(health.IsDead && health.Current == 0 && motor.IsDead && !inventory.IsUsing && inventory.IsFull && !itemView.IsVisible && !health.Heal(100), "Zero HP invokes existing death, cancels use, preserves syringe and blocks resurrection", report);
             Require(File.Exists("Assets/Player/Validation/Syringe_Using_HUD.png") && File.Exists("Assets/Player/Validation/Farming_Full_HUD.png"), "Actual Game View HUD screenshots saved", report);
@@ -195,7 +201,7 @@ namespace VoidLast.Player.Editor
             var equipment = player.GetComponent<FpsEquipment>(); var interactor = player.GetComponent<FpsItemInteractor>();
             var motor = player.GetComponent<FpsMotor>(); var view = player.GetComponent<FpsItemView>();
             var camera = player.GetComponentInChildren<Camera>(true); var pivot = camera.transform.parent;
-            equipment.Process(4, false, false); health.TakeDamage(20);
+            equipment.Process(4, false, false); view.Refresh(0.5f); health.TakeDamage(20);
             Require(inventory.TryStartUse(), "LMB held self-use begins", report);
             var before = player.transform.position; Move(motor, Vector2.right, true, false);
             Require(Vector3.Distance(before, player.transform.position) < 0.4f && !motor.IsRunning, "Syringe use slows movement to 15 percent and blocks sprint", report);
@@ -231,7 +237,7 @@ namespace VoidLast.Player.Editor
                 Require(inventory.TryStartUse(recipient), "Target healing restarts after obstruction clears", report);
                 equipment.Process(5, false, false); inventory.TickUse(0, false, true);
                 Require(!inventory.IsUsing && inventory.IsFull, "Switching slots cancels other-player healing", report);
-                equipment.Process(4, false, false); Require(inventory.TryStartUse(recipient), "Other-player completion test starts", report);
+                equipment.Process(4, false, false); view.Refresh(0.5f); Require(inventory.TryStartUse(recipient), "Other-player completion test starts", report);
                 for (float time = 0; time < 1.5f; time += Time.deltaTime) { inventory.TickUse(Time.deltaTime, false, true); yield return null; }
                 Require(recipient.Current == 50 && health.Current == 100, "Target healing is deferred until full hold completes", report);
                 ScreenCapture.CaptureScreenshot("Assets/Player/Validation/Syringe_OtherPlayer_HUD.png");

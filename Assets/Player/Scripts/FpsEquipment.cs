@@ -11,12 +11,13 @@ namespace VoidLast.Player
         [SerializeField] EquipmentSlot selectedSlot = EquipmentSlot.Pistol;
         FpsInput input;
         FpsMotor motor;
+        FpsPistol pistol;
         public EquipmentSlot SelectedSlot => selectedSlot;
         public bool IsAiming { get; private set; }
         public event Action MeleeRequested;
         public event Action SlotChanged;
         public event Action<int> SlotSelected;
-        void Awake() { input = GetComponent<FpsInput>(); motor = GetComponent<FpsMotor>(); }
+        void Awake() { input = GetComponent<FpsInput>(); motor = GetComponent<FpsMotor>(); pistol = GetComponent<FpsPistol>(); }
         void Update() => Process(input.Slot, input.Aim, input.Attack);
         public void Process(int slot, bool aim, bool attack)
         {
@@ -27,7 +28,7 @@ namespace VoidLast.Player
                 SlotChanged?.Invoke();
             }
             if (slot >= 1 && slot <= 6) SlotSelected?.Invoke(slot);
-            IsAiming = selectedSlot == EquipmentSlot.Pistol && aim;
+            IsAiming = selectedSlot == EquipmentSlot.Pistol && aim && (pistol == null || !pistol.IsReloading);
             if (selectedSlot == EquipmentSlot.Melee && attack) MeleeRequested?.Invoke();
         }
         void OnDisable() => IsAiming = false;

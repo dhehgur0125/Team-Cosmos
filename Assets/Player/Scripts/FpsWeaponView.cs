@@ -1,4 +1,4 @@
-/* [ 코드 설명 ] 기존 SF 권총 인스턴스의 기본/조준 위치를 부드럽게 전환하고 1번 슬롯에서만 표시합니다. 카메라 자식 WeaponRoot와 오른손의 외부 표시용 권총을 관리하며 사격 기능은 없습니다. */
+/* [ 코드 설명 ] 기존 권총의 장착·조준·임시 재장전 위치를 한 곳에서 보간합니다. 탄약과 발사는 FpsPistol에 맡기며 카메라 자식과 외부 권총 표시를 유지합니다. */
 using UnityEngine;
 
 namespace VoidLast.Player
@@ -15,34 +15,42 @@ namespace VoidLast.Player
         [SerializeField, Min(0.01f)] float aimTransitionSpeed = 12;
         [SerializeField, Range(0.2f, 0.4f)] float equipDuration = 0.3f;
         [SerializeField] Vector3 equipOffset = new Vector3(0, -0.35f, -0.08f);
+        [SerializeField] Vector3 reloadOffset = new Vector3(0, -0.4f, -0.08f);
         FpsEquipment equipment;
         FpsMotor motor;
         float aimBlend;
-        float equipElapsed;
-        bool wasVisible;
+        FpsPistol pistol;
+        readonly FpsEquipMotion equip = new FpsEquipMotion();
         public float AimBlend => aimBlend;
         public bool IsVisible => weaponRoot != null && weaponRoot.gameObject.activeSelf;
+        public bool IsEquipped => IsVisible && equip.IsReady && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol && !motor.IsDead;
 
         void Awake()
         {
-            equipment = GetComponent<FpsEquipment>(); motor = GetComponent<FpsMotor>();
+            equipment = GetComponent<FpsEquipment>(); motor = GetComponent<FpsMotor>(); pistol = GetComponent<FpsPistol>();
             Refresh(0);
         }
         void LateUpdate() => Refresh(Time.deltaTime);
+        void OnEnable() => equipment.SlotChanged += SelectionChanged;
+        void OnDisable() { equipment.SlotChanged -= SelectionChanged; equip.Reset(); }
+        void SelectionChanged() { equip.Reset(); Refresh(0); }
         public void Refresh(float deltaTime)
         {
             if (weaponRoot == null || equipment == null) return;
             bool visible = equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol && !motor.IsDead;
-            if (visible && !wasVisible) equipElapsed = 0;
-            wasVisible = visible;
-            equipElapsed = visible ? Mathf.Min(equipDuration, equipElapsed + Mathf.Max(0, deltaTime)) : 0;
+            equip.Tick(visible, 1, deltaTime, equipDuration);
             weaponRoot.gameObject.SetActive(visible);
             if (worldWeapon != null) worldWeapon.SetActive(visible);
-            float target = visible && equipment.IsAiming ? 1 : 0;
+            float target = visible && equipment.IsAiming && (pistol == null || !pistol.IsReloading) ? 1 : 0;
             aimBlend = Mathf.Lerp(aimBlend, target, 1 - Mathf.Exp(-aimTransitionSpeed * deltaTime));
             if (!visible) aimBlend = 0;
-            float equip = Mathf.SmoothStep(0, 1, equipElapsed / Mathf.Max(0.01f, equipDuration));
-            weaponRoot.localPosition = Vector3.Lerp(hipPosition, aimPosition, aimBlend) + equipOffset * (1 - equip);
+            float reload = 0;
+            if (pistol != null && pistol.IsReloading)
+            {
+                float progress = pistol.ReloadProgress;
+                reload = progress < 0.2f ? Mathf.SmoothStep(0, 1, progress / 0.2f) : progress < 0.8f ? 1 : Mathf.SmoothStep(1, 0, (progress - 0.8f) / 0.2f);
+            }
+            weaponRoot.localPosition = Vector3.Lerp(hipPosition, aimPosition, aimBlend) + equipOffset * (1 - equip.Blend) + reloadOffset * reload;
             weaponRoot.localRotation = Quaternion.Slerp(Quaternion.Euler(hipEulerAngles), Quaternion.Euler(aimEulerAngles), aimBlend);
             weaponRoot.localScale = Vector3.one * modelScale;
         }

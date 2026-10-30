@@ -18,6 +18,7 @@ namespace VoidLast.Player
         FpsMotor motor;
         FpsInput input;
         FpsItemInteractor interactor;
+        FpsItemView view;
         FpsHealth recipient;
         int usingIndex = -1;
         float elapsed;
@@ -37,6 +38,7 @@ namespace VoidLast.Player
             equipment = GetComponent<FpsEquipment>(); health = GetComponent<FpsHealth>();
             input = GetComponent<FpsInput>(); motor = GetComponent<FpsMotor>();
             interactor = GetComponent<FpsItemInteractor>();
+            view = GetComponent<FpsItemView>();
         }
         void OnEnable() { equipment.SlotChanged += SelectionChanged; health.Died += CancelUse; }
         void OnDisable() { equipment.SlotChanged -= SelectionChanged; health.Died -= CancelUse; CancelUse(); }
@@ -71,7 +73,7 @@ namespace VoidLast.Player
         public bool TryStartUse(FpsHealth target = null)
         {
             target = target == null ? health : target;
-            if (!IsAlive || IsUsing || ItemAt(SelectedIndex) != FarmingItemKind.Syringe || !target.CanHeal) return false;
+            if (!IsAlive || IsUsing || ItemAt(SelectedIndex) != FarmingItemKind.Syringe || !target.CanHeal || view == null || !view.CanUse) return false;
             if (target != health && !interactor.CanReachPlayer(target)) return false;
             recipient = target;
             usingIndex = SelectedIndex; elapsed = 0;

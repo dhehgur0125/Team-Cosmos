@@ -45,12 +45,19 @@ namespace VoidLast.Player.Editor
                     model.transform.SetParent(syringe, false);
                     foreach (var collider in model.GetComponentsInChildren<Collider>(true)) { collider.enabled = false; PrefabUtility.RecordPrefabInstancePropertyModifications(collider); }
                 }
-                SetSocket(syringe, rightRotation, wrist);
+                SetSocket(syringe, rightRotation, wrist + new Vector3(0, 0.03f, 0));
                 var camera = root.GetComponentInChildren<Camera>(true);
                 var item = new SerializedObject(root.GetComponent<FpsItemView>());
                 item.FindProperty("handGrip").objectReferenceValue = camera.transform.Find("ItemRoot/FPS Right Glove");
                 item.FindProperty("worldItem").objectReferenceValue = syringe;
                 item.FindProperty("worldPump").objectReferenceValue = syringe.GetChild(0).Find("Pump");
+                // Upgrade only the previous default; retain any user-adjusted grip.
+                var handPosition = item.FindProperty("handPosition");
+                if (Vector3.Distance(handPosition.vector3Value, new Vector3(0, -0.018f, -0.035f)) < 0.0001f)
+                {
+                    handPosition.vector3Value = new Vector3(0, 0.005f, -0.015f);
+                    item.FindProperty("handScale").floatValue = 0.9f;
+                }
                 item.ApplyModifiedPropertiesWithoutUndo();
                 var visibility = new SerializedObject(root.GetComponent<FpsLocalVisibility>());
                 Renderers(visibility.FindProperty("worldRenderers"), animator.GetComponentsInChildren<Renderer>(true));
@@ -59,6 +66,9 @@ namespace VoidLast.Player.Editor
                 PrefabUtility.SaveAsPrefabAsset(root, FpsAssetSetup.PrefabPath);
                 var controller = (AnimatorController)animator.runtimeAnimatorController;
                 var layers = controller.layers; layers[1].iKPass = true; controller.layers = layers;
+                // A null motion with Write Defaults off retained the previous raised pistol arm.
+                var unarmed = layers[1].stateMachine.states.Single(s => s.state.name == "Unarmed").state;
+                if (unarmed.motion == null) { unarmed.motion = FpsAssetSetup.Clip("Idle"); EditorUtility.SetDirty(unarmed); }
                 var mask = layers[1].avatarMask;
                 mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftHandIK, true);
                 mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightHandIK, true);

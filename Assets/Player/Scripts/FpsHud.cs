@@ -15,23 +15,26 @@ namespace VoidLast.Player
         [SerializeField] Sprite syringeIcon;
         [SerializeField, Min(1)] float healthBarWidth = 400;
         [SerializeField] Text contextLabel;
+        [SerializeField] Text ammoLabel;
         [SerializeField, Min(0)] float visibleSeconds = 3;
         [SerializeField, Min(0.01f)] float fadeSeconds = 0.5f;
         FpsHealth health;
         FpsInventory inventory;
         FpsItemInteractor interactor;
         FpsEquipment equipment;
+        FpsPistol pistol;
         float lastActivity;
         public float HotbarAlpha => hotbar.alpha;
         public string HealthText => healthLabel.text;
-        void Awake() { health = GetComponent<FpsHealth>(); inventory = GetComponent<FpsInventory>(); interactor = GetComponent<FpsItemInteractor>(); equipment = GetComponent<FpsEquipment>(); }
+        void Awake() { health = GetComponent<FpsHealth>(); inventory = GetComponent<FpsInventory>(); interactor = GetComponent<FpsItemInteractor>(); equipment = GetComponent<FpsEquipment>(); pistol = GetComponent<FpsPistol>(); }
         void OnEnable()
         {
             health.Changed += Refresh; inventory.Changed += Refresh; inventory.Activity += ShowHotbar;
             equipment.SlotSelected += OnSlotSelected;
+            if (pistol != null) pistol.Changed += RefreshAmmo;
             Refresh(); ShowHotbar();
         }
-        void OnDisable() { health.Changed -= Refresh; inventory.Changed -= Refresh; inventory.Activity -= ShowHotbar; equipment.SlotSelected -= OnSlotSelected; }
+        void OnDisable() { health.Changed -= Refresh; inventory.Changed -= Refresh; inventory.Activity -= ShowHotbar; equipment.SlotSelected -= OnSlotSelected; if (pistol != null) pistol.Changed -= RefreshAmmo; }
         void Update()
         {
             float target = Time.unscaledTime - lastActivity <= visibleSeconds ? 1 : 0;
@@ -42,6 +45,7 @@ namespace VoidLast.Player
         }
         void Refresh()
         {
+            RefreshAmmo();
             healthLabel.text = "HP " + health.Current.ToString("0.#") + " / " + health.Maximum.ToString("0.#");
             healthFill.fillAmount = health.Current / health.Maximum;
             var size = healthFill.rectTransform.sizeDelta; size.x = healthBarWidth * health.Current / health.Maximum; healthFill.rectTransform.sizeDelta = size;
@@ -57,6 +61,12 @@ namespace VoidLast.Player
             }
         }
         public void ShowHotbar() { lastActivity = Time.unscaledTime; hotbar.alpha = 1; }
+        void RefreshAmmo()
+        {
+            if (ammoLabel == null || pistol == null) return;
+            ammoLabel.text = pistol.Magazine + " / " + pistol.Reserve;
+            ammoLabel.enabled = !health.IsDead && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol;
+        }
         void OnSlotSelected(int slot) { Refresh(); if (slot >= 4 && slot <= 6) ShowHotbar(); }
     }
 }

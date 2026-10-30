@@ -1,5 +1,5 @@
 VOID LAST — Unity Play Mode validation
-2026-10-30T04:41:05.0361533Z
+2026-10-30T12:19:06.4639122Z
 Unity 6000.4.9f1
 
 PASS: Running actual Character_test scene in Play Mode
@@ -133,6 +133,7 @@ PASS: No missing script: Icon
 PASS: No missing script: Label
 PASS: No missing script: Center Dot
 PASS: No missing script: Context
+PASS: No missing script: Ammo
 PASS: Mesh/material references: Astronaut_Person_Body
 PASS: Mesh/material references: Astronaut_Person_Face_01
 PASS: Mesh/material references: Astronaut_Person_Face_02
@@ -193,10 +194,10 @@ PASS: Walk distance in one simulated second: 2.200
 PASS: Shift sprint speed
 PASS: Diagonal input is normalized
 PASS: Crouch speed and capsule height
-PASS: Camera eases to crouched eye height: 1.02
+PASS: Camera eases to crouched eye height: 1.020006
 PASS: Low ceiling blocks standing after Ctrl release
 PASS: Standing restores capsule in clear space
-PASS: Camera restores standing eye height: 1.669999
+PASS: Camera restores standing eye height: 1.67
 PASS: Wall blocks movement
 PASS: Pistol slot / right-button aim state
 PASS: Aim release
@@ -257,9 +258,44 @@ PASS: Non-pistol slot hides both weapons: 6
 PASS: Grounded jump takes off
 PASS: Mid-air second jump is rejected
 PASS: Airborne leg animation preserves pistol upper body and ADS
-PASS: Jump reaches configured height and lands: apex=1.085
+PASS: Jump reaches configured height and lands: apex=1.017
 PASS: Landing fades Jump layer and restores locomotion
 PASS: Crouched jump is rejected
+PASS: Initial magazine/reserve = 10 / 30
+PASS: Pistol cannot fire/reload during equip
+PASS: Full magazine rejects reload; white ammo UI anchored bottom-right
+PASS: One shot consumes exactly one magazine round and updates HUD
+PASS: Center-camera hitscan ignores own colliders and reports nearest wall hit
+PASS: Mark follows impact point/normal with offset and no Collider
+PASS: Shot interval rejects immediate second request
+PASS: Wall shot 2 maintains global FIFO count
+PASS: Wall shot 3 maintains global FIFO count
+PASS: Wall shot 4 maintains global FIFO count
+PASS: Wall shot 5 maintains global FIFO count
+PASS: Wall shot 6 maintains global FIFO count
+PASS: Wall shot 7 maintains global FIFO count
+PASS: Wall shot 8 maintains global FIFO count
+PASS: Eighth impact removes oldest mark immediately
+PASS: Second shooter shares the same world-wide seven-mark limit
+PASS: Ninth shot remains unobstructed by existing marks
+PASS: Miss creates no mark; empty magazine displays zero
+PASS: Empty magazine blocks firing
+PASS: Reload starts once, clears ADS and blocks firing
+PASS: Reload holds gun lowered without moving ammunition or allowing ADS
+PASS: Slot switch cancels reload with unchanged ammo and hides gun/UI
+PASS: Re-equipping restores pose and allows restarting reload
+PASS: Ammo stays unchanged immediately before reload completes
+PASS: Empty reload transfers 0/30 to 10/20 only at completion
+PASS: ADS recovers after completed reload
+PASS: Reload accepts configured ammo 6/30
+PASS: Reload result 10/26
+PASS: Dead player cannot fire or reload
+PASS: Reload accepts configured ammo 0/5
+PASS: Reload result 5/0
+PASS: Zero reserve rejects reload
+PASS: Dead player cannot fire or reload
+Waiting for actual 30-second bullet-mark expiry (no time-scale changes).
+PASS: Every mark expires after 30 seconds of real Play Mode time
 PASS: HP starts at 100 and HUD displays current/max
 PASS: H debug input exists only as Character_test scene override
 PASS: H test halves 100 to 50 and updates HUD immediately
@@ -295,6 +331,9 @@ PASS: Slot 1 hides syringe and cannot Q-drop pistol
 PASS: Pistol rises from below within 0.3 second equip transition
 PASS: Rapid equip cancellation and melee Q do not create items
 PASS: Unique item slot cannot Q-drop
+PASS: Item use is blocked at start of equip
+PASS: Item use is blocked halfway through equip
+PASS: Item rises and becomes usable after its separate 0.4-second equip
 PASS: Use starts once; duplicate use and Q are blocked
 PASS: Changing slot cancels use without healing or consuming
 PASS: Cancelling use restores the original pump position

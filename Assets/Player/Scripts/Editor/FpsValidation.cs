@@ -179,6 +179,8 @@ namespace VoidLast.Player.Editor
                 Require(headRenderers.All(r => !r.forceRenderingOff), "Local visibility restored after rendering; observer retains head/helmet", report);
                 var featureChecks = CheckJumpAndWeapon(player, report);
                 while (featureChecks.MoveNext()) yield return featureChecks.Current;
+                var combatChecks = CheckCombat(player, report);
+                while (combatChecks.MoveNext()) yield return combatChecks.Current;
                 var farmingChecks = CheckFarming(player, report);
                 while (farmingChecks.MoveNext()) yield return farmingChecks.Current;
                 player.GetComponent<FpsHealth>().TakeDamage(float.MaxValue); Advance(animator, 0.4f);
