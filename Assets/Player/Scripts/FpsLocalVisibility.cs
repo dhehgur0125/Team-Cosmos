@@ -1,4 +1,4 @@
-/* [ 코드 설명 ] 자신의 FPS 카메라에는 권총만, 다른 카메라에는 전신과 손의 권총을 표시합니다. 렌더 콜백에서만 상태를 바꾸고 즉시 복원하며 모델·본·Animator는 유지합니다. */
+/* [ 코드 설명 ] 자신의 FPS 카메라에는 1인칭 장비·장갑을, 다른 카메라에는 전신과 손의 권총을 표시합니다. 렌더 콜백에서만 상태를 바꾸고 즉시 복원하며 모델·본·Animator는 유지합니다. */
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Serialization;

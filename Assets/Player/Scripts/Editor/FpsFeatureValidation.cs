@@ -57,12 +57,21 @@ namespace VoidLast.Player.Editor
             equipment.Process(1, false, false); view.Refresh(1); animation.enabled = true;
             for (float elapsed = 0; elapsed < 1.6f; elapsed += Time.deltaTime) yield return null;
             Require(view.IsVisible && worldSocket.gameObject.activeSelf, "Slot 1 shows both representations to their respective cameras", report);
+            var handPose = animator.GetComponent<FpsHeldItemPose>();
+            var rightHand = animator.GetBoneTransform(HumanBodyBones.RightHand); var leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            CaptureObserver(player, "Pistol_Hip_Observer.png", true);
+            Require(handPose != null && handPose.RightWeight > 0.99f && handPose.LeftWeight > 0.99f, "Pistol enables both hand IK grips", report);
+            Require(Vector3.Distance(rightHand.position, handPose.RightTarget) < 0.08f && Vector3.Distance(leftHand.position, handPose.LeftTarget) < 0.08f, "Both pistol hands reach grip targets", report);
+            Require(player.transform.InverseTransformPoint(rightHand.position).x > player.transform.InverseTransformPoint(leftHand.position).x, "Pistol wrists stay on their own sides without X crossing", report);
+            Require(Vector3.Dot(worldSocket.forward, player.transform.forward) > 0.97f, "External pistol muzzle points forward after avatar wrist-axis correction", report);
             var hipPosition = weaponRoot.localPosition;
             Capture(camera, "Pistol_Hip_FPS.png");
             equipment.Process(1, true, false); view.Refresh(0.04f);
             Require(view.AimBlend > 0 && view.AimBlend < 0.9f && weaponRoot.localPosition != hipPosition, "ADS interpolates rather than snapping", report);
             for (float elapsed = 0; elapsed < 0.6f; elapsed += Time.deltaTime) { view.Refresh(Time.deltaTime); yield return null; }
             Require(view.AimBlend > 0.99f && Mathf.Abs(weaponRoot.localPosition.x) < 0.005f, "ADS reaches center position", report);
+            Require(Vector3.Distance(rightHand.position, handPose.RightTarget) < 0.08f && Vector3.Distance(leftHand.position, handPose.LeftTarget) < 0.08f, "Both hands maintain grip while aiming", report);
+            CaptureObserver(player, "Pistol_Grip_Observer.png", true);
             var muzzle = weaponRoot.TransformPoint(new Vector3(0, 0.025f, 0.16f));
             var viewport = camera.WorldToViewportPoint(muzzle);
             Require(Vector2.Distance(new Vector2(viewport.x, viewport.y), new Vector2(0.5f, 0.5f)) < 0.06f && Vector3.Dot(weaponRoot.TransformDirection(Vector3.forward), camera.transform.forward) > 0.99f, "Pistol muzzle (+Z) axis and sights align with view center", report);

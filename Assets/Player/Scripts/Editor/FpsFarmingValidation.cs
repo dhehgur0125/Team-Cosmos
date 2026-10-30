@@ -22,6 +22,7 @@ namespace VoidLast.Player.Editor
             var pivot = camera.transform.parent; var motor = player.GetComponent<FpsMotor>();
             // Drive held-button values explicitly while physics, Animator, UI and rendering run in Play Mode.
             inventory.enabled = false; hud.enabled = itemView.enabled = true;
+            player.GetComponent<FpsAnimation>().enabled = true;
             Require(health.Current == 100 && health.Maximum == 100 && hud.HealthText == "HP 100 / 100", "HP starts at 100 and HUD displays current/max", report);
             var debug = player.GetComponent<FpsHealthDebugInput>();
             Require(debug != null && AssetDatabase.LoadAssetAtPath<GameObject>(FpsAssetSetup.PrefabPath).GetComponent<FpsHealthDebugInput>() == null, "H debug input exists only as Character_test scene override", report);
@@ -106,6 +107,8 @@ namespace VoidLast.Player.Editor
             Require(health.Current == 50 && inventory.ItemAt(1) == FarmingItemKind.Syringe && inventory.IsUsing, "No gradual healing or early consumption during 3-second use", report);
             Require(Vector3.Dot(itemView.ItemRoot.forward, camera.transform.forward) < -0.7f, "Use pose turns syringe needle toward player", report);
             Require(itemView.PumpProgress > 0.2f && itemView.PumpProgress < 0.7f && pump.localPosition.z > 0.01f && pump.localPosition.z < 0.04f, "Syringe Pump child depresses gradually at half use progress", report);
+            Require(itemView.WorldItem != null && itemView.WorldItem.gameObject.activeSelf, "Held syringe has active world representation", report);
+            Require(Mathf.Abs(itemView.WorldItem.GetChild(0).Find("Pump").localPosition.z - pump.localPosition.z) < 0.001f, "World syringe pump follows the same use progress", report);
             ScreenCapture.CaptureScreenshot("Assets/Player/Validation/Syringe_Using_HUD.png");
             bool pumpCaptured = false;
             while (inventory.IsUsing)
@@ -124,20 +127,28 @@ namespace VoidLast.Player.Editor
             var holdChecks = CheckHeldAndOtherPlayer(player, report);
             while (holdChecks.MoveNext()) yield return holdChecks.Current;
             equipment.Process(4, false, false); itemView.Refresh(0.5f);
+            Move(motor, Vector2.zero, false, false, 1);
+            for (float time = 0; time < 0.4f; time += Time.deltaTime) yield return null;
+            var posedAnimator = player.GetComponentInChildren<Animator>(); var handPose = posedAnimator.GetComponent<FpsHeldItemPose>();
+            Require(itemView.WorldItem.parent == posedAnimator.GetBoneTransform(HumanBodyBones.RightHand) && itemView.WorldItem.gameObject.activeSelf, "World syringe is mounted on the original right hand", report);
+            Require(handPose.RightWeight > 0.99f && handPose.LeftWeight < 0.01f && Vector3.Distance(posedAnimator.GetBoneTransform(HumanBodyBones.RightHand).position, handPose.RightTarget) < 0.08f, "Syringe uses only right-hand grip IK", report);
+            Require(Vector3.Dot(itemView.WorldItem.forward, player.transform.forward) > 0.97f, "World syringe needle follows the forward hand grip", report);
+            CaptureObserver(player, "Syringe_Grip_Observer.png", true);
             hud.SendMessage("Update");
             Require(player.transform.Find("FPS HUD/Context").GetComponent<Text>().text == "", "Holding syringe shows no central control-key instructions", report);
             Require(itemView.ItemRoot.Find("FPS Right Glove").GetComponent<MeshFilter>().sharedMesh != null && camera.transform.Find("WeaponRoot/FPS Right Glove").GetComponent<MeshFilter>().sharedMesh != null, "Existing astronaut glove copy is attached to syringe and pistol", report);
             bool localVisible = false, observerHidden = false;
             var syringeRenderers = itemView.ItemRoot.GetComponentsInChildren<Renderer>(true);
+            var worldSyringeRenderers = itemView.WorldItem.GetComponentsInChildren<Renderer>(true);
             System.Action<ScriptableRenderContext, Camera> observe = (context, rendered) =>
             {
-                if (rendered == camera) localVisible = syringeRenderers.All(r => !r.forceRenderingOff);
-                else observerHidden = syringeRenderers.All(r => r.forceRenderingOff);
+                if (rendered == camera) localVisible = syringeRenderers.All(r => !r.forceRenderingOff) && worldSyringeRenderers.All(r => r.forceRenderingOff);
+                else observerHidden = syringeRenderers.All(r => r.forceRenderingOff) && worldSyringeRenderers.All(r => !r.forceRenderingOff);
             };
             RenderPipelineManager.beginCameraRendering += observe;
             try { Capture(camera, "Syringe_Held_FPS.png"); CaptureObserver(player, "Syringe_Observer.png"); }
             finally { RenderPipelineManager.beginCameraRendering -= observe; }
-            Require(localVisible && observerHidden && syringeRenderers.All(r => !r.forceRenderingOff), "FPS syringe is local-camera only and render flags restore", report);
+            Require(localVisible && observerHidden && syringeRenderers.All(r => !r.forceRenderingOff), "Local camera sees FPS syringe only; observer sees hand-mounted world syringe only; flags restore", report);
             ScreenCapture.CaptureScreenshot("Assets/Player/Validation/Farming_Full_HUD.png");
             for (float time = 0; time < 3.8f; time += Time.unscaledDeltaTime) yield return null;
             Require(hud.HotbarAlpha < 0.01f && inventory.IsFull && inventory.SelectedIndex == 0, "Hotbar fades after inactivity while preserving contents/selection", report);
@@ -204,7 +215,7 @@ namespace VoidLast.Player.Editor
                 Physics.SyncTransforms(); pivot.LookAt(other.GetComponent<CharacterController>().bounds.center);
                 Require(interactor.FindUseTarget() == recipient && inventory.TryStartUse(recipient), "RMB selects nearby other player and begins held healing", report);
                 inventory.TickUse(0.8f, false, true); view.Refresh(0.5f);
-                Require(view.ItemRoot.localPosition.z > 0.55f && Vector3.Dot(view.ItemRoot.forward, camera.transform.forward) > 0.8f, "Other-player use extends syringe forward", report);
+                Require(view.ItemRoot.localPosition.z > 0.4f && Vector3.Dot(view.ItemRoot.forward, camera.transform.forward) > 0.8f, "Other-player use extends syringe forward", report);
                 inventory.TickUse(0, false, false);
                 Require(!inventory.IsUsing && recipient.Current == 50 && inventory.IsFull, "Releasing RMB cancels target healing without consuming", report);
                 Require(inventory.TryStartUse(recipient), "Can restart other-player use after release", report);

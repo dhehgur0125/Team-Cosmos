@@ -9,6 +9,7 @@ namespace VoidLast.Player
         [SerializeField, Min(0)] float directionDamping = 0.12f;
         FpsMotor motor;
         FpsEquipment equipment;
+        FpsInventory inventory;
         float upperWeight, jumpWeight;
         static readonly int MoveX = Animator.StringToHash("MoveX"), MoveY = Animator.StringToHash("MoveY"),
             Crouch = Animator.StringToHash("Crouch"), Slot = Animator.StringToHash("Slot"), Aim = Animator.StringToHash("Aim"),
@@ -16,7 +17,7 @@ namespace VoidLast.Player
 
         void Awake()
         {
-            motor = GetComponent<FpsMotor>(); equipment = GetComponent<FpsEquipment>();
+            motor = GetComponent<FpsMotor>(); equipment = GetComponent<FpsEquipment>(); inventory = GetComponent<FpsInventory>();
             if (animator != null) animator.applyRootMotion = false;
         }
         void OnEnable() { if (equipment == null) equipment = GetComponent<FpsEquipment>(); equipment.MeleeRequested += Attack; }
@@ -47,7 +48,8 @@ namespace VoidLast.Player
             animator.SetBool("CrouchBackward", backward);
             bool attacking = animator.GetCurrentAnimatorStateInfo(1).IsTag("Melee") ||
                 (animator.IsInTransition(1) && animator.GetNextAnimatorStateInfo(1).IsTag("Melee"));
-            float targetWeight = !motor.IsDead && (equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol || backward || attacking) ? 1 : 0;
+            bool holdingItem = inventory != null && inventory.ItemAt(inventory.SelectedIndex) != FarmingItemKind.None;
+            float targetWeight = !motor.IsDead && (equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol || holdingItem || backward || attacking) ? 1 : 0;
             upperWeight = Mathf.MoveTowards(upperWeight, targetWeight, Time.deltaTime * 8);
             animator.SetLayerWeight(1, upperWeight);
             jumpWeight = Mathf.MoveTowards(jumpWeight, motor.IsAirborne ? 1 : 0, Time.deltaTime * 12);

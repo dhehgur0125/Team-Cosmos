@@ -1,5 +1,5 @@
 VOID LAST — Unity Play Mode validation
-2026-10-29T17:15:16.0743833Z
+2026-10-30T04:41:05.0361533Z
 Unity 6000.4.9f1
 
 PASS: Running actual Character_test scene in Play Mode
@@ -82,6 +82,10 @@ PASS: No missing script: Trigger
 PASS: No missing script: UCX_SciFiPistol01_2_01
 PASS: No missing script: UCX_SciFiPistol01_2_02
 PASS: No missing script: UCX_SciFiPistol01_2_03
+PASS: No missing script: WorldItemSocket
+PASS: No missing script: SciFiMedInjector01_2
+PASS: No missing script: Pump
+PASS: No missing script: UCX_SciFiMedInjector01_2_01
 PASS: No missing script: lowerarm_twist_01_r
 PASS: No missing script: neck_01
 PASS: No missing script: head
@@ -233,8 +237,13 @@ PASS: Forward crouch diagonal keeps full movement weight
 PASS: Backward crouch diagonal keeps full movement weight
 PASS: Movement/animation velocity uses character-local coordinates
 PASS: Slot 1 shows both representations to their respective cameras
+PASS: Pistol enables both hand IK grips
+PASS: Both pistol hands reach grip targets
+PASS: Pistol wrists stay on their own sides without X crossing
+PASS: External pistol muzzle points forward after avatar wrist-axis correction
 PASS: ADS interpolates rather than snapping
 PASS: ADS reaches center position
+PASS: Both hands maintain grip while aiming
 PASS: Pistol muzzle (+Z) axis and sights align with view center
 PASS: Local camera sees gun only; observer sees body/world gun only
 PASS: Per-camera renderer state restored after rendering
@@ -248,7 +257,7 @@ PASS: Non-pistol slot hides both weapons: 6
 PASS: Grounded jump takes off
 PASS: Mid-air second jump is rejected
 PASS: Airborne leg animation preserves pistol upper body and ADS
-PASS: Jump reaches configured height and lands: apex=1.077
+PASS: Jump reaches configured height and lands: apex=1.085
 PASS: Landing fades Jump layer and restores locomotion
 PASS: Crouched jump is rejected
 PASS: HP starts at 100 and HUD displays current/max
@@ -293,6 +302,8 @@ PASS: Next selected syringe can start after cancellation
 PASS: No gradual healing or early consumption during 3-second use
 PASS: Use pose turns syringe needle toward player
 PASS: Syringe Pump child depresses gradually at half use progress
+PASS: Held syringe has active world representation
+PASS: World syringe pump follows the same use progress
 PASS: At completion, heal max HP 30% once and empty only selected slot
 PASS: Consumed syringe disappears from FPS view
 PASS: Consumption resets pump for the next syringe
@@ -315,9 +326,12 @@ PASS: Switching slots cancels other-player healing
 PASS: Other-player completion test starts
 PASS: Target healing is deferred until full hold completes
 PASS: RMB 3-second hold heals only target by 30 and consumes source syringe once
+PASS: World syringe is mounted on the original right hand
+PASS: Syringe uses only right-hand grip IK
+PASS: World syringe needle follows the forward hand grip
 PASS: Holding syringe shows no central control-key instructions
 PASS: Existing astronaut glove copy is attached to syringe and pistol
-PASS: FPS syringe is local-camera only and render flags restore
+PASS: Local camera sees FPS syringe only; observer sees hand-mounted world syringe only; flags restore
 PASS: Hotbar fades after inactivity while preserving contents/selection
 PASS: Selecting same farming slot wakes hotbar immediately
 PASS: Wall blocks Q drop without losing item

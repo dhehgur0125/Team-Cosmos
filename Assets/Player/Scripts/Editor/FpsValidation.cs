@@ -192,14 +192,14 @@ namespace VoidLast.Player.Editor
                 report.AppendLine("\nALL AUTOMATED CHECKS PASSED. Physical keyboard/mouse feel, final weapon offsets and residual foot sliding require manual review.");
             }
         }
-        static void CaptureObserver(GameObject player, string file)
+        static void CaptureObserver(GameObject player, string file, bool closeUp = false)
         {
             var go = new GameObject("Temporary validation observer");
             try
             {
                 var camera = go.AddComponent<Camera>(); camera.enabled = false; camera.fieldOfView = 45; camera.nearClipPlane = 0.05f;
-                go.transform.position = player.transform.position + new Vector3(2.6f, 1.6f, 3.2f);
-                go.transform.LookAt(player.transform.position + Vector3.up * 0.95f);
+                go.transform.position = player.transform.position + (closeUp ? new Vector3(0.95f, 1.55f, 1.45f) : new Vector3(2.6f, 1.6f, 3.2f));
+                go.transform.LookAt(player.transform.position + Vector3.up * (closeUp ? 1.35f : 0.95f));
                 Capture(camera, file);
             }
             finally { Object.DestroyImmediate(go); }
