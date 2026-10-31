@@ -59,7 +59,7 @@ namespace VoidLast.Player
         }
         void Impact(RaycastHit hit)
         {
-            if (impactPrefab == null || hit.collider.GetComponentInParent<FpsHealth>() != null || hit.collider.GetComponentInParent<Animator>() != null) return;
+            if (impactPrefab == null || hit.collider.GetComponentInParent<IFpsDamageTarget>() != null || hit.collider.GetComponentInParent<FpsHealth>() != null || hit.collider.GetComponentInParent<Animator>() != null) return;
             LastImpact = Instantiate(impactPrefab, hit.point + hit.normal * 0.003f, Quaternion.LookRotation(hit.normal));
             LastImpact.transform.localScale = Vector3.one * impactScale;
             LastImpact.Play(true); // Non-looping prefab destroys itself when its last particle expires.

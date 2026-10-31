@@ -1,0 +1,13 @@
+VOID LAST Monster final asset audit
+2026-10-31T15:06:51.6635932Z
+Scene: Assets/Monster/Scenes/Monster_test.unity | loadedScenes=1 | dirty=False
+Checked components: 642 | missing scripts=0 | broken serialized references=0 | missing renderer materials=0
+Scene monsters=1 | players=1
+FPS prefab source=Assets/Player/Prefabs/Player/VOID_LAST_FPS.prefab
+Monster HP=300 | pistol damage=30 | melee=30
+Melee windup=0.3 | start range=2.5 | lunge=1.5m / 0.2s | recovery=0.8s
+NavMesh data=Assets/Monster/Scenes/Monster_test_NavMesh.asset | triangles=139
+Unity=6000.4.9f1 | scripts compiling=False
+ASSET AUDIT PASSED. Melee update: runtime checks passed; existing Vivox editor service HTTP 403 was reported separately.
+
+Melee revision scope: compared 323 starting file hashes. Changes confined to Assets/Monster (MonsterMelee, one attack-state line in EyedMonsterAI, monster prefab, validation, README and validation outputs). No Player files, scene layout, baked NavMesh, Packages or ProjectSettings changed. Current Console errors were existing Vivox editor service HTTP 403 entries; no monster compiler/runtime exceptions found.

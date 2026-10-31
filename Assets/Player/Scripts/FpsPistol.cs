@@ -1,4 +1,4 @@
-/* [ 코드 설명 ] 1번 권총의 반자동 히트스캔 사격, 탄창·예비 탄약, 취소 가능한 재장전을 관리합니다. 명중 정보만 알리고 실제 피해나 네트워크 처리는 하지 않습니다. */
+/* [ 코드 설명 ] 권총의 반자동 히트스캔·탄약·취소 가능한 재장전을 관리합니다. 실제 명중한 피해 수신 대상에만 피해와 공격자를 전달하며 네트워크 처리는 하지 않습니다. */
 using System;
 using UnityEngine;
 
@@ -14,6 +14,7 @@ namespace VoidLast.Player
         [SerializeField, Min(0)] int startingReserve = 30;
         [SerializeField, Min(0.01f)] float shotInterval = 0.18f;
         [SerializeField, Min(1)] float range = 100;
+        [SerializeField, Min(0)] float damage = 30;
         [SerializeField, Min(0.1f)] float reloadDuration = 1.5f;
         FpsInput input;
         FpsEquipment equipment;
@@ -26,6 +27,7 @@ namespace VoidLast.Player
         public float ReloadProgress => IsReloading ? Mathf.Clamp01(reloadElapsed / reloadDuration) : 0;
         public float ReloadDuration => reloadDuration;
         public float ShotInterval => shotInterval;
+        public float Damage => damage;
         public bool HasLastHit { get; private set; }
         public RaycastHit LastHit { get; private set; }
         public event Action Changed;
@@ -60,9 +62,11 @@ namespace VoidLast.Player
             }
             if (HasLastHit)
             {
+                var damageTarget = LastHit.collider.GetComponentInParent<IFpsDamageTarget>();
+                damageTarget?.TakeHit(damage, gameObject, LastHit.point);
                 Hit?.Invoke(LastHit);
-                // Character hits remain available to future damage code; surface marks belong to scenery.
-                if (bulletMarkPrefab != null && LastHit.collider.GetComponentInParent<FpsHealth>() == null) FpsBulletMark.Spawn(bulletMarkPrefab, LastHit);
+                // Surface marks belong to scenery, not damage receivers or player characters.
+                if (bulletMarkPrefab != null && damageTarget == null && LastHit.collider.GetComponentInParent<FpsHealth>() == null) FpsBulletMark.Spawn(bulletMarkPrefab, LastHit);
             }
             Shot?.Invoke();
             Changed?.Invoke(); return true;

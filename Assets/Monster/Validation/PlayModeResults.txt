@@ -1,0 +1,91 @@
+VOID LAST Monster actual Unity Play Mode validation
+2026-10-31T15:03:44.1189510Z
+PASS: Running actual Monster_test in Play Mode
+PASS: Baked NavMesh exists and HP equals ten real pistol hits
+PASS: Prefab contains requested lunge timings and distances
+PASS: Attack starts at 2.45m, within new 2.5m trigger range
+Lunge metrics: strike=0.309s recovery=0.504s end=1.308s travel=1.500m HP=70
+PASS: Continuous backward walking is hit for exactly 30, once
+PASS: Unobstructed lunge advances 1.5m along the locked direction
+PASS: Measured windup/lunge/recovery match approximately 0.3/0.2/0.8 seconds
+PASS: Attack returns synchronized NavMesh position and rotation control
+PASS: Side dodge begins against a committed attack
+PASS: Direction locks before forward movement
+PASS: Timed lateral run using the real CharacterController dodges the attack
+PASS: Lunge never rotates or curves after the player dodges sideways
+PASS: Stationary target with multiple colliders starts attack
+PASS: Repeated hit-volume checks finish recovery
+PASS: Multiple colliders and repeated strike frames still deal only 30
+PASS: Wall scenario starts while target is initially visible
+PASS: Wall scenario commits direction
+PASS: Lunge against thin unbaked obstacle finishes
+PASS: Capsule sweep stops at thin wall; no body penetration or damage through wall
+PASS: Navigation-edge attack starts on valid mesh
+PASS: Navigation-edge attack commits
+PASS: Navigation-edge attack finishes safely
+PASS: NavMesh boundary truncates straight lunge before leaving the walkable surface
+PASS: Live AI starts lunge automatically
+PASS: Live AI enters stationary recovery
+PASS: AI does not resume chase during the 0.8-second recovery
+PASS: AI resumes normal NavMesh chase after recovery
+PASS: Death case reaches windup
+PASS: Death during windup cancels lunge and damage
+PASS: Death case reaches moving lunge
+PASS: Death during lunge immediately cancels movement and later damage
+PASS: Large capsule is on the baked NavMesh
+PASS: Random patrol reaches multiple designated destinations with waits
+PASS: Path from closed room to hall bends around wall through doorway
+PASS: Agent physically traverses doorway instead of crossing wall
+PASS: NavMesh moving capsule stays clear of solid walls
+PASS: Player in forward 120-degree/15m view is visible
+PASS: Crouching remains visible without cover
+PASS: Room wall blocks vision
+PASS: Player behind monster is outside field of view
+PASS: Distant player outside 15m is not detected
+PASS: Real pistol can fire a miss
+PASS: Gunshot/miss behind monster does not trigger hearing or damage
+PASS: Real Raycast hits monster from behind
+PASS: Direct hit identifies visible attacker and starts chase
+PASS: First visible player becomes chase target
+PASS: Second visible player and second shooter do not steal visible target
+PASS: Losing old target allows switching to another visible player
+PASS: Dead chase target is discarded
+PASS: Wall blocks actual bullet damage and detection
+PASS: Unseen-hit reaction investigates only attack-time position (damage API case)
+PASS: Hidden attacker movement does not update remembered position
+PASS: Search scenario acquires visible player
+PASS: Breaking sight starts last-seen-position investigation
+PASS: Investigation uses last sighting rather than hidden room position
+PASS: Monster reaches remembered location before local search
+PASS: Search chooses a reachable authored room/corridor point
+PASS: Chosen search destination has a complete NavMesh path
+PASS: Search timeout starts return to patrol region
+PASS: Local search lasts approximately ten seconds
+PASS: Unsuccessful search returns to original patrol points
+PASS: Actual pistol hit 1
+PASS: HP/death threshold after shot 1
+PASS: Actual pistol hit 2
+PASS: HP/death threshold after shot 2
+PASS: Actual pistol hit 3
+PASS: HP/death threshold after shot 3
+PASS: Actual pistol hit 4
+PASS: HP/death threshold after shot 4
+PASS: Actual pistol hit 5
+PASS: HP/death threshold after shot 5
+PASS: Actual pistol hit 6
+PASS: HP/death threshold after shot 6
+PASS: Actual pistol hit 7
+PASS: HP/death threshold after shot 7
+PASS: Actual pistol hit 8
+PASS: HP/death threshold after shot 8
+PASS: Actual pistol hit 9
+PASS: HP/death threshold after shot 9
+PASS: Actual pistol hit 10
+PASS: HP/death threshold after shot 10
+PASS: Ten hits empty magazine; empty fire is blocked and reload starts
+PASS: Existing timed pistol reload completes
+PASS: Existing ammo transfer remains 0/30 to 10/20
+PASS: Existing CharacterController movement still works
+PASS: Existing player melee event applies prototype-only 20 damage through test-scene bridge
+
+ALL MONSTER AUTOMATED CHECKS PASSED. Inputs were driven through runtime APIs; physical controls and final balance require manual play.
