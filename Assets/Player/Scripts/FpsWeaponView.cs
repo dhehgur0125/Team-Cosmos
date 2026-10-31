@@ -1,4 +1,4 @@
-/* [ 코드 설명 ] 기존 권총의 장착·조준·임시 재장전 위치를 한 곳에서 보간합니다. 탄약과 발사는 FpsPistol에 맡기며 카메라 자식과 외부 권총 표시를 유지합니다. */
+/* [ 코드 설명 ] 권총의 장착·조준·재장전 위치에 누적되지 않는 모델 반동을 합성합니다. 탄약과 발사는 FpsPistol에 맡기며 카메라·손 애니메이션을 변경하지 않습니다. */
 using UnityEngine;
 
 namespace VoidLast.Player
@@ -16,12 +16,18 @@ namespace VoidLast.Player
         [SerializeField, Range(0.2f, 0.4f)] float equipDuration = 0.3f;
         [SerializeField] Vector3 equipOffset = new Vector3(0, -0.35f, -0.08f);
         [SerializeField] Vector3 reloadOffset = new Vector3(0, -0.4f, -0.08f);
+        [SerializeField] Vector3 recoilPosition = new Vector3(0, 0.008f, -0.025f);
+        [SerializeField] Vector3 recoilEuler = new Vector3(-3.5f, 0, 0);
+        [SerializeField, Min(1)] float recoilReturnSpeed = 22;
+        [SerializeField, Range(0, 1)] float aimedRecoilMultiplier = 0.65f;
         FpsEquipment equipment;
         FpsMotor motor;
         float aimBlend;
+        float recoil;
         FpsPistol pistol;
         readonly FpsEquipMotion equip = new FpsEquipMotion();
         public float AimBlend => aimBlend;
+        public float RecoilAmount => recoil;
         public bool IsVisible => weaponRoot != null && weaponRoot.gameObject.activeSelf;
         public bool IsEquipped => IsVisible && equip.IsReady && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol && !motor.IsDead;
 
@@ -31,13 +37,26 @@ namespace VoidLast.Player
             Refresh(0);
         }
         void LateUpdate() => Refresh(Time.deltaTime);
-        void OnEnable() => equipment.SlotChanged += SelectionChanged;
-        void OnDisable() { equipment.SlotChanged -= SelectionChanged; equip.Reset(); }
-        void SelectionChanged() { equip.Reset(); Refresh(0); }
+        void OnEnable()
+        {
+            equipment.SlotChanged += SelectionChanged;
+            if (pistol != null) { pistol.Shot += Kick; pistol.Changed += PistolChanged; }
+        }
+        void OnDisable()
+        {
+            equipment.SlotChanged -= SelectionChanged;
+            if (pistol != null) { pistol.Shot -= Kick; pistol.Changed -= PistolChanged; }
+            equip.Reset(); recoil = 0;
+        }
+        void Kick() => recoil = 1; // Each shot restarts a bounded offset, never adds to the Transform.
+        void PistolChanged() { if (pistol.IsReloading) { recoil = 0; Refresh(0); } }
+        void SelectionChanged() { equip.Reset(); recoil = 0; Refresh(0); }
         public void Refresh(float deltaTime)
         {
             if (weaponRoot == null || equipment == null) return;
             bool visible = equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol && !motor.IsDead;
+            if (!visible || pistol != null && pistol.IsReloading) recoil = 0;
+            else { recoil *= Mathf.Exp(-recoilReturnSpeed * Mathf.Max(0, deltaTime)); if (recoil < 0.001f) recoil = 0; }
             equip.Tick(visible, 1, deltaTime, equipDuration);
             weaponRoot.gameObject.SetActive(visible);
             if (worldWeapon != null) worldWeapon.SetActive(visible);
@@ -50,8 +69,9 @@ namespace VoidLast.Player
                 float progress = pistol.ReloadProgress;
                 reload = progress < 0.2f ? Mathf.SmoothStep(0, 1, progress / 0.2f) : progress < 0.8f ? 1 : Mathf.SmoothStep(1, 0, (progress - 0.8f) / 0.2f);
             }
-            weaponRoot.localPosition = Vector3.Lerp(hipPosition, aimPosition, aimBlend) + equipOffset * (1 - equip.Blend) + reloadOffset * reload;
-            weaponRoot.localRotation = Quaternion.Slerp(Quaternion.Euler(hipEulerAngles), Quaternion.Euler(aimEulerAngles), aimBlend);
+            float kick = recoil * Mathf.Lerp(1, aimedRecoilMultiplier, aimBlend);
+            weaponRoot.localPosition = Vector3.Lerp(hipPosition, aimPosition, aimBlend) + equipOffset * (1 - equip.Blend) + reloadOffset * reload + recoilPosition * kick;
+            weaponRoot.localRotation = Quaternion.Slerp(Quaternion.Euler(hipEulerAngles), Quaternion.Euler(aimEulerAngles), aimBlend) * Quaternion.Euler(recoilEuler * kick);
             weaponRoot.localScale = Vector3.one * modelScale;
         }
     }

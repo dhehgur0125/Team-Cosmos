@@ -29,6 +29,7 @@ namespace VoidLast.Player
         public bool HasLastHit { get; private set; }
         public RaycastHit LastHit { get; private set; }
         public event Action Changed;
+        public event Action Shot;
         public event Action<RaycastHit> Hit;
         bool Equipped => equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol && !motor.IsDead;
         void Awake()
@@ -63,6 +64,7 @@ namespace VoidLast.Player
                 // Character hits remain available to future damage code; surface marks belong to scenery.
                 if (bulletMarkPrefab != null && LastHit.collider.GetComponentInParent<FpsHealth>() == null) FpsBulletMark.Spawn(bulletMarkPrefab, LastHit);
             }
+            Shot?.Invoke();
             Changed?.Invoke(); return true;
         }
         public bool TryReload()

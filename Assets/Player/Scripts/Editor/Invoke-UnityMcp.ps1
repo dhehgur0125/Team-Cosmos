@@ -1,6 +1,6 @@
 param([string]$Type='get_available_tools',[string]$Code,[string]$ArgumentsJson='{}')
 $ErrorActionPreference='Stop'
-$pipe=[IO.Pipes.NamedPipeClientStream]::new('.','unity-mcp-acc4580f-14908',[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
+$pipe=[IO.Pipes.NamedPipeClientStream]::new('.','unity-mcp-acc4580f-17616',[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
 try {
     $pipe.Connect(5000)
     $reader=[IO.StreamReader]::new($pipe,[Text.UTF8Encoding]::new($false))
