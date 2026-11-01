@@ -1,6 +1,36 @@
-<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
-    <ui:VisualElement style="flex-grow: 1; flex-direction: column-reverse;">
-        <ui:ProgressBar value="10" title="my-progress" name="MicVolumeBar" style="height: 24px; width: 300px; flex-direction: column; font-size: 20px; -unity-font-style: bold;"/>
-        <ui:Label text="Label" name="StatusLabel" style="width: auto; height: auto; font-size: 40px; -unity-font-style: bold;"/>
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="project://database/Assets/item/voicechat/RadioHUD.uss" />
+    <ui:VisualElement name="Root" class="root" picking-mode="Ignore">
+        <ui:VisualElement name="Card" class="card">
+
+            <ui:VisualElement class="header">
+                <ui:VisualElement name="StatusDot" class="status-dot dot-connecting" />
+                <ui:Label name="TitleLabel" text="VOICE CHAT" class="title" />
+                <ui:VisualElement class="spacer" />
+                <ui:Label name="MemberLabel" text="접속 0명" class="chip" />
+            </ui:VisualElement>
+
+            <ui:Label name="StatusLabel" text="서버 연결 중..." class="mode-label mode-connecting" />
+            <ui:Label name="SubLabel" text="Unity Services · Vivox 로그인 중" class="sub-label" />
+
+            <ui:VisualElement class="meter-row">
+                <ui:Label text="MIC" class="meter-caption" />
+                <ui:VisualElement name="MicMeter" class="meter" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="divider" />
+
+            <ui:VisualElement class="hint-row">
+                <ui:VisualElement class="hint">
+                    <ui:Label text="R" class="keycap" />
+                    <ui:Label text="무전기 (누르는 동안)" class="hint-text" />
+                </ui:VisualElement>
+                <ui:VisualElement class="hint">
+                    <ui:Label text="T" class="keycap" />
+                    <ui:Label text="소리 내기" class="hint-text" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

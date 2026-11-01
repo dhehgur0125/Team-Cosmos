@@ -1,0 +1,93 @@
+using UnityEngine;
+
+/// <summary>
+/// 플레이어에 붙이는 아이템 탐지기.
+/// 키를 누르면 반경 안의 DetectableItem이 플레이어에게서 바깥으로 퍼지는 파동 순서대로 발광하며,
+/// 벽·지형 너머에 있는 아이템도 실루엣으로 비쳐 보인다.
+/// </summary>
+public class ItemDetector : MonoBehaviour
+{
+    [Header("탐지기 설정")]
+    public float detectRadius = 15f; // 감지 반경 (15m)
+    public float glowDuration = 3f;  // 발광 유지 시간
+
+    [Tooltip("비워두면(Nothing) 모든 DetectableItem을 감지합니다. 지정하면 해당 레이어의 아이템만 감지합니다.")]
+    public LayerMask itemLayer;
+
+    [Tooltip("탐지기 작동 키. Q는 FpsInput의 '아이템 버리기'와 겹쳐서 Z로 변경했습니다.")]
+    public KeyCode activateKey = KeyCode.Z;
+
+    [Min(0f)] public float cooldown = 1.5f; // 재사용 대기 시간(초)
+
+    [Header("스캔 파동")]
+    [Tooltip("파동이 퍼지는 속도(m/s). 0이면 반경 안의 아이템이 동시에 발광합니다.")]
+    public float waveSpeed = 25f;
+
+    [Header("벽 투과 발광")]
+    [Tooltip("Custom/ItemXRayGlow 셰이더. 빌드에 포함되도록 반드시 연결되어 있어야 합니다.")]
+    public Shader xrayShader;
+
+    private float nextReadyTime;
+
+    public bool IsReady => Time.time >= nextReadyTime;
+    public float CooldownRemaining => Mathf.Max(0f, nextReadyTime - Time.time);
+
+    private void Reset()
+    {
+        // 에디터에서 컴포넌트를 처음 붙일 때 셰이더를 자동으로 연결
+        xrayShader = Shader.Find("Custom/ItemXRayGlow");
+    }
+
+    private void Awake()
+    {
+        if (xrayShader != null) DetectableItem.DefaultXRayShader = xrayShader;
+    }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(activateKey))
+        {
+            ActivateDetector();
+        }
+    }
+
+    public void ActivateDetector()
+    {
+        if (!IsReady)
+        {
+            Debug.Log($"<color=grey>[탐지기] 재사용 대기 중 ({CooldownRemaining:F1}초)</color>");
+            return;
+        }
+        nextReadyTime = Time.time + cooldown;
+
+        Vector3 origin = transform.position;
+        float sqrRadius = detectRadius * detectRadius;
+        int found = 0;
+
+        var items = DetectableItem.All;
+        for (int i = 0; i < items.Count; i++)
+        {
+            DetectableItem item = items[i];
+            if (item == null || !item.isActiveAndEnabled) continue;
+
+            // 레이어 지정이 있을 때만 레이어로 거름
+            if (itemLayer.value != 0 && (itemLayer.value & (1 << item.gameObject.layer)) == 0) continue;
+
+            float sqrDist = (item.WorldCenter - origin).sqrMagnitude;
+            if (sqrDist > sqrRadius) continue;
+
+            // 플레이어에게서 가까운 아이템부터 차례로 발광 (소나 파동 느낌)
+            float delay = waveSpeed > 0f ? Mathf.Sqrt(sqrDist) / waveSpeed : 0f;
+            item.StartGlow(glowDuration, delay);
+            found++;
+        }
+
+        Debug.Log($"<color=cyan>[탐지기 작동] 반경 {detectRadius}m 안에서 아이템 {found}개를 감지했습니다.</color>");
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = new Color(0.2f, 0.9f, 1f, 0.6f);
+        Gizmos.DrawWireSphere(transform.position, detectRadius);
+    }
+}

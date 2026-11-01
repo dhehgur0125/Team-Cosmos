@@ -1,9 +1,9 @@
-using UnityEngine;
-using UnityEngine.UIElements;
+using System.Collections.Generic;
+using Unity.Services.Authentication;
 using Unity.Services.Core;
 using Unity.Services.Vivox;
-using Unity.Services.Authentication;
-using System.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.UIElements;
 
 [RequireComponent(typeof(UIDocument))]
 public class StandaloneRadioTest : MonoBehaviour
@@ -11,140 +11,307 @@ public class StandaloneRadioTest : MonoBehaviour
     [Header("테스트 채널 이름")]
     public string proximityChannel = "Test_3D_Room";
     public string radioChannel = "Test_2D_Radio";
-    
+
     [Header("3D 사운드용 가짜 플레이어 위치")]
-    public Transform dummyPlayerTransform; 
-    public float normalVoiceRadius = 10f; 
-    public float radioVoiceRadius = 30f;  
-    public LayerMask monsterLayer;        
+    public Transform dummyPlayerTransform;
+    public float normalVoiceRadius = 10f;
+    public float radioVoiceRadius = 30f;
+    public LayerMask monsterLayer;
+
+    private enum HudState { Connecting, Proximity, Radio, Error }
+
+    private const int MeterSegments = 16;
+    private static readonly string[] ModeClasses = { "mode-connecting", "mode-proximity", "mode-radio", "mode-error" };
+    private static readonly string[] DotClasses = { "dot-connecting", "dot-ok", "dot-radio", "dot-error" };
 
     private Label statusLabel;
-    private ProgressBar micVolumeBar;
-    private bool isRadioTransmitting = false;
-    private bool isChannelJoined = false; 
+    private Label subLabel;
+    private Label memberLabel;
+    private VisualElement statusDot;
+    private readonly List<VisualElement> meterSegments = new List<VisualElement>();
 
-    async void Start()
+    private bool isRadioTransmitting;
+    private bool isChannelJoined;
+    private string currentChannel;
+    private float displayedLevel;
+    private float nextMemberRefreshTime;
+
+    private async void Start()
     {
-        var root = GetComponent<UIDocument>().rootVisualElement;
-        statusLabel = root.Q<Label>("StatusLabel");
-        micVolumeBar = root.Q<ProgressBar>("MicVolumeBar");
-        
-        UpdateUIState(false);
-        if (statusLabel != null) statusLabel.text = "[ 서버 연결 중... ]";
+        BindUI();
+        SetHudState(HudState.Connecting);
 
-        // 🌟 에러 해결: ParrelSync 클론끼리 충돌하지 않도록 랜덤 프로필 강제 할당
-        InitializationOptions initOptions = new InitializationOptions();
-        initOptions.SetProfile("TesterProfile_" + Random.Range(1000, 9999));
-        await UnityServices.InitializeAsync(initOptions);
+        try
+        {
+            // ParrelSync 클론끼리 충돌하지 않도록 랜덤 프로필 강제 할당
+            InitializationOptions initOptions = new InitializationOptions();
+            initOptions.SetProfile("TesterProfile_" + Random.Range(1000, 9999));
+            await UnityServices.InitializeAsync(initOptions);
 
-        if (!AuthenticationService.Instance.IsSignedIn)
-            await AuthenticationService.Instance.SignInAnonymouslyAsync();
+            if (!AuthenticationService.Instance.IsSignedIn)
+                await AuthenticationService.Instance.SignInAnonymouslyAsync();
 
-        await VivoxService.Instance.InitializeAsync();
-        LoginOptions options = new LoginOptions { DisplayName = "Tester_" + Random.Range(100, 999) };
-        await VivoxService.Instance.LoginAsync(options);
-        
-        Debug.Log($"[Vivox] {options.DisplayName} 서버 로그인 성공!");
+            await VivoxService.Instance.InitializeAsync();
+            LoginOptions options = new LoginOptions { DisplayName = "Tester_" + Random.Range(100, 999) };
+            await VivoxService.Instance.LoginAsync(options);
+            Debug.Log($"[Vivox] {options.DisplayName} 서버 로그인 성공!");
 
-        await VivoxService.Instance.JoinGroupChannelAsync(radioChannel, ChatCapability.AudioOnly);
-        Channel3DProperties props = new Channel3DProperties(30, 1, 1.0f, AudioFadeModel.InverseByDistance);
-        await VivoxService.Instance.JoinPositionalChannelAsync(proximityChannel, ChatCapability.AudioOnly, props);
+            await VivoxService.Instance.JoinGroupChannelAsync(radioChannel, ChatCapability.AudioOnly);
+            Channel3DProperties props = new Channel3DProperties(30, 1, 1.0f, AudioFadeModel.InverseByDistance);
+            await VivoxService.Instance.JoinPositionalChannelAsync(proximityChannel, ChatCapability.AudioOnly, props);
 
-        isChannelJoined = true;
-        UpdateUIState(false); 
-        SwitchTransmissionMode(proximityChannel);
-        
-        Debug.Log("[Vivox] 채널 접속 및 마이크 세팅 완료!");
+            isChannelJoined = true;
+            SwitchTransmissionMode(proximityChannel);
+            SetHudState(HudState.Proximity);
+
+            Debug.Log("[Vivox] 채널 접속 및 마이크 세팅 완료!");
+        }
+        catch (System.Exception e)
+        {
+            // 에러가 나도 화면이 '연결 중'에서 멈추지 않도록 UI에 표시
+            Debug.LogError($"[Vivox] 초기화 실패: {e}");
+            string message = e.Message;
+            if (message.Length > 90) message = message.Substring(0, 90) + "...";
+            SetHudState(HudState.Error, message);
+        }
     }
 
     private void Update()
     {
+        UpdateMicMeter();
         if (!isChannelJoined) return;
 
-        // 🌟 수정됨: 복잡한 내부 접근 권한 대신 try-catch로 위치 전송 에러를 부드럽게 넘김
-        if (dummyPlayerTransform != null && VivoxService.Instance.ActiveChannels.ContainsKey(proximityChannel))
-        {
-            try
-            {
-                VivoxService.Instance.Set3DPosition(dummyPlayerTransform.gameObject, proximityChannel);
-            }
-            catch (System.Exception)
-            {
-                // 통신이 아주 잠깐 끊겼을 때 발생하는 1001 에러 도배를 조용히 무시합니다.
-            }
-        }
+        UpdateMemberCount();
+        Send3DPosition();
 
         // T 키: 일반 말소리 어그로 발생 (테스트용)
         if (Input.GetKeyDown(KeyCode.T))
         {
             EmitSound(false);
-            Debug.Log("일반 말소리를 냅니다. (반경 10m)");
+            Debug.Log($"일반 말소리를 냅니다. (반경 {normalVoiceRadius}m)");
         }
 
-        // R 키: 무전기 사용
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            isRadioTransmitting = true;
-            SwitchTransmissionMode(radioChannel);
-            UpdateUIState(true);
-            EmitSound(true); 
-            Debug.Log("<color=yellow>[무전기 송출 중] 2D 채널로 말합니다. (반경 30m 어그로)</color>");
-        }
-        
-        if (Input.GetKeyUp(KeyCode.R))
-        {
-            isRadioTransmitting = false;
-            SwitchTransmissionMode(proximityChannel);
-            UpdateUIState(false);
-            Debug.Log("<color=white>[무전기 종료] 3D 대화 모드로 복귀했습니다.</color>");
-        }
+        // R 키: 무전기 사용 (누르는 동안만 송출)
+        if (Input.GetKeyDown(KeyCode.R)) StartRadio();
+        if (Input.GetKeyUp(KeyCode.R) && isRadioTransmitting) StopRadio();
+    }
 
-        if (isRadioTransmitting && micVolumeBar != null)
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        // R을 누른 채 창 포커스를 잃으면 KeyUp을 놓쳐 송출이 계속되는 문제 방지
+        if (!hasFocus && isRadioTransmitting) StopRadio();
+    }
+
+    private void OnDestroy()
+    {
+        if (isChannelJoined) SafeLogout();
+    }
+
+    private static async void SafeLogout()
+    {
+        try
         {
-            micVolumeBar.value = Mathf.Lerp(micVolumeBar.value, Random.Range(20f, 100f), Time.deltaTime * 15f);
+            if (VivoxService.Instance.IsLoggedIn)
+                await VivoxService.Instance.LogoutAsync();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[Vivox] 로그아웃 중 경고: {e.Message}");
+        }
+    }
+
+    // ---------------------------------------------------------------- 무전기
+
+    private void StartRadio()
+    {
+        isRadioTransmitting = true;
+        SwitchTransmissionMode(radioChannel);
+        SetHudState(HudState.Radio);
+        EmitSound(true);
+        Debug.Log($"<color=yellow>[무전기 송출 중] 2D 채널로 말합니다. (반경 {radioVoiceRadius}m 어그로)</color>");
+    }
+
+    private void StopRadio()
+    {
+        isRadioTransmitting = false;
+        SwitchTransmissionMode(proximityChannel);
+        SetHudState(HudState.Proximity);
+        Debug.Log("<color=white>[무전기 종료] 3D 대화 모드로 복귀했습니다.</color>");
+    }
+
+    private async void SwitchTransmissionMode(string targetChannel)
+    {
+        currentChannel = targetChannel;
+        try
+        {
+            await VivoxService.Instance.SetChannelTransmissionModeAsync(TransmissionMode.Single, targetChannel);
+        }
+        catch (System.Exception e) { Debug.LogWarning(e.Message); }
+    }
+
+    // ---------------------------------------------------------------- 3D 위치 / 몬스터 어그로
+
+private void Send3DPosition()
+    {
+        if (dummyPlayerTransform == null) return;
+
+        try
+        {
+            // Vivox 상태가 초기화되면 ActiveChannels가 null일 수 있어 try 안에서 확인
+            var channels = VivoxService.Instance.ActiveChannels;
+            if (channels == null || !channels.ContainsKey(proximityChannel)) return;
+
+            VivoxService.Instance.Set3DPosition(dummyPlayerTransform.gameObject, proximityChannel);
+        }
+        catch (System.Exception)
+        {
+            // 통신이 아주 잠깐 끊겼을 때 발생하는 에러 도배를 조용히 무시
         }
     }
 
     private void EmitSound(bool isRadio)
     {
         float currentRadius = isRadio ? radioVoiceRadius : normalVoiceRadius;
-        Collider[] hitColliders = Physics.OverlapSphere(transform.position, currentRadius, monsterLayer);
-        
+
+        // 소리의 기준점은 이 오브젝트(voice chat)가 아니라 플레이어 위치
+        Transform source = dummyPlayerTransform != null ? dummyPlayerTransform : transform;
+
+        Collider[] hitColliders = Physics.OverlapSphere(source.position, currentRadius, monsterLayer);
         foreach (var hit in hitColliders)
         {
             MonsterAI monster = hit.GetComponent<MonsterAI>();
             if (monster != null)
             {
-                monster.OnHearSound(this.transform, isRadio);
+                monster.OnHearSound(source, isRadio);
             }
         }
     }
 
-    private void UpdateUIState(bool isRadio)
-    {
-        if (statusLabel == null || micVolumeBar == null) return;
+    // ---------------------------------------------------------------- HUD
 
-        if (isRadio)
+    private void BindUI()
+    {
+        var root = GetComponent<UIDocument>().rootVisualElement;
+        statusLabel = root.Q<Label>("StatusLabel");
+        subLabel = root.Q<Label>("SubLabel");
+        memberLabel = root.Q<Label>("MemberLabel");
+        statusDot = root.Q<VisualElement>("StatusDot");
+
+        var meter = root.Q<VisualElement>("MicMeter");
+        meterSegments.Clear();
+        if (meter == null) return;
+
+        meter.Clear();
+        for (int i = 0; i < MeterSegments; i++)
         {
-            statusLabel.text = "[ 무전기 송출 중... ]";
-            statusLabel.style.color = new StyleColor(Color.red);
-            micVolumeBar.style.display = DisplayStyle.Flex; 
-        }
-        else
-        {
-            statusLabel.text = "3D 근접 대화 모드";
-            statusLabel.style.color = new StyleColor(Color.white);
-            micVolumeBar.value = 0;
-            micVolumeBar.style.display = DisplayStyle.None; 
+            var segment = new VisualElement();
+            segment.AddToClassList("meter-seg");
+            meter.Add(segment);
+            meterSegments.Add(segment);
         }
     }
 
-    private async void SwitchTransmissionMode(string targetChannel)
+    private void SetHudState(HudState state, string detail = null)
+    {
+        string title;
+        string sub;
+        switch (state)
+        {
+            case HudState.Proximity:
+                title = "3D 근접 대화";
+                sub = "가까이 있는 플레이어에게 들려요";
+                break;
+            case HudState.Radio:
+                title = "무전기 송출 중";
+                sub = "무전기 채널 전체에 전달돼요";
+                break;
+            case HudState.Error:
+                title = "연결 실패";
+                sub = string.IsNullOrEmpty(detail) ? "콘솔 로그를 확인해 주세요" : detail;
+                break;
+            default:
+                title = "서버 연결 중...";
+                sub = "Unity Services · Vivox 로그인 중";
+                break;
+        }
+
+        if (statusLabel != null) statusLabel.text = title;
+        if (subLabel != null) subLabel.text = sub;
+        SetExclusiveClass(statusLabel, ModeClasses, ModeClasses[(int)state]);
+        SetExclusiveClass(statusDot, DotClasses, DotClasses[(int)state]);
+
+        if (memberLabel != null)
+        {
+            bool connected = state == HudState.Proximity || state == HudState.Radio;
+            memberLabel.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+    }
+
+    private static void SetExclusiveClass(VisualElement element, string[] allClasses, string activeClass)
+    {
+        if (element == null) return;
+        foreach (var c in allClasses)
+            element.EnableInClassList(c, c == activeClass);
+    }
+
+    private void UpdateMicMeter()
+    {
+        if (meterSegments.Count == 0) return;
+
+        float target = 0f;
+        if (isChannelJoined && !string.IsNullOrEmpty(currentChannel))
+            target = ReadMicEnergy();
+
+        // 올라갈 때는 빠르게, 내려갈 때는 부드럽게
+        float speed = target > displayedLevel ? 30f : 8f;
+        displayedLevel = Mathf.Lerp(displayedLevel, target, 1f - Mathf.Exp(-speed * Time.deltaTime));
+
+        int lit = Mathf.RoundToInt(displayedLevel * meterSegments.Count);
+        for (int i = 0; i < meterSegments.Count; i++)
+        {
+            bool on = i < lit;
+            var segment = meterSegments[i];
+            segment.EnableInClassList("meter-seg-low", on && i < 10);
+            segment.EnableInClassList("meter-seg-mid", on && i >= 10 && i < 13);
+            segment.EnableInClassList("meter-seg-high", on && i >= 13);
+        }
+    }
+
+    // Vivox가 알려주는 내 마이크의 실제 음성 에너지(0~1)
+    private float ReadMicEnergy()
     {
         try
         {
-            await VivoxService.Instance.SetChannelTransmissionModeAsync(TransmissionMode.Single, targetChannel);
+            if (!VivoxService.Instance.ActiveChannels.TryGetValue(currentChannel, out var participants))
+                return 0f;
+
+            foreach (var participant in participants)
+            {
+                if (participant.IsSelf)
+                    return Mathf.Clamp01(Mathf.Sqrt((float)participant.AudioEnergy) * 1.2f);
+            }
         }
-        catch (System.Exception e) { Debug.LogWarning(e.Message); }
+        catch (System.Exception)
+        {
+            // 채널 정보가 바뀌는 순간의 일시적 오류는 무시
+        }
+        return 0f;
+    }
+
+private void UpdateMemberCount()
+    {
+        if (memberLabel == null || Time.unscaledTime < nextMemberRefreshTime) return;
+        nextMemberRefreshTime = Time.unscaledTime + 0.5f;
+
+        try
+        {
+            var channels = VivoxService.Instance.ActiveChannels;
+            if (channels != null && channels.TryGetValue(radioChannel, out var participants))
+                memberLabel.text = $"접속 {participants.Count}명";
+        }
+        catch (System.Exception)
+        {
+            // 채널 정보가 바뀌는 순간의 일시적 오류는 무시
+        }
     }
 }
