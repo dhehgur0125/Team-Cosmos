@@ -35,8 +35,8 @@ public class ShipHullVisibility : MonoBehaviour
     [Tooltip("조종실 뒤쪽 출입벽 x (여기서부터 캐노피 쪽으로 갈수록 안개가 옅어짐)")]
     public float cockpitBackX = -80.5f;
     public float cockpitFrontX = -118f;
-    [Tooltip("이 높이 범위의 카메라에서만 조종실을 그림 (2~4층)")]
-    public Vector2 cockpitVisibleY = new Vector2(8f, 30f);
+    [Tooltip("이 높이 범위의 카메라에서 조종실을 그림 (5층)")]
+    public Vector2 cockpitVisibleY = new Vector2(30f, 48f);
 
     [Header("Fog")]
     public bool controlFog = true;

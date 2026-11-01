@@ -5841,6 +5841,7 @@ GameObject:
   - component: {fileID: 893101056516047871}
   - component: {fileID: 6058082756904572691}
   - component: {fileID: 5009736756988602245}
+  - component: {fileID: 7250816624072708206}
   m_Layer: 0
   m_Name: VOID_LAST_FPS
   m_TagString: Untagged
@@ -6207,6 +6208,22 @@ MonoBehaviour:
   lightIntensity: 0.12
   lightRange: 1
   impactScale: 1
+--- !u!114 &7250816624072708206
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4874269986630254310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c9f6a006a3f34b40814b7d4ee34ca78, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsCrouchBodyFit
+  animator: {fileID: 7151468276248000077}
+  helmetAboveHead: 0.27
+  ceilingMargin: 0.04
+  ankleHeight: 0.145
 --- !u!1 &5023782149386011162
 GameObject:
   m_ObjectHideFlags: 0
@@ -12150,6 +12167,18 @@ PrefabInstance:
     - target: {fileID: 7224804625164599880, guid: 49a997af8a14bf34e9f98516b258bd18, type: 3}
       propertyPath: m_IsActive
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7224804625164967424, guid: 49a997af8a14bf34e9f98516b258bd18, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.985
+      objectReference: {fileID: 0}
+    - target: {fileID: 7224804625164967424, guid: 49a997af8a14bf34e9f98516b258bd18, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.985
+      objectReference: {fileID: 0}
+    - target: {fileID: 7224804625164967424, guid: 49a997af8a14bf34e9f98516b258bd18, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.985
       objectReference: {fileID: 0}
     - target: {fileID: 7224804625164967424, guid: 49a997af8a14bf34e9f98516b258bd18, type: 3}
       propertyPath: m_LocalPosition.x

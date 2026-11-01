@@ -31,11 +31,11 @@ namespace VoidLast.MapTools
         public const float LinkX0 = 37.5f, LinkX1 = 44.5f, LinkH = 6f;      // ShipMapBuilder 연결 통로와 동일
         public const float MouthX0 = 21f, MouthX1 = 61f, MouthH = 13f;       // 발사구 (+z 방향 우주로 열림)
         const float WallD = 0.6f;                                            // 격납고 벽 두께
-        // 조종실(선수 조종석 내부): 3층 바닥(y=16)과 같은 높이, 3층 정비 통로에서 연결 통로(z -6..-1)로 들어온다
-        public const float CkFloor = 16f, CkScale = 3.3f, CkBackX = -74f, CkWallX = -80.5f, CkFrontX = -127f;
+        // 조종실(선수 조종석 내부): 5층 바닥(y=32)과 같은 높이, NW-W 복도에서 계단실 외곽 통로로 들어온다
+        public const float CkFloor = 32f, CkScale = 3.3f, CkBackX = -74f, CkWallX = -80.5f, CkFrontX = -127f;
         public const float CkDoorZ0 = -6f, CkDoorZ1 = -1f, CkDoorH = 4f;
         const float CkFlatZ0 = -10f, CkFlatZ1 = 4f;                           // 조종실 평평한 바닥 폭 (양옆은 경사)
-        const float CkWallZ0 = -18.4f, CkWallZ1 = 11.4f, CkTop = 29.2f;       // 뒤쪽 출입벽 범위
+        const float CkWallZ0 = -18.4f, CkWallZ1 = 11.4f, CkTop = CkFloor + 13.2f;       // 뒤쪽 출입벽 범위
         const float RoofTop = HTop + 0.65f;                                  // 격납고 지붕 바깥면
 
         static Dictionary<string, GameObject> _kit;
@@ -112,7 +112,10 @@ namespace VoidLast.MapTools
             vis.cockpitBounds = MinMax(new Vector3(CkFrontX - 3f, CkFloor - 1f, CkWallZ0 - 1f), new Vector3(X0, CkTop + 1f, CkWallZ1 + 1f));
             vis.cockpitBackX = CkWallX;
             vis.cockpitFrontX = -118f;
+            vis.cockpitVisibleY = new Vector2(30f, 48f);
             EditorUtility.SetDirty(vis);
+            // Preserve the approved fifth-floor access geometry when the hull is rebuilt.
+            ShipCockpitFifthFloorUpgrade.Apply(false);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -569,7 +572,7 @@ namespace VoidLast.MapTools
 
         // ==================================================================== cockpit (조종실)
         /// <summary>
-        /// 선수 조종석 모듈을 3.3배로 배치하고(내부 바닥 = 3층 y16), 바깥 껍데기는 외부 선체로 합치고
+        /// 선수 조종석 모듈을 3.3배로 배치하고(내부 바닥 = 5층 y32), 바깥 껍데기는 외부 선체로 합치고
         /// 내벽/유리/조명은 충돌을 살려 조종실 내부로 옮긴 뒤 사람 크기 소품으로 꾸민다.
         /// </summary>
         static void BuildCockpit(Transform extTemp, Transform interior, Transform col, Transform vis, Transform props, Transform lights, Transform markers)
@@ -579,7 +582,7 @@ namespace VoidLast.MapTools
             PrefabUtility.UnpackPrefabInstance(shell, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             shell.transform.rotation = Quaternion.Euler(0, 90, 0);        // 프리팹 앞(-z) → 선수(-x)
             shell.transform.localScale = Vector3.one * CkScale;
-            shell.transform.position = new Vector3(CkBackX, CkFloor - CkScale * 1f, MidZ);   // 내벽 바닥(로컬 y=1) = y16
+            shell.transform.position = new Vector3(CkBackX, CkFloor - CkScale * 1f, MidZ);   // 내벽 바닥(로컬 y=1) = y32
 
             var all = shell.GetComponentsInChildren<Transform>(true);
             var moveNames = new HashSet<string> { "Interior_01", "Decal_A 1", "Cockpit_Struct_01", "Glass_01", "Ship_Interior_Lamp_02", "Light_01" };
@@ -603,7 +606,7 @@ namespace VoidLast.MapTools
             Box(col, "Cockpit_BackWall_N", MinMax(new Vector3(CkWallX, CkFloor, CkDoorZ1), new Vector3(CkWallX + 0.5f, CkTop, CkWallZ1)));
             Box(col, "Cockpit_BackWall_Top", MinMax(new Vector3(CkWallX, CkFloor + CkDoorH, CkDoorZ0), new Vector3(CkWallX + 0.5f, CkTop, CkDoorZ1)));
 
-            // 사람 크기 바닥 타일 (조종석 내벽 바닥 위, 윗면 y16.013)
+            // 사람 크기 바닥 타일 (조종석 내벽 바닥 위, 윗면 y32.013)
             int nx = 12, nz = 4;
             float tx = (CkWallX - (CkFrontX + 3f)) / nx, tz = (CkFlatZ1 - CkFlatZ0) / nz;
             for (int i = 0; i < nx; i++)
@@ -663,12 +666,12 @@ namespace VoidLast.MapTools
             Emergency(lights, new Vector3(CkWallX - 0.6f, CkFloor + CkDoorH + 0.7f, (CkDoorZ0 + CkDoorZ1) * 0.5f), 1.4f, 8f, 1);
 
             // 마커
-            Marker(markers, "F3_Cockpit_Entry", new Vector3(CkWallX - 1.5f, CkFloor + 0.1f, (CkDoorZ0 + CkDoorZ1) * 0.5f), 1);
-            Marker(markers, "F3_Cockpit_HoloStatus", new Vector3(-103.5f, CkFloor + 0.1f, cz), 2);
-            Marker(markers, "F3_Cockpit_NavLog", new Vector3(-95f, CkFloor + 0.1f, CkFlatZ1 - 3f), 2);
-            Marker(markers, "F3_Cockpit_PilotSeat", new Vector3(-111.5f, CkFloor + 0.1f, cz), 3);
+            Marker(markers, "F5_Cockpit_Entry", new Vector3(CkWallX - 1.5f, CkFloor + 0.1f, (CkDoorZ0 + CkDoorZ1) * 0.5f), 1);
+            Marker(markers, "F5_Cockpit_HoloStatus", new Vector3(-103.5f, CkFloor + 0.1f, cz), 2);
+            Marker(markers, "F5_Cockpit_NavLog", new Vector3(-95f, CkFloor + 0.1f, CkFlatZ1 - 3f), 2);
+            Marker(markers, "F5_Cockpit_PilotSeat", new Vector3(-111.5f, CkFloor + 0.1f, cz), 3);
             Marker(markers, "F3_Monster_Cockpit_Window", new Vector3(-126f, CkFloor + 6f, cz), 6);
-            Marker(markers, "F3_Cockpit_Hide_BehindServers", new Vector3(CkWallX - 2.2f, CkFloor + 0.1f, CkFlatZ0 + 1.6f), 5);
+            Marker(markers, "F5_Cockpit_Hide_BehindServers", new Vector3(CkWallX - 2.2f, CkFloor + 0.1f, CkFlatZ0 + 1.6f), 5);
         }
 
         /// <summary>조종실 뒤쪽 출입벽: 실내면이 n(-x) 을 보도록, 5m 폭 모듈.</summary>
@@ -710,7 +713,7 @@ namespace VoidLast.MapTools
                 AssetDatabase.CreateAsset(surf.navMeshData, p);
                 res = "cockpitNav=" + p;
             }
-            var linkGo = new GameObject("NavLink_F3_Cockpit");
+            var linkGo = new GameObject("NavLink_F5_Cockpit");
             linkGo.transform.SetParent(cockpit.transform, false);
             linkGo.transform.position = new Vector3(CkWallX, CkFloor, (CkDoorZ0 + CkDoorZ1) * 0.5f);
             var link = linkGo.AddComponent<NavMeshLink>();
