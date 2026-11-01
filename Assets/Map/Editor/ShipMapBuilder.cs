@@ -33,7 +33,7 @@ namespace VoidLast.MapTools
 
         static LayoutD _data;
         static Dictionary<string, GameObject> _kit;
-        static Material _trim, _lampMat;
+        static Material _trim, _lampMat, _back;
         static GameObject _lightPf, _sparkPf;
         static System.Random _rng;
 
@@ -50,6 +50,7 @@ namespace VoidLast.MapTools
             }
             _trim = AssetDatabase.LoadAssetAtPath<Material>("Assets/Map/Materials/M_Stage2_TrimGrey.mat");
             _lampMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Map/Materials/Stage2_NewMap/M_NM_EmergencyLamp.mat");
+            _back = EnsureBackingMaterial();
             _lightPf = AssetDatabase.LoadAssetAtPath<GameObject>(RootDir + "/Prefabs/P_EmergencyLight.prefab");
             _sparkPf = AssetDatabase.LoadAssetAtPath<GameObject>(RootDir + "/Prefabs/P_SparkBurst.prefab");
         }
@@ -214,6 +215,73 @@ namespace VoidLast.MapTools
             }
         }
 
+        /// <summary>
+        /// 막음판 재질: 천장 타일 이음새·모서리 모따기, 벽 모듈의 뚫린 디테일 사이로 바깥(스카이박스)이 비치지 않도록
+        /// 천장 위 / 바닥 아래 / 벽 뒤에 까는 거의 검은 판.
+        /// </summary>
+        static Material EnsureBackingMaterial()
+        {
+            // 반사/조명 영향이 없는 Unlit 검정 (Lit 이면 비스듬한 각도에서 우주 스카이박스가 반사돼 하늘색으로 보임)
+            const string path = "Assets/Map/Materials/M_Stage2_Backing.mat";
+            var sh = Shader.Find("Universal Render Pipeline/Unlit");
+            var c = new Color(0.01f, 0.011f, 0.012f);
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null) { m = new Material(sh) { name = "M_Stage2_Backing" }; AssetDatabase.CreateAsset(m, path); }
+            if (m.shader != sh) m.shader = sh;
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+            m.color = c;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>한쪽 면 판: normal 쪽에서만 보이고 반대편(방 밖, 씬 뷰에서 벽 사이)에서는 보이지 않는다.</summary>
+        static void BackQuad(Transform vis, Vector3 center, Vector3 normal, Vector3 up, float w, float h)
+        {
+            var g = GameObject.CreatePrimitive(PrimitiveType.Quad);   // Quad 앞면 = 로컬 -z
+            UnityEngine.Object.DestroyImmediate(g.GetComponent<Collider>());
+            g.transform.SetParent(vis, false);
+            g.transform.position = center;
+            g.transform.rotation = Quaternion.LookRotation(-normal, up);
+            g.transform.localScale = new Vector3(w, h, 1f);
+            g.GetComponent<MeshRenderer>().sharedMaterial = _back;
+        }
+
+        /// <summary>방/복도 사각형의 천장 위·바닥 아래 막음판 (방 안쪽을 향하는 한쪽 면).</summary>
+        static void SealRect(Transform vis, float Y, float h, float x0, float z0, float x1, float z1)
+        {
+            // 사각형과 정확히 같은 크기: 넓히면 문 위/옆으로 이웃 공간에 판이 비어져 나온다
+            float sx = x1 - x0, sz = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+            BackQuad(vis, new Vector3(cx, Y + h + 0.08f, cz), Vector3.down, Vector3.forward, sx, sz);
+            BackQuad(vis, new Vector3(cx, Y - 0.25f, cz), Vector3.up, Vector3.forward, sx, sz);
+        }
+
+        /// <summary>벽 뒤 막음판 (벽 모듈 깊이 0.3m 바로 뒤, 방 쪽을 향하는 한쪽 면).</summary>
+        static void SealWall(Transform vis, string o, float line, float a, float b, float y0, float y1, Vector3 N, float extA = 0f, float extB = 0f)
+        {
+            // 길이는 벽 구간과 같게 (늘리면 문틀 옆 복도 쪽으로 비어져 나옴) - 바깥 모서리에서만 ext 만큼 연장해 모서리 틈을 막음
+            // 위아래는 천장/바닥 막음판보다 조금 더
+            float L = b - a + extA + extB, top = y1 + 0.3f, bottom = y0 - 0.3f, H = top - bottom;
+            var c = WallPoint(o, line, (a - extA + b + extB) / 2, (top + bottom) / 2) - N * 0.38f;
+            BackQuad(vis, c, N, Vector3.up, L, H);
+        }
+
+        /// <summary>
+        /// 같은 공간(owner)의 수직 벽과 만나는 "바깥 모서리"면 막음판 연장 길이를 돌려준다.
+        /// 안쪽 모서리(L자 복도 안쪽)에서 연장하면 판이 공간 안으로 튀어나오므로 0.
+        /// </summary>
+        static float CornerExt(List<(string owner, string o, Vector3 p, Vector3 n)> ends, WallD w, float at, float sign)
+        {
+            var p = WallPoint(w.o, w.line, at, 0);
+            var dir = w.o == "x" ? new Vector3(0, 0, sign) : new Vector3(sign, 0, 0);
+            foreach (var e in ends)
+            {
+                if (e.owner != w.owner || e.o == w.o) continue;
+                if (Mathf.Abs(e.p.x - p.x) > 0.05f || Mathf.Abs(e.p.z - p.z) > 0.05f) continue;
+                if (Vector3.Dot(dir, e.n) < -0.5f) return 0.43f;
+            }
+            return 0f;
+        }
+
         /// <summary>벽 모듈: 앞면(+z)이 normal 방향을 보도록, 앞면 중심을 face 위치에 맞춘다.</summary>
         static GameObject Module(Transform parent, string name, Vector3 normal, Vector3 faceBottomCenter, float w, float h, float depthMax)
         {
@@ -242,7 +310,9 @@ namespace VoidLast.MapTools
             float wx = sx / b.size.x, wz = sz / b.size.z;
             go.transform.localScale = swap ? new Vector3(wz, 1, wx) : new Vector3(wx, 1, wz);
             b = GB(go);
-            go.transform.position += new Vector3(c.x - b.center.x, alignTop ? c.y - b.max.y : c.y - b.min.y, c.z - b.center.z);
+            // 바닥 타일은 윗면 기준으로 맞춘다 (그레이팅 타일은 아래로 18cm 파여 있어서 아랫면 기준이면 윗면이 19cm 뜬다)
+            const float FloorTileTop = 0.007f;
+            go.transform.position += new Vector3(c.x - b.center.x, alignTop ? c.y - b.max.y : c.y + FloorTileTop - b.max.y, c.z - b.center.z);
         }
 
         // 정점 수가 적은 모듈 위주 (Electric_02 2.5k, Rounded_Simple 0.9k, Rounded_TV 2k) + 디테일 모듈 소량
@@ -281,6 +351,7 @@ namespace VoidLast.MapTools
                 var g = Box(roomsT, "F" + c.F.n + "_" + r.id + "_" + r.name, new Vector3(cx, Y - 0.15f, cz), new Vector3(sx, 0.3f, sz));
                 Box(g.transform, "Ceiling", new Vector3(cx, Y + r.h + 0.15f, cz), new Vector3(sx, 0.3f, sz));
                 TileRoom(tF, tC, Y, r.h, r.x0, r.z0, r.x1, r.z1);
+                SealRect(tC, Y, r.h, r.x0, r.z0, r.x1, r.z1);
             }
             foreach (var kv in c.cors)
             {
@@ -293,6 +364,7 @@ namespace VoidLast.MapTools
                     Box(g.transform, "Floor", new Vector3(cx, Y - 0.15f, cz), new Vector3(sx, 0.3f, sz));
                     Box(g.transform, "Ceiling", new Vector3(cx, Y + cr.h + 0.15f, cz), new Vector3(sx, 0.3f, sz));
                     TileRect(tF, tC, Y, cr.h, q.x0, q.z0, q.x1, q.z1, cr.kind == "maint" ? "maint" : "corr");
+                    SealRect(tC, Y, cr.h, q.x0, q.z0, q.x1, q.z1);
                 }
             }
         }
@@ -386,6 +458,15 @@ namespace VoidLast.MapTools
             float Y = c.Y;
             var col = Child(c.structure, "Walls");
             var vis = Child(c.temp, "Walls");
+            var ends = new List<(string owner, string o, Vector3 p, Vector3 n)>();
+            foreach (var w in c.F.walls)
+            {
+                // 모서리 판단은 바닥부터 올라가는 벽끼리만 (문 위 단차를 채우는 step 벽은 모서리가 아님 - 연장하면 옆 통로로 판이 튀어나옴)
+                if (w.b - w.a < 0.25f || w.kind != "wall") continue;
+                var nw = WallNormal(w.o, w.n);
+                ends.Add((w.owner, w.o, WallPoint(w.o, w.line, w.a, 0), nw));
+                ends.Add((w.owner, w.o, WallPoint(w.o, w.line, w.b, 0), nw));
+            }
             foreach (var w in c.F.walls)
             {
                 float L = w.b - w.a;
@@ -397,6 +478,7 @@ namespace VoidLast.MapTools
                 var cc = WallPoint(w.o, w.line, mid, (y0 + y1) / 2) - N * 0.2f;
                 var size = w.o == "x" ? new Vector3(0.4f, H, L) : new Vector3(L, H, 0.4f);
                 Box(col, (w.kind == "step" ? "Step_" : "Wall_") + w.owner, cc, size);
+                SealWall(vis, w.o, w.line, w.a, w.b, y0, y1, N, CornerExt(ends, w, w.a, -1f), CornerExt(ends, w, w.b, 1f));
 
                 if (w.kind == "step")
                 {
@@ -554,6 +636,7 @@ namespace VoidLast.MapTools
                     var N = WallNormal(o, n);
                     var cc = WallPoint(o, line, (a + b) / 2, (y0 + y1) / 2) - N * 0.2f;
                     Box(st, "ShaftWall", cc, o == "x" ? new Vector3(0.4f, H, L) : new Vector3(L, H, 0.4f));
+                    if (Mathf.Abs(line - doorX) > 0.01f) SealWall(vis, o, line, a, b, y0, y1, N, 0.43f, 0.43f);   // 문 쪽 벽 뒤는 복도
                     int m = Mathf.Max(1, Mathf.RoundToInt(L / 5f)); float wd = L / m;
                     for (int i = 0; i < m; i++)
                     {
@@ -585,13 +668,13 @@ namespace VoidLast.MapTools
                 {
                     float lx0 = Mathf.Min(doorX, doorX + d * 4f), lx1 = Mathf.Max(doorX, doorX + d * 4f);
                     Box(st, "Landing", new Vector3((lx0 + lx1) / 2, Y - 0.15f, 0), new Vector3(4f, 0.3f, Shaft));
-                    VisBox(vis, new Vector3((lx0 + lx1) / 2, Y - 0.2f, 0), new Vector3(4f, 0.4f, Shaft), _trim);
+                    VisBox(vis, new Vector3((lx0 + lx1) / 2, Y - 0.3f, 0), new Vector3(4f, 0.2f, Shaft), _trim);   // 그레이팅 홈(Y-0.18) 아래
                     TileTop(vis, lx0, -8f, lx1, 8f, Y);
 
                     // mid landing (Y-4)
                     float mx0 = Mathf.Min(doorX + d * 10f, far), mx1 = Mathf.Max(doorX + d * 10f, far);
                     Box(st, "MidLanding", new Vector3((mx0 + mx1) / 2, Y - 4f - 0.15f, 0), new Vector3(6f, 0.3f, Shaft));
-                    VisBox(vis, new Vector3((mx0 + mx1) / 2, Y - 4f - 0.2f, 0), new Vector3(6f, 0.4f, Shaft), _trim);
+                    VisBox(vis, new Vector3((mx0 + mx1) / 2, Y - 4f - 0.3f, 0), new Vector3(6f, 0.2f, Shaft), _trim);
                     TileTop(vis, mx0, -8f, mx1, 8f, Y - 4f);
 
                     // flight 1: landing -> mid (north half), flight 2: mid -> lower landing (south half)
@@ -673,6 +756,32 @@ namespace VoidLast.MapTools
             }
         }
 
+        /// <summary>바닥 높이 배관: 같은 벽에 난 출입구 구간은 끊어서 문 앞을 가로지르지 않게 한다.</summary>
+        static void FloorPipeAvoidingDoors(Ctx c, Transform vis, Vector3 a, Vector3 b, float dia)
+        {
+            bool alongZ = Mathf.Abs(b.x - a.x) < 0.01f;
+            float fixedC = alongZ ? a.x : a.z;
+            float s0 = alongZ ? a.z : a.x, s1 = alongZ ? b.z : b.x;
+            float lo = Mathf.Min(s0, s1), hi = Mathf.Max(s0, s1);
+            var cuts = new List<Vector2>();
+            foreach (var d in c.F.doors)
+            {
+                if ((alongZ && d.o != "x") || (!alongZ && d.o != "z")) continue;
+                if (Mathf.Abs(d.line - fixedC) > 0.9f) continue;
+                cuts.Add(new Vector2(d.a - 0.25f, d.b + 0.25f));
+            }
+            cuts.Sort((p, q) => p.x.CompareTo(q.x));
+            float cur = lo;
+            System.Func<float, Vector3> at = t => alongZ ? new Vector3(fixedC, a.y, t) : new Vector3(t, a.y, fixedC);
+            foreach (var cut in cuts)
+            {
+                if (cut.y <= cur || cut.x >= hi) continue;
+                if (cut.x > cur) PipeRun(vis, at(cur), at(Mathf.Min(cut.x, hi)), dia);
+                cur = Mathf.Max(cur, cut.y);
+            }
+            if (hi > cur) PipeRun(vis, at(cur), at(hi), dia);
+        }
+
         static void BuildPipes(Ctx c)
         {
             float Y = c.Y;
@@ -690,7 +799,7 @@ namespace VoidLast.MapTools
                     PipeRun(vis, a + perp * off + Vector3.up * (Y + cr.h - 0.35f), b + perp * off + Vector3.up * (Y + cr.h - 0.35f), 0.26f);
                     PipeRun(vis, a + perp * (off - 0.35f) + Vector3.up * (Y + cr.h - 0.3f), b + perp * (off - 0.35f) + Vector3.up * (Y + cr.h - 0.3f), 0.17f);
                     if (cr.kind == "maint")
-                        PipeRun(vis, a - perp * off + Vector3.up * (Y + 0.35f), b - perp * off + Vector3.up * (Y + 0.35f), 0.3f);
+                        FloorPipeAvoidingDoors(c, vis, a - perp * off + Vector3.up * (Y + 0.35f), b - perp * off + Vector3.up * (Y + 0.35f), 0.3f);
                 }
             }
             foreach (var r in c.rooms.Values)
