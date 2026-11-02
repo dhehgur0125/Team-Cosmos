@@ -31,12 +31,19 @@ namespace VoidLast.MapTools
         public const float LinkX0 = 37.5f, LinkX1 = 44.5f, LinkH = 6f;      // ShipMapBuilder 연결 통로와 동일
         public const float MouthX0 = 21f, MouthX1 = 61f, MouthH = 13f;       // 발사구 (+z 방향 우주로 열림)
         const float WallD = 0.6f;                                            // 격납고 벽 두께
-        // 조종실(선수 조종석 내부): 5층 바닥(y=32)과 같은 높이, NW-W 복도에서 계단실 외곽 통로로 들어온다
+        // 조종실(스테이션 조종 모듈 앞쪽 방): 5층 바닥(y=32), NW-W 복도 → 계단실 외곽 통로(NW-Cockpit) → 서쪽 연결 통로로 들어온다
+        const float BXR = ShipStationBuilder.BXR, BXF = ShipStationBuilder.BXF, BZ0 = ShipStationBuilder.BZ0, BZ1 = ShipStationBuilder.BZ1;
+        const float BFloor = ShipStationBuilder.BFloor, BTop = ShipStationBuilder.BTop;
+        const float TZ0 = ShipStationBuilder.TZ0, TZ1 = ShipStationBuilder.TZ1, TH = ShipStationBuilder.TH;
+        // (예전 선수 조종석 값 — BuildCockpit 은 더 이상 쓰지 않음)
         public const float CkFloor = 32f, CkScale = 3.3f, CkBackX = -74f, CkWallX = -80.5f, CkFrontX = -127f;
         public const float CkDoorZ0 = -6f, CkDoorZ1 = -1f, CkDoorH = 4f;
         const float CkFlatZ0 = -10f, CkFlatZ1 = 4f;                           // 조종실 평평한 바닥 폭 (양옆은 경사)
         const float CkWallZ0 = -18.4f, CkWallZ1 = 11.4f, CkTop = CkFloor + 13.2f;       // 뒤쪽 출입벽 범위
-        const float RoofTop = HTop + 0.65f;                                  // 격납고 지붕 바깥면
+        const float RoofTop = HTop + 0.65f;                                  // (예전 남쪽 발사 격납고 — 더 이상 만들지 않음)
+        // 스테이션 북쪽 격납 베이 (ShipStationBuilder 와 같은 값): 바닥 y-35.8, 입구(우주) z-159, 뒷벽 z-82.9
+        const float BayFloor = ShipStationBuilder.BayFloor, BayTop = ShipStationBuilder.BayTop;
+        const float BayX0 = ShipStationBuilder.BayX0, BayX1 = ShipStationBuilder.BayX1, BayZ0 = ShipStationBuilder.BayZ0, BayZ1 = ShipStationBuilder.BayZ1;
 
         static Dictionary<string, GameObject> _kit;
         static Material _trim, _lamp;
@@ -67,37 +74,32 @@ namespace VoidLast.MapTools
             var hProps = Child(hangar, "Props");
             var hLights = Child(hangar, "Lights");
             var hMarkers = Child(hangar, "Markers");
-            BuildHangarShell(hStruct, hTemp);
-            BuildHangarDressing(hTemp, hProps, hLights, hMarkers);
+            // 1층 → 스테이션 북쪽 격납 베이 (예전 남쪽 발사 격납고 대신). 베이 바닥/벽 콜라이더는 ShipStationBuilder.Copy 가 원본에서 옮겨 온다
+            BuildBay(hStruct, hTemp, hProps, hLights, hMarkers);
 
-            // ---------------- 외부 선체
+            // ---------------- 외부 선체: Demo_D_SpacePort_A 스테이션 (ShipStationBuilder 가 Exterior/Station 을 채운다)
             var ext = Child(root, "Exterior");
-            var eTemp = Child(ext, "_Temp");
-            BuildHullPlating(eTemp);
-            BuildHullDecks(eTemp);
-            BuildBowAndStern(eTemp);
+            if (AssetDatabase.IsValidFolder(BakedDir + "/Hull_Exterior")) AssetDatabase.DeleteAsset(BakedDir + "/Hull_Exterior");
+            // ---------------- 조종실: 스테이션 조종 모듈(서쪽 끝) 앞쪽 방, 5층 높이 — 사람 크기로 새로 만든다
             var cockpit = Child(root, "Cockpit");
             var cStruct = Child(cockpit, "Structure");
             var cTemp = Child(cockpit, "_Temp");
             var cProps = Child(cockpit, "Props");
             var cLights = Child(cockpit, "Lights");
             var cMarkers = Child(cockpit, "Markers");
-            BuildCockpit(eTemp, Child(cockpit, "Interior"), cStruct, cTemp, cProps, cLights, cMarkers);
-            BuildRings(eTemp);
-            BuildTopside(eTemp);
-            BuildLettering(eTemp);
+            BuildBridge(cStruct, cTemp, cProps, cLights, cMarkers);
             BuildSpace(Child(ext, "Space"));
             // 발사구 너머 배경: 스카이박스가 없으면 빈 화면이 흰색으로 나와서 우주 스카이박스를 지정 (주변광은 Flat 유지)
             var sky = AssetDatabase.LoadAssetAtPath<Material>("Assets/Creepy_Cat/3D Scifi Kit Vol 4/Meshes/Materials/Skyboxes/Skybox_SpacePort.mat");
             if (sky != null) RenderSettings.skybox = sky;
 
-            string stats = "hangarTemp=" + (CountVerts(hTemp) / 1000) + "k exteriorTemp=" + (CountVerts(eTemp) / 1000) + "k";
+            string stats = "hangarTemp=" + (CountVerts(hTemp) / 1000) + "k cockpitTemp=" + (CountVerts(cTemp) / 1000) + "k";
             int mh = Merge(hTemp, Child(hangar, "Visual"), "Hull_Hangar", 32f);
-            int me = Merge(eTemp, Child(ext, "Visual"), "Hull_Exterior", 48f);
+            int me = 0;
             int mc = Merge(cTemp, Child(cockpit, "Visual"), "Hull_Cockpit", 32f);
 
             // ---------------- 내비메시 (격납고) + 1층 연결 통로와 잇는 링크
-            string nav = BakeHangarNav(hangar.gameObject) + " " + BakeCockpitNav(cockpit.gameObject);
+            string nav = BakeCockpitNav(cockpit.gameObject);   // 격납 베이 내비메시는 베이 콜라이더가 들어온 뒤 ShipStationBuilder.Finish 에서 굽는다
 
             // ---------------- 표시 최적화
             var vis = root.gameObject.AddComponent<ShipHullVisibility>();
@@ -105,17 +107,15 @@ namespace VoidLast.MapTools
             vis.hangarToggles = new[] { hangar.Find("Visual").gameObject, hLights.gameObject };
             vis.hangarPropRenderers = hProps.GetComponentsInChildren<Renderer>(true);
             vis.interiorBounds = MinMax(new Vector3(X0, Y0, Z0), new Vector3(X1, Y1 + 0.5f, Z1));
-            vis.hangarBounds = MinMax(new Vector3(HX0 - 1f, Y0, Z1), new Vector3(HX1 + 1f, HTop + 1f, HZ1 + 0.5f));
-            vis.launchMouthZ = HZ1;
-            vis.cockpitToggles = new[] { cockpit.Find("Visual").gameObject, cockpit.Find("Interior").gameObject, cLights.gameObject };
+            vis.hangarBounds = MinMax(new Vector3(BayX0 - 1.5f, BayFloor - 1f, BayZ0 - 1f), new Vector3(BayX1 + 1.5f, BayTop + 1f, BayZ1 + 0.2f));
+            vis.launchMouthZ = BayZ0;
+            vis.cockpitToggles = new[] { cockpit.Find("Visual").gameObject, cLights.gameObject };
             vis.cockpitPropRenderers = cProps.GetComponentsInChildren<Renderer>(true);
-            vis.cockpitBounds = MinMax(new Vector3(CkFrontX - 3f, CkFloor - 1f, CkWallZ0 - 1f), new Vector3(X0, CkTop + 1f, CkWallZ1 + 1f));
-            vis.cockpitBackX = CkWallX;
-            vis.cockpitFrontX = -118f;
-            vis.cockpitVisibleY = new Vector2(30f, 48f);
+            vis.cockpitBounds = MinMax(new Vector3(BXR - 1f, BFloor - 1f, BZ0 - 1f), new Vector3(BXF + 0.7f, BTop + 1.5f, BZ1 + 1f));
+            vis.tunnelBounds = MinMax(new Vector3(BXF + 0.7f, BFloor - 1f, TZ0 - 0.6f), new Vector3(X0, BFloor + TH + 1f, TZ1 + 0.6f));
+            vis.cockpitVisibleY = new Vector2(28f, 42f);
             EditorUtility.SetDirty(vis);
-            // Preserve the approved fifth-floor access geometry when the hull is rebuilt.
-            ShipCockpitFifthFloorUpgrade.Apply(false);
+            // 5층 조종실 연결 통로(NW-Cockpit)는 ship_layout_v2.json → ShipMapBuilder.BuildFloor(5) 가 만든다 (예전 ShipCockpitFifthFloorUpgrade 는 쓰지 않음)
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -125,6 +125,158 @@ namespace VoidLast.MapTools
         }
 
         // ==================================================================== hangar
+        // ==================================================================== 격납 베이 (1층 → 계단 → 베이 바닥)
+        /// <summary>
+        /// 1층 발사 관제실(NE) 북쪽 통로가 베이 뒷벽(z-82.9, y0)으로 나오면 위층 발판에서 동쪽 벽을 따라 9단 계단으로 베이 바닥(y-35.8)까지 내려간다.
+        /// 베이 바닥 가운데에 탈출 셔틀을 입구(-z, 우주)를 보도록 세운다.
+        /// </summary>
+        static void BuildBay(Transform col, Transform vis, Transform props, Transform lights, Transform markers)
+        {
+            const float ex0 = ShipStationBuilder.ExitX0, ex1 = ShipStationBuilder.ExitX1, ez = BayZ1;
+            const float lx0 = ShipStationBuilder.LandX0, lx1 = ShipStationBuilder.LandX1, lz0 = ShipStationBuilder.LandZ0;
+            const float sx0 = ShipStationBuilder.StX0, sx1 = ShipStationBuilder.StX1;
+            int flights = ShipStationBuilder.Flights; float run = ShipStationBuilder.Run, land = ShipStationBuilder.Land;
+            float rise = -BayFloor / flights;
+            float scx = (sx0 + sx1) * 0.5f, sw = sx1 - sx0;
+
+            // ---- 출구 테두리 (뒷벽에 뚫은 자리를 덮음) + 경고등
+            VisBox(vis, MinMax(new Vector3(ex0 - 0.6f, -0.8f, ez - 0.35f), new Vector3(ex0, 4.8f, ez + 0.05f)), _trim);
+            VisBox(vis, MinMax(new Vector3(ex1, -0.8f, ez - 0.35f), new Vector3(ex1 + 0.6f, 4.8f, ez + 0.05f)), _trim);
+            VisBox(vis, MinMax(new Vector3(ex0 - 0.6f, 4f, ez - 0.35f), new Vector3(ex1 + 0.6f, 4.8f, ez + 0.05f)), _trim);
+            VisBox(vis, MinMax(new Vector3(ex0, 4.15f, ez - 0.39f), new Vector3(ex1, 4.3f, ez - 0.35f)), _lamp);
+
+            // ---- 위층 발판 (y0)
+            Box(col, "Bay_TopLanding", MinMax(new Vector3(lx0, -0.4f, lz0), new Vector3(lx1, 0f, ez)));
+            VisBox(vis, MinMax(new Vector3(lx0, -0.45f, lz0), new Vector3(lx1, -0.05f, ez)), _trim);
+            FitTop("P_Floor_Hangar_Pattern_01", vis, Quaternion.identity, new Vector3(lx0, -0.06f, lz0), new Vector3(lx1, 0.013f, ez));
+            Rail(col, vis, new Vector3(lx0, 0f, ez - 0.2f), new Vector3(lx0, 0f, lz0), true);           // 서쪽 끝 난간
+            Rail(col, vis, new Vector3(lx0, 0f, lz0), new Vector3(sx0, 0f, lz0), true);                // 계단 옆 남는 칸
+
+            // ---- 계단 (동쪽 벽을 따라 -z 로 내려감) + 층계참
+            for (int k = 0; k < flights; k++)
+            {
+                float z0 = lz0 - k * (run + land), z1 = z0 - run;
+                float y0 = -k * rise, y1 = y0 - rise;
+                var a = new Vector3(scx, y0, z0); var b = new Vector3(scx, y1, z1);
+                SlopeBox(col, null, "Bay_Flight_" + k, a, b, sw, 0.4f, null);                                // 걷는 경사 콜라이더 (계단 코 높이)
+                int n = 16;
+                for (int s = 0; s < n; s++)
+                {
+                    float top = y0 - (s + 1) * rise / n;
+                    float za = z0 - s * run / n, zb = z0 - (s + 1) * run / n;
+                    VisBox(vis, MinMax(new Vector3(sx0, top - rise / n - 0.02f, zb), new Vector3(sx1, top, za + 0.02f)), _trim);
+                    if (s % 4 == 1) VisBox(vis, MinMax(new Vector3(sx0 + 0.2f, top, zb + 0.02f), new Vector3(sx1 - 0.2f, top + 0.01f, zb + 0.08f)), _lamp);
+                }
+                SlopeBox(null, vis, "Bay_FlightUnder", a + new Vector3(0, -rise / n - 0.25f, 0), b + new Vector3(0, -rise / n - 0.25f, 0), sw + 0.3f, 0.45f, _trim);
+                Rail(col, vis, new Vector3(sx0 - 0.08f, y0, z0), new Vector3(sx0 - 0.08f, y1, z1), false);
+                Rail(col, vis, new Vector3(sx1 + 0.08f, y0, z0), new Vector3(sx1 + 0.08f, y1, z1), false);
+                if (k < flights - 1)
+                {
+                    float lz1 = z1 - land;
+                    Box(col, "Bay_StairLanding_" + k, MinMax(new Vector3(sx0, y1 - 0.4f, lz1), new Vector3(sx1, y1, z1)));
+                    VisBox(vis, MinMax(new Vector3(sx0, y1 - 0.5f, lz1), new Vector3(sx1, y1, z1 + 0.02f)), _trim);
+                    Rail(col, vis, new Vector3(sx0 - 0.08f, y1, z1), new Vector3(sx0 - 0.08f, y1, lz1), true);
+                    Rail(col, vis, new Vector3(sx1 + 0.08f, y1, z1), new Vector3(sx1 + 0.08f, y1, lz1), true);
+                    if (k % 2 == 1) Emergency(lights, new Vector3(sx0 - 0.3f, y1 + 2.2f, z1 - land * 0.5f), 1.4f, 10f, k == 7 ? 1 : 0);
+                }
+                // 계단 아래 받침 기둥
+                if (k % 2 == 0)
+                    VisBox(vis, MinMax(new Vector3(scx - 0.3f, BayFloor, z1 - 0.3f), new Vector3(scx + 0.3f, y1 - 0.5f, z1 + 0.3f)), _trim);
+            }
+            float bottomZ = lz0 - flights * run - (flights - 1) * land;
+
+            // ---- 탈출 셔틀 (베이 바닥 가운데, 조종석이 입구 -z 를 봄)
+            float floorY = BayFloor + 0.013f;
+            const float cx = ShipStationBuilder.ShipX, shipZ = ShipStationBuilder.ShipZ;
+            foreach (var dx in new[] { -5.5f, 5.5f })
+                foreach (var dz in new[] { -5.5f, 5.5f })
+                    CockpitProp("P_Ship_Exterior_FixDock_01", props, 0f, new Vector3(cx + dx, floorY, shipZ + dz));
+            foreach (var p in new[] { (-9f, 9f, -9f, -8.85f), (-9f, 9f, 8.85f, 9f), (-9f, -8.85f, -9f, 9f), (8.85f, 9f, -9f, 9f) })
+                VisBox(vis, MinMax(new Vector3(cx + p.Item1, floorY, shipZ + p.Item3), new Vector3(cx + p.Item2, floorY + 0.02f, shipZ + p.Item4)), _lamp);
+            var shuttle = Inst("P_BubbleShip_Mark_01_White", props);
+            if (shuttle != null)
+            {
+                shuttle.name = "EscapeShuttle_BubbleShip";
+                var body = FindDeep(shuttle.transform, "P_Bubble_Body_01");
+                var cockpitT = FindDeep(shuttle.transform, "P_Bubble_Cockpit_01");
+                float yaw = 0f;
+                if (body != null && cockpitT != null)
+                {
+                    var bb = MB(body.gameObject).center; var cb = MB(cockpitT.gameObject).center;
+                    var f = new Vector3(cb.x - bb.x, 0, cb.z - bb.z);
+                    if (f.sqrMagnitude > 0.001f) yaw = -Vector3.SignedAngle(Vector3.forward, f.normalized, Vector3.up);
+                }
+                shuttle.transform.rotation = Quaternion.Euler(0, yaw + 180f, 0);          // 앞(조종석) → -z (베이 입구)
+                shuttle.transform.localScale = Vector3.one * 2.0f;
+                var sb = MB(shuttle);
+                shuttle.transform.position += new Vector3(cx - sb.center.x, BayFloor + 0.55f - sb.min.y, shipZ - sb.center.z);
+                foreach (var rb in shuttle.GetComponentsInChildren<Rigidbody>(true)) { rb.isKinematic = true; rb.useGravity = false; }
+                foreach (var l in shuttle.GetComponentsInChildren<Light>(true)) l.shadows = LightShadows.None;
+                foreach (var r in shuttle.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = ShadowCastingMode.Off;
+            }
+            CockpitProp("P_Chariot_01", props, 30f, new Vector3(cx + 10.5f, floorY, shipZ + 9.5f));
+            CockpitProp("P_Technic_Console_01_D", props, 180f, new Vector3(sx0 - 3.5f, floorY, bottomZ - 1.5f));    // 계단 아래 발사 관제 콘솔
+
+            // ---- 베이 입구: 플레이어가 우주로 걸어 나가지 않도록 막는 투명 벽 (엔딩 연출에서 비활성화)
+            Box(col, "LaunchMouth_PlayerBlocker", MinMax(new Vector3(BayX0, BayFloor, BayZ0 + 0.2f), new Vector3(BayX1, BayTop, BayZ0 + 0.6f)));
+            VisBox(vis, MinMax(new Vector3(BayX0 + 2f, BayFloor + 0.013f, BayZ0 + 1f), new Vector3(BayX1 - 2f, BayFloor + 0.03f, BayZ0 + 1.3f)), _lamp);
+
+            // ---- 조명: 셔틀 위 작업등 + 위층 발판 등
+            Spot(lights, new Vector3(cx - 6f, BayFloor + 18f, shipZ - 3f), 6f, 34f, new Color(0.75f, 0.85f, 1f));
+            Spot(lights, new Vector3(cx + 6f, BayFloor + 18f, shipZ + 3f), 6f, 34f, new Color(0.75f, 0.85f, 1f));
+            Spot(lights, new Vector3((lx0 + lx1) * 0.5f, 5.5f, lz0 + 2.5f), 3f, 10f, new Color(0.75f, 0.85f, 1f));
+            Emergency(lights, new Vector3((ex0 + ex1) * 0.5f, 5.2f, ez - 0.8f), 1.6f, 10f, 1);
+
+            // ---- 마커 (스토리/게임플레이 연결용, 예전 발사 격납고 이름 유지)
+            Marker(markers, "F1_Hangar_Entry_FromShuttleRoom", new Vector3((ex0 + ex1) * 0.5f, 0.1f, ez - 2.5f), 1);
+            Marker(markers, "F1_Hangar_StairsBottom", new Vector3(scx, BayFloor + 0.1f, bottomZ - 2f), 1);
+            Marker(markers, "F1_Hangar_LaunchControl", new Vector3(sx0 - 3.5f, BayFloor + 0.1f, bottomZ - 3f), 2);
+            Marker(markers, "F1_Escape_Shuttle_Board", new Vector3(cx + 9.5f, BayFloor + 0.1f, shipZ), 3);
+            Marker(markers, "F1_Hangar_FuelSupply", new Vector3(46f, BayFloor + 0.1f, -104f), 2);
+            Marker(markers, "F1_Monster_Large_Approach_FromLink", new Vector3((ex0 + ex1) * 0.5f, 0.1f, -60f), 6);
+            Marker(markers, "F1_Hangar_LaunchMouth", new Vector3(cx, BayFloor + 12f, BayZ0 - 0.5f), 4);
+        }
+
+        /// <summary>a→b 선분(윗면 중심선)을 따라 기울어진 상자. col 이 있으면 콜라이더, vis 가 있으면 보이는 상자.</summary>
+        static void SlopeBox(Transform col, Transform vis, string name, Vector3 a, Vector3 b, float width, float thick, Material mat)
+        {
+            var dir = b - a; float len = dir.magnitude; if (len < 0.01f) return;
+            var rot = Quaternion.LookRotation(dir / len, Vector3.up);
+            var center = (a + b) * 0.5f - rot * Vector3.up * (thick * 0.5f);
+            if (col != null)
+            {
+                var g = new GameObject(name); g.transform.SetParent(col, false);
+                g.transform.SetPositionAndRotation(center, rot);
+                var bc = g.AddComponent<BoxCollider>(); bc.size = new Vector3(width, thick, len);
+            }
+            if (vis != null)
+            {
+                var g = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                g.name = name; Object.DestroyImmediate(g.GetComponent<Collider>());
+                g.transform.SetParent(vis, false);
+                g.transform.SetPositionAndRotation(center, rot);
+                g.transform.localScale = new Vector3(width, thick, len);
+                var r = g.GetComponent<MeshRenderer>(); if (mat) r.sharedMaterial = mat; r.shadowCastingMode = ShadowCastingMode.Off;
+            }
+        }
+
+        /// <summary>난간: a→b (바닥/계단 코 높이 선) 위로 손잡이 + 기둥, 넘어가지 않도록 얇은 콜라이더 벽.</summary>
+        static void Rail(Transform col, Transform vis, Vector3 a, Vector3 b, bool flat)
+        {
+            const float h = 1.1f;
+            var up = Vector3.up * h;
+            SlopeBox(null, vis, "Rail_Hand", a + up + Vector3.up * 0.04f, b + up + Vector3.up * 0.04f, 0.08f, 0.08f, _trim);
+            SlopeBox(null, vis, "Rail_Mid", a + up * 0.5f, b + up * 0.5f, 0.05f, 0.05f, _trim);
+            float len = Vector3.Distance(a, b);
+            int posts = Mathf.Max(1, Mathf.CeilToInt(len / 2.2f));
+            for (int i = 0; i <= posts; i++)
+            {
+                var p = Vector3.Lerp(a, b, i / (float)posts);
+                VisBox(vis, MinMax(p + new Vector3(-0.05f, 0f, -0.05f), p + new Vector3(0.05f, h, 0.05f)), _trim);
+            }
+            if (col != null) SlopeBox(col, null, "Rail_Blocker", a + up, b + up, 0.12f, h + 0.3f, null);
+        }
+
         static void BuildHangarShell(Transform col, Transform vis)
         {
             // 바닥 / 천장 / 벽 콜라이더
@@ -541,7 +693,7 @@ namespace VoidLast.MapTools
         static void BuildSpace(Transform t)
         {
             // 별 (발사구 앞 / 선체 주변)
-            foreach (var p in new[] { new Vector3(41f, 20f, 260f), new Vector3(-200f, 40f, -40f), new Vector3(220f, 40f, -40f) })
+            foreach (var p in new[] { new Vector3(41f, 20f, 900f), new Vector3(-800f, 80f, 700f), new Vector3(900f, 80f, -800f) })
             {
                 var s = Inst("Particle_Stars_Box_01", t);
                 if (s != null) s.transform.position = p;
@@ -552,9 +704,9 @@ namespace VoidLast.MapTools
             {
                 var b = MB(planet);
                 float d = Mathf.Max(b.size.x, b.size.y, b.size.z);
-                if (d > 0.01f) planet.transform.localScale = Vector3.one * (700f / d);
+                if (d > 0.01f) planet.transform.localScale = Vector3.one * (1100f / d);
                 b = MB(planet);
-                planet.transform.position += new Vector3(160f, -330f, 760f) - b.center;
+                planet.transform.position += new Vector3(420f, -520f, 1500f) - b.center;   // 스테이션(남쪽 도킹 암 z~330) 너머, 발사구 앞 아래쪽
             }
             // 선수 조종실 캐노피 너머로 보이는 두 번째 행성 (조종실 정면 약간 위)
             var planet2 = Inst("P_Planet_Fake_01", t);
@@ -562,10 +714,10 @@ namespace VoidLast.MapTools
             {
                 var b = MB(planet2);
                 float d = Mathf.Max(b.size.x, b.size.y, b.size.z);
-                if (d > 0.01f) planet2.transform.localScale = Vector3.one * (420f / d);
+                if (d > 0.01f) planet2.transform.localScale = Vector3.one * (600f / d);
                 planet2.transform.rotation = Quaternion.Euler(20f, 140f, 0f);
                 b = MB(planet2);
-                planet2.transform.position += new Vector3(-740f, 150f, -140f) - b.center;   // 앉은 눈높이에서 캐노피(위쪽 8~30°) 안에 들어오도록
+                planet2.transform.position += new Vector3(1700f, 700f, -600f) - b.center;   // 조종실 창(동쪽) 너머 가운데 모듈 위쪽
             }
         }
 
@@ -575,6 +727,106 @@ namespace VoidLast.MapTools
         /// 선수 조종석 모듈을 3.3배로 배치하고(내부 바닥 = 5층 y32), 바깥 껍데기는 외부 선체로 합치고
         /// 내벽/유리/조명은 충돌을 살려 조종실 내부로 옮긴 뒤 사람 크기 소품으로 꾸민다.
         /// </summary>
+        /// <summary>
+        /// 조종실: 스테이션 조종 모듈(서쪽 끝) 위층 앞쪽 방 자리에 사람 크기 브리지를 만든다.
+        /// 바닥 = 5층 높이(y32). 앞벽(동쪽 +x, 가운데 모듈 쪽) 가운데 문으로 5층 연결 통로와 이어지고, 양옆 창으로 링/가운데 모듈이 보인다.
+        /// </summary>
+        static void BuildBridge(Transform col, Transform vis, Transform props, Transform lights, Transform markers)
+        {
+            float cz = (TZ0 + TZ1) * 0.5f;     // -3.5 (통로 중심 = 스테이션 축)
+            // ---- 충돌: 바닥/천장/벽 (앞벽은 문 자리 비움)
+            Box(col, "Bridge_Floor", MinMax(new Vector3(BXR, BFloor - 0.3f, BZ0), new Vector3(BXF, BFloor, BZ1)));
+            Box(col, "Bridge_Ceiling", MinMax(new Vector3(BXR, BTop, BZ0), new Vector3(BXF, BTop + 0.3f, BZ1)));
+            Box(col, "Bridge_Wall_S", MinMax(new Vector3(BXR, BFloor, BZ0 - 0.5f), new Vector3(BXF, BTop, BZ0)));
+            Box(col, "Bridge_Wall_N", MinMax(new Vector3(BXR, BFloor, BZ1), new Vector3(BXF, BTop, BZ1 + 0.5f)));
+            Box(col, "Bridge_Wall_Back", MinMax(new Vector3(BXR - 0.5f, BFloor, BZ0 - 0.5f), new Vector3(BXR, BTop, BZ1 + 0.5f)));
+            Box(col, "Bridge_Front_S", MinMax(new Vector3(BXF, BFloor, BZ0 - 0.5f), new Vector3(BXF + 0.5f, BTop, TZ0)));
+            Box(col, "Bridge_Front_N", MinMax(new Vector3(BXF, BFloor, TZ1), new Vector3(BXF + 0.5f, BTop, BZ1 + 0.5f)));
+            Box(col, "Bridge_Front_Top", MinMax(new Vector3(BXF, BFloor + TH, TZ0), new Vector3(BXF + 0.5f, BTop, TZ1)));
+
+            // ---- 바닥 / 천장 타일
+            int nx = 6, nz = 8;
+            float tx = (BXF - BXR) / nx, tz = (BZ1 - BZ0) / nz;
+            for (int i = 0; i < nx; i++)
+                for (int j = 0; j < nz; j++)
+                {
+                    float x0 = BXR + i * tx, z0 = BZ0 + j * tz;
+                    bool aisle = j == 3 || j == 4;
+                    string pf = aisle ? "P_Floor_Pattern_04_LP" : ((i + j) % 3 == 0 ? "P_Floor_Pattern_03_LP_B" : "P_Floor_Pattern_05_LP");
+                    FitTop(pf, vis, Quaternion.identity, new Vector3(x0, BFloor + 0.006f, z0), new Vector3(x0 + tx, BFloor + 0.013f, z0 + tz));
+                    Fit(aisle ? "P_Roof_Pattern_01_LP" : "P_Roof_Pattern_Angle_01_LP", vis, Quaternion.identity, new Vector3(x0, BTop - 0.12f, z0), new Vector3(x0 + tx, BTop, z0 + tz));
+                }
+
+            // ---- 벽 (모듈 실내면이 방 안쪽을 보도록)
+            // 뒷벽(서쪽): 패널 / 닫힌 문(승무원 구역) / 패널
+            WallRow(vis, new Vector3(1, 0, 0), BXR - 0.5f, BZ0, BZ1, new[] { "P_Wall_Electric_Panel_02_LP", "P_Wall_Technic_Simple_02_LP", "P_Wall_Interior_Door_01", "P_Wall_Technic_Simple_02_LP", "P_Wall_Electric_Panel_02_LP" });
+            // 옆벽 (남/북)
+            WallRow(vis, new Vector3(0, 0, 1), BZ0 - 0.5f, BXR, BXF, new[] { "P_Wall_Rounded_TV_01_LP", "P_Wall_Technic_Simple_02_LP", "P_Wall_Electric_Panel_02_LP" });
+            WallRow(vis, new Vector3(0, 0, -1), BZ1, BXR, BXF, new[] { "P_Wall_Electric_Panel_02_LP", "P_Wall_Technic_Simple_02_LP", "P_Wall_Rounded_TV_01_LP" });
+            // 앞벽(동쪽, 가운데 모듈 쪽): 창 + 문 + 창
+            var nf = new Vector3(-1, 0, 0);
+            Fit("P_Wall_Rounded_Window_02", vis, Quaternion.LookRotation(nf), new Vector3(BXF, BFloor, BZ0), new Vector3(BXF + 0.5f, BTop, TZ0));
+            Fit("P_Wall_Rounded_Window_02", vis, Quaternion.LookRotation(nf), new Vector3(BXF, BFloor, TZ1), new Vector3(BXF + 0.5f, BTop, BZ1));
+            VisBox(vis, MinMax(new Vector3(BXF - 0.05f, BFloor + TH, TZ0), new Vector3(BXF + 0.5f, BTop, TZ1)), _trim);
+            // 출입구 테두리 + 경고등
+            VisBox(vis, MinMax(new Vector3(BXF - 0.3f, BFloor, TZ0 - 0.35f), new Vector3(BXF + 0.05f, BFloor + TH, TZ0)), _trim);
+            VisBox(vis, MinMax(new Vector3(BXF - 0.3f, BFloor, TZ1), new Vector3(BXF + 0.05f, BFloor + TH, TZ1 + 0.35f)), _trim);
+            VisBox(vis, MinMax(new Vector3(BXF - 0.3f, BFloor + TH, TZ0 - 0.35f), new Vector3(BXF + 0.05f, BFloor + TH + 0.3f, TZ1 + 0.35f)), _trim);
+            VisBox(vis, MinMax(new Vector3(BXF - 0.34f, BFloor + TH + 0.08f, TZ0), new Vector3(BXF - 0.3f, BFloor + TH + 0.2f, TZ1)), _lamp);
+
+            // ---- 소품 (사람 크기)
+            float y = BFloor + 0.013f;
+            float seatX = BXF - 3.4f;
+            foreach (float sz in new[] { BZ0 + 4f, BZ1 - 4f })
+            {
+                CockpitProp("P_Ship_Interior_PilotChairBase_01", props, 90f, new Vector3(seatX, y, sz));      // 2인 조종석, 창(+x)을 봄
+                CockpitProp("P_Technic_Console_01_D", props, -90f, new Vector3(BXF - 1.1f, y, sz - 1.7f));
+                CockpitProp("P_Technic_Console_01_D", props, -90f, new Vector3(BXF - 1.1f, y, sz + 1.7f));
+            }
+            CockpitProp("P_Holo_Display_03", props, 90f, new Vector3(BXR + 6.5f, y, cz));                  // 가운데 홀로 상황판
+            foreach (float x in new[] { BXR + 3.0f, BXR + 7.5f })
+            {
+                CockpitProp("P_Desktop_01_A", props, 0f, new Vector3(x, y, BZ0 + 0.9f));                    // 남쪽 벽 업무석 (사용자 +z)
+                CockpitProp("P_Desktop_01_A", props, 180f, new Vector3(x, y, BZ1 - 0.9f));                  // 북쪽 벽 업무석 (사용자 -z)
+            }
+            foreach (float z in new[] { BZ0 + 1.0f, BZ0 + 1.9f, BZ0 + 2.8f, BZ1 - 2.8f, BZ1 - 1.9f, BZ1 - 1.0f })
+                CockpitProp("P_Server_01", props, -90f, new Vector3(BXR + 0.7f, y, z));                       // 뒷벽 서버 랙
+            CockpitProp("P_Crate_02", props, 20f, new Vector3(BXR + 1.6f, y, cz + 4.6f));
+
+            // ---- 조명
+            foreach (float sz in new[] { BZ0 + 4f, BZ1 - 4f })
+                Spot(lights, new Vector3(seatX, BTop - 0.4f, sz), 3.2f, 8f, new Color(0.75f, 0.85f, 1f));
+            Spot(lights, new Vector3(BXR + 4f, BTop - 0.4f, cz), 2.4f, 8f, new Color(0.75f, 0.85f, 1f));
+            var holo = new GameObject("Cockpit_HoloGlow"); holo.transform.SetParent(lights, false); holo.transform.position = new Vector3(BXR + 6.5f, BFloor + 2.5f, cz);
+            var hl = holo.AddComponent<Light>(); hl.type = LightType.Point; hl.color = new Color(0.3f, 0.85f, 1f); hl.intensity = 1.4f; hl.range = 8f; hl.shadows = LightShadows.None;
+            Emergency(lights, new Vector3(BXR + 0.6f, BTop - 0.6f, BZ0 + 0.6f), 1.2f, 9f, 0);
+            Emergency(lights, new Vector3(BXR + 0.6f, BTop - 0.6f, BZ1 - 0.6f), 1.2f, 9f, 0);
+            Emergency(lights, new Vector3(BXF - 0.6f, BFloor + TH + 0.7f, cz), 1.4f, 8f, 1);
+
+            // ---- 마커
+            Marker(markers, "F5_Cockpit_Entry", new Vector3(BXF - 1.5f, BFloor + 0.1f, cz), 1);
+            Marker(markers, "F5_Cockpit_HoloStatus", new Vector3(BXR + 8.2f, BFloor + 0.1f, cz), 2);
+            Marker(markers, "F5_Cockpit_NavLog", new Vector3(BXR + 7.5f, BFloor + 0.1f, BZ1 - 2.2f), 2);
+            Marker(markers, "F5_Cockpit_PilotSeat", new Vector3(seatX - 1.4f, BFloor + 0.1f, BZ0 + 4f), 3);
+            Marker(markers, "F5_Monster_Cockpit_Window", new Vector3(BXF + 3f, BFloor + 2f, BZ0 + 4f), 6);
+            Marker(markers, "F5_Cockpit_Hide_BehindServers", new Vector3(BXR + 1.2f, BFloor + 0.1f, BZ0 + 4.4f), 5);
+        }
+
+        /// <summary>벽 한 줄을 모듈 수만큼 균등 분할해 채운다. n = 실내 방향, line = 벽 바깥면 좌표(두께 0.5).</summary>
+        static void WallRow(Transform vis, Vector3 n, float line, float a, float b, string[] prefabs)
+        {
+            int cols = prefabs.Length; float w = (b - a) / cols;
+            var rot = Quaternion.LookRotation(n, Vector3.up);
+            bool alongX = Mathf.Abs(n.z) > 0.5f;
+            for (int i = 0; i < cols; i++)
+            {
+                float s0 = a + i * w, s1 = s0 + w;
+                var min = alongX ? new Vector3(s0, BFloor, line) : new Vector3(line, BFloor, s0);
+                var max = alongX ? new Vector3(s1, BTop, line + 0.5f) : new Vector3(line + 0.5f, BTop, s1);
+                Fit(prefabs[i], vis, rot, min, max);
+            }
+        }
+
         static void BuildCockpit(Transform extTemp, Transform interior, Transform col, Transform vis, Transform props, Transform lights, Transform markers)
         {
             var shell = Inst("P_Ship_Exterior_Cockpit_01", extTemp);
@@ -715,11 +967,11 @@ namespace VoidLast.MapTools
             }
             var linkGo = new GameObject("NavLink_F5_Cockpit");
             linkGo.transform.SetParent(cockpit.transform, false);
-            linkGo.transform.position = new Vector3(CkWallX, CkFloor, (CkDoorZ0 + CkDoorZ1) * 0.5f);
+            linkGo.transform.position = new Vector3(BXF, BFloor, (TZ0 + TZ1) * 0.5f);
             var link = linkGo.AddComponent<NavMeshLink>();
             link.startPoint = new Vector3(1.5f, 0, 0);
             link.endPoint = new Vector3(-1.5f, 0, 0);
-            link.width = CkDoorZ1 - CkDoorZ0 - 1f;
+            link.width = TZ1 - TZ0 - 1f;
             link.bidirectional = true;
             return res;
         }
