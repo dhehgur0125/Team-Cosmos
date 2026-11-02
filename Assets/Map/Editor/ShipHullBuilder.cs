@@ -185,36 +185,35 @@ namespace VoidLast.MapTools
             }
             float bottomZ = lz0 - flights * run - (flights - 1) * land;
 
-            // ---- 탈출 셔틀 (베이 바닥 가운데, 조종석이 입구 -z 를 봄)
+            // ---- 탈출선: Discovery (원래 남쪽 베이에 도킹돼 있던 우주선을 사람 크기 1배로 옮겨 옴). 조종석(-z)이 베이 입구(우주)를 봄
             float floorY = BayFloor + 0.013f;
             const float cx = ShipStationBuilder.ShipX, shipZ = ShipStationBuilder.ShipZ;
-            foreach (var dx in new[] { -5.5f, 5.5f })
-                foreach (var dz in new[] { -5.5f, 5.5f })
-                    CockpitProp("P_Ship_Exterior_FixDock_01", props, 0f, new Vector3(cx + dx, floorY, shipZ + dz));
-            foreach (var p in new[] { (-9f, 9f, -9f, -8.85f), (-9f, 9f, 8.85f, 9f), (-9f, -8.85f, -9f, 9f), (8.85f, 9f, -9f, 9f) })
-                VisBox(vis, MinMax(new Vector3(cx + p.Item1, floorY, shipZ + p.Item3), new Vector3(cx + p.Item2, floorY + 0.02f, shipZ + p.Item4)), _lamp);
-            var shuttle = Inst("P_BubbleShip_Mark_01_White", props);
-            if (shuttle != null)
+            var ship = Inst("P_SpaceShip_Discovery_Full", props);
+            if (ship != null)
             {
-                shuttle.name = "EscapeShuttle_BubbleShip";
-                var body = FindDeep(shuttle.transform, "P_Bubble_Body_01");
-                var cockpitT = FindDeep(shuttle.transform, "P_Bubble_Cockpit_01");
-                float yaw = 0f;
-                if (body != null && cockpitT != null)
+                ship.name = "EscapeShip_Discovery";
+                ship.transform.rotation = Quaternion.identity;
+                ship.transform.localScale = Vector3.one;
+                // 켜져 있는 메시 렌더러만으로 크기를 잰다 (꺼진 실내/이펙트 메시는 제외)
+                Bounds sb0 = new Bounds(ship.transform.position, Vector3.zero); bool first0 = true;
+                foreach (var mr in ship.GetComponentsInChildren<MeshRenderer>(false))
                 {
-                    var bb = MB(body.gameObject).center; var cb = MB(cockpitT.gameObject).center;
-                    var f = new Vector3(cb.x - bb.x, 0, cb.z - bb.z);
-                    if (f.sqrMagnitude > 0.001f) yaw = -Vector3.SignedAngle(Vector3.forward, f.normalized, Vector3.up);
+                    if (!mr.enabled) continue;
+                    if (first0) { sb0 = mr.bounds; first0 = false; } else sb0.Encapsulate(mr.bounds);
                 }
-                shuttle.transform.rotation = Quaternion.Euler(0, yaw + 180f, 0);          // 앞(조종석) → -z (베이 입구)
-                shuttle.transform.localScale = Vector3.one * 2.0f;
-                var sb = MB(shuttle);
-                shuttle.transform.position += new Vector3(cx - sb.center.x, BayFloor + 0.55f - sb.min.y, shipZ - sb.center.z);
-                foreach (var rb in shuttle.GetComponentsInChildren<Rigidbody>(true)) { rb.isKinematic = true; rb.useGravity = false; }
-                foreach (var l in shuttle.GetComponentsInChildren<Light>(true)) l.shadows = LightShadows.None;
-                foreach (var r in shuttle.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = ShadowCastingMode.Off;
+                ship.transform.position += new Vector3(cx - sb0.center.x, BayFloor - sb0.min.y, shipZ - sb0.center.z);
+                foreach (var rb in ship.GetComponentsInChildren<Rigidbody>(true)) { rb.isKinematic = true; rb.useGravity = false; }
+                foreach (var l in ship.GetComponentsInChildren<Light>(true)) l.shadows = LightShadows.None;
+                foreach (var r in ship.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = ShadowCastingMode.Off;
+                foreach (var pr in ship.GetComponentsInChildren<ReflectionProbe>(true)) Object.DestroyImmediate(pr.gameObject);
+                ModifyEscapeShip(ship.transform, col, vis, lights, markers);
             }
-            CockpitProp("P_Chariot_01", props, 30f, new Vector3(cx + 10.5f, floorY, shipZ + 9.5f));
+            float shipHalfW = ShipStationBuilder.ShipHalfW, shipHalfL = ShipStationBuilder.ShipHalfL;
+            // 착륙 구역 표시등
+            foreach (var p in new[] { (-shipHalfW, shipHalfW, -shipHalfL, -shipHalfL + 0.15f), (-shipHalfW, shipHalfW, shipHalfL - 0.15f, shipHalfL),
+                                      (-shipHalfW, -shipHalfW + 0.15f, -shipHalfL, shipHalfL), (shipHalfW - 0.15f, shipHalfW, -shipHalfL, shipHalfL) })
+                VisBox(vis, MinMax(new Vector3(cx + p.Item1, floorY, shipZ + p.Item3), new Vector3(cx + p.Item2, floorY + 0.02f, shipZ + p.Item4)), _lamp);
+            CockpitProp("P_Chariot_01", props, 30f, new Vector3(cx + shipHalfW + 3f, floorY, shipZ + 12f));
             CockpitProp("P_Technic_Console_01_D", props, 180f, new Vector3(sx0 - 3.5f, floorY, bottomZ - 1.5f));    // 계단 아래 발사 관제 콘솔
 
             // ---- 베이 입구: 플레이어가 우주로 걸어 나가지 않도록 막는 투명 벽 (엔딩 연출에서 비활성화)
@@ -222,8 +221,8 @@ namespace VoidLast.MapTools
             VisBox(vis, MinMax(new Vector3(BayX0 + 2f, BayFloor + 0.013f, BayZ0 + 1f), new Vector3(BayX1 - 2f, BayFloor + 0.03f, BayZ0 + 1.3f)), _lamp);
 
             // ---- 조명: 셔틀 위 작업등 + 위층 발판 등
-            Spot(lights, new Vector3(cx - 6f, BayFloor + 18f, shipZ - 3f), 6f, 34f, new Color(0.75f, 0.85f, 1f));
-            Spot(lights, new Vector3(cx + 6f, BayFloor + 18f, shipZ + 3f), 6f, 34f, new Color(0.75f, 0.85f, 1f));
+            Spot(lights, new Vector3(cx - 12f, BayFloor + 40f, shipZ - 18f), 6f, 50f, new Color(0.75f, 0.85f, 1f));
+            Spot(lights, new Vector3(cx + 12f, BayFloor + 40f, shipZ + 18f), 6f, 50f, new Color(0.75f, 0.85f, 1f));
             Spot(lights, new Vector3((lx0 + lx1) * 0.5f, 5.5f, lz0 + 2.5f), 3f, 10f, new Color(0.75f, 0.85f, 1f));
             Emergency(lights, new Vector3((ex0 + ex1) * 0.5f, 5.2f, ez - 0.8f), 1.6f, 10f, 1);
 
@@ -231,10 +230,277 @@ namespace VoidLast.MapTools
             Marker(markers, "F1_Hangar_Entry_FromShuttleRoom", new Vector3((ex0 + ex1) * 0.5f, 0.1f, ez - 2.5f), 1);
             Marker(markers, "F1_Hangar_StairsBottom", new Vector3(scx, BayFloor + 0.1f, bottomZ - 2f), 1);
             Marker(markers, "F1_Hangar_LaunchControl", new Vector3(sx0 - 3.5f, BayFloor + 0.1f, bottomZ - 3f), 2);
-            Marker(markers, "F1_Escape_Shuttle_Board", new Vector3(cx + 9.5f, BayFloor + 0.1f, shipZ), 3);
             Marker(markers, "F1_Hangar_FuelSupply", new Vector3(46f, BayFloor + 0.1f, -104f), 2);
             Marker(markers, "F1_Monster_Large_Approach_FromLink", new Vector3((ex0 + ex1) * 0.5f, 0.1f, -60f), 6);
             Marker(markers, "F1_Hangar_LaunchMouth", new Vector3(cx, BayFloor + 12f, BayZ0 - 0.5f), 4);
+        }
+
+        // ==================================================================== 탈출선(Discovery) 탑승 개조
+        // 조종실 칸 동쪽 도킹 포트(로컬 x5~6, z-7.3~-3.3) 자리를 해치로 뚫고, 바깥에 발판 + 계단(베이 바닥까지)을 붙인다.
+        // 키트 자동문/최적화 스크립트는 "Player"/"MainCamera" 태그 충돌체에만 반응해서 지금 플레이어(VOID_LAST_FPS, CharacterController 는 Untagged)에게는
+        // 열리지 않으므로, 탑승 경로의 큰 문 2개는 열린 채로 고정하고 실내 숨김/조명 최적화 스크립트는 끈다.
+        const float HatchZ0 = -6.8f, HatchZ1 = -3.8f, HatchTop = 4.6f, DeckY = 1.0f;   // 탈출선 로컬 좌표
+        const float HatchFloor = 1.85f;   // 조종실 칸 바닥이 벽 쪽으로 비스듬히 올라가서(벽 앞 y1.7) 문턱을 그 높이에 맞춘다
+        const string EscapeDir = RootDir + "/EscapeShip";
+
+        static void ModifyEscapeShip(Transform ship, Transform col, Transform vis, Transform lights, Transform markers)
+        {
+            if (AssetDatabase.IsValidFolder(EscapeDir)) AssetDatabase.DeleteAsset(EscapeDir);
+            AssetDatabase.CreateFolder(RootDir, "EscapeShip");
+
+            // ---- 스크립트: 실내 숨김/조명 최적화 끄기, 탑승 경로 큰 문 열어 두기
+            foreach (var mb in ship.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (mb == null) continue;
+                string tn = mb.GetType().Name;
+                if (tn == "AutomaticObjectOptimizer" || tn == "AutomaticLightOptimizer") { mb.enabled = false; continue; }
+                if (tn == "DoubleDoorOpenAuto" && mb.transform.parent != null && mb.transform.parent.name == "P_Interior_01")
+                {
+                    var so = new SerializedObject(mb);
+                    var dl = so.FindProperty("doorL").objectReferenceValue as Transform;
+                    var dr = so.FindProperty("doorR").objectReferenceValue as Transform;
+                    int dt = so.FindProperty("directionType").enumValueIndex;
+                    float dist = so.FindProperty("openDistance").floatValue;
+                    var dir = dt == 0 ? Vector3.right : dt == 1 ? Vector3.up : Vector3.back;
+                    if (dl) dl.localPosition += dir * dist;
+                    if (dr) dr.localPosition -= dir * dist;
+                    mb.enabled = false;
+                }
+            }
+            foreach (var l in ship.GetComponentsInChildren<Light>(true)) { if (l.intensity < 0.05f) l.intensity = 1.2f; l.enabled = true; }
+
+            // ---- 해치 자리 정리: 바깥 도킹판, 안쪽 선반/상자/배관
+            var hatchClear = MinMax(ship.TransformPoint(new Vector3(2.2f, DeckY + 0.05f, HatchZ0 - 0.3f)), ship.TransformPoint(new Vector3(6.4f, HatchTop, HatchZ1 + 1.8f)));
+            int hidden = 0;
+            foreach (var mr in ship.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                var go = mr.gameObject; if (!go.activeSelf) continue;
+                string n = go.name;
+                if (n.StartsWith("Ship_Exterior_Cockpit") || n == "Interior_01" || n.StartsWith("Decal") || n == "Detail_01" || n.StartsWith("Module_") || n == "Top_Grid") continue;
+                var b = mr.bounds;
+                if (b.size.magnitude > 8f || !hatchClear.Contains(b.center)) continue;
+                if (b.min.y > ship.TransformPoint(new Vector3(0, 3.4f, 0)).y) continue;    // 머리 위 모니터 팔은 남김
+                // 소품 단위(P_ 접두사 부모)로 숨김
+                var top = mr.transform; while (top.parent != null && top.parent != ship && !top.name.StartsWith("P_")) top = top.parent;
+                if (top == ship || (top.name.StartsWith("P_Ship_Exterior") && top.name != "P_Ship_Exterior_FixDock_01") || top.name.StartsWith("P_Interior")) continue;   // 선체/방 통째는 건드리지 않음
+                if (top.gameObject.activeSelf) { top.gameObject.SetActive(false); hidden++; }
+            }
+            foreach (var t in ship.GetComponentsInChildren<Transform>(true))
+                if (t.name == "P_Ship_Exterior_FixDock_01" && ship.InverseTransformPoint(t.position).x > 3f && Mathf.Abs(ship.InverseTransformPoint(t.position).y - 3f) < 2.5f) { t.gameObject.SetActive(false); hidden++; }
+
+            // ---- 문 구멍: 조종실 선체/내벽 메시(+메시 콜라이더)를 문 크기 상자 모양으로 잘라냄 (문 아래 선체는 그대로)
+            // 문짝 모서리가 살짝 둥글어서, 구멍을 문보다 사방 8cm 작게 뚫어 모서리 뒤로 선체가 보이게 한다 (구멍 테두리는 문짝 두께 안에 숨음)
+            const float Inset = 0.08f;
+            var cut = MinMax(ship.TransformPoint(new Vector3(4.15f, HatchFloor + Inset, HatchZ0 + Inset)), ship.TransformPoint(new Vector3(6.6f, HatchTop - Inset, HatchZ1 - Inset)));
+            var cockpit = ship.Find("P_Ship_Exterior_Cockpit_01");
+            int cutN = cockpit != null ? CutMeshes(cockpit, cut, EscapeDir) : 0;
+
+            // ---- 탑승문: 좌우 두 짝 미닫이문만 (여닫는 기능은 아직 없음 — 닫힌 상태, 문짝마다 콜라이더 + 열림 위치 표시)
+            //      탈출선과 함께 움직이도록 탈출선 자식으로 둔다. 문틀/해치 장식은 없음
+            BuildBoardingDoor(ship);
+
+            // ---- 바깥 탑승 발판 + 계단 (베이 바닥까지, 동쪽 +x 로 내려감) — 격납고 구조물(움직이지 않음)
+            float deckW = ship.TransformPoint(new Vector3(0, HatchFloor, 0)).y;
+            float z0 = ship.TransformPoint(new Vector3(0, 0, HatchZ0)).z, z1 = ship.TransformPoint(new Vector3(0, 0, HatchZ1)).z;
+            float px0 = ship.TransformPoint(new Vector3(5.02f, 0, 0)).x, px1 = px0 + 4f;
+            float zc = (z0 + z1) * 0.5f, w = z1 - z0;
+            Box(col, "Gangway_Platform", MinMax(new Vector3(px0, deckW - 0.4f, z0), new Vector3(px1, deckW, z1)));
+            VisBox(vis, MinMax(new Vector3(px0, deckW - 0.5f, z0), new Vector3(px1, deckW, z1)), _trim);
+            FitTop("P_Floor_Hangar_Pattern_01", vis, Quaternion.identity, new Vector3(px0, deckW - 0.06f, z0), new Vector3(px1, deckW + 0.013f, z1));
+            Rail(col, vis, new Vector3(px0 + 0.1f, deckW, z0 - 0.08f), new Vector3(px1, deckW, z0 - 0.08f), true);
+            Rail(col, vis, new Vector3(px0 + 0.1f, deckW, z1 + 0.08f), new Vector3(px1, deckW, z1 + 0.08f), true);
+            int flights = 3; float run = 5.5f, land = 1.8f, rise = (deckW - BayFloor) / flights;
+            float x = px1;
+            for (int k = 0; k < flights; k++)
+            {
+                float y0 = deckW - k * rise, y1 = y0 - rise, xa = x, xb = x + run;
+                var a = new Vector3(xa, y0, zc); var b = new Vector3(xb, y1, zc);
+                SlopeBox(col, null, "Gangway_Flight_" + k, a, b, w, 0.4f, null);
+                int n = 16;
+                for (int s = 0; s < n; s++)
+                {
+                    float top = y0 - (s + 1) * rise / n, sa = xa + s * run / n, sbx = xa + (s + 1) * run / n;
+                    VisBox(vis, MinMax(new Vector3(sa - 0.02f, top - rise / n - 0.02f, z0), new Vector3(sbx, top, z1)), _trim);
+                    if (s % 4 == 1) VisBox(vis, MinMax(new Vector3(sbx - 0.08f, top, z0 + 0.2f), new Vector3(sbx - 0.02f, top + 0.01f, z1 - 0.2f)), _lamp);
+                }
+                SlopeBox(null, vis, "Gangway_Under", a + new Vector3(0, -rise / n - 0.25f, 0), b + new Vector3(0, -rise / n - 0.25f, 0), w + 0.3f, 0.45f, _trim);
+                Rail(col, vis, new Vector3(xa, y0, z0 - 0.08f), new Vector3(xb, y1, z0 - 0.08f), false);
+                Rail(col, vis, new Vector3(xa, y0, z1 + 0.08f), new Vector3(xb, y1, z1 + 0.08f), false);
+                VisBox(vis, MinMax(new Vector3(xb - 0.3f, BayFloor, zc - 0.3f), new Vector3(xb + 0.3f, y1 - 0.5f, zc + 0.3f)), _trim);
+                x = xb;
+                if (k < flights - 1)
+                {
+                    Box(col, "Gangway_Landing_" + k, MinMax(new Vector3(x, y1 - 0.4f, z0), new Vector3(x + land, y1, z1)));
+                    VisBox(vis, MinMax(new Vector3(x - 0.02f, y1 - 0.5f, z0), new Vector3(x + land, y1, z1)), _trim);
+                    Rail(col, vis, new Vector3(x, y1, z0 - 0.08f), new Vector3(x + land, y1, z0 - 0.08f), true);
+                    Rail(col, vis, new Vector3(x, y1, z1 + 0.08f), new Vector3(x + land, y1, z1 + 0.08f), true);
+                    x += land;
+                }
+            }
+            Emergency(lights, new Vector3(px1 - 0.5f, deckW + 2.6f, z0 - 0.4f), 1.6f, 10f, 1);
+
+            // ---- 마커
+            Marker(markers, "F1_Escape_Gangway_Bottom", new Vector3(x + 1.5f, BayFloor + 0.1f, zc), 1);
+            Marker(markers, "F1_Escape_ShipDoor", ship.TransformPoint(new Vector3(6.9f, HatchFloor + 0.1f, (HatchZ0 + HatchZ1) * 0.5f)), 1);   // 문 바깥 발판
+            Marker(markers, "F1_Escape_Shuttle_Board", ship.TransformPoint(new Vector3(2.0f, DeckY + 0.35f, (HatchZ0 + HatchZ1) * 0.5f + 0.6f)), 3);   // 해치 안쪽 (조종실 칸 가운데 통로)
+            Marker(markers, "F1_Escape_PilotSeat", ship.TransformPoint(new Vector3(0f, DeckY + 0.4f, -13.5f)), 3);
+            Debug.Log("[ShipHull] escape ship: hidden=" + hidden + " cutMeshes=" + cutN + " gangway x=" + px0.ToString("F1") + ".." + x.ToString("F1"));
+        }
+
+        /// <summary>
+        /// 탈출선 탑승문 (문만): Boarding_Door / Door_Leaf_L + Door_Leaf_R (키트 P_Wall_Interior_Door_01 의 직사각형 문짝, 각 1.5m 폭, 닫힘)
+        /// + Door_Leaf_L_Open / Door_Leaf_R_Open (문짝이 벽 속으로 밀려 들어간 열림 위치, 나중에 슬라이드 스크립트가 쓸 기준점)
+        /// + Door_Threshold_Collider (보이지 않는 발판 콜라이더 — 문이 열렸을 때 걸어 지나가는 높이).
+        /// 문짝은 내벽 면(x 4.45)부터 선체 바깥 면(x 5.02)까지 벽 두께를 꽉 채워 잘라낸 구멍 단면을 가린다. 문짝은 탈출선 로컬 z 축으로 미끄러진다 (L: -z, R: +z).
+        /// </summary>
+        static void BuildBoardingDoor(Transform ship)
+        {
+            var root = new GameObject("Boarding_Door").transform; root.SetParent(ship, false);
+            float half = (HatchZ1 - HatchZ0) * 0.5f, zm = (HatchZ0 + HatchZ1) * 0.5f;
+            const float X0 = 4.45f, X1 = 5.02f;
+            var leafL = MakeKitLeaf(root, "Door_Leaf_L", "P_Wall_Interior_Door_01", "Door_Left", new Vector3(X0, HatchFloor, HatchZ0), new Vector3(X1, HatchTop, zm), 90f);
+            var leafR = MakeKitLeaf(root, "Door_Leaf_R", "P_Wall_Interior_Door_01", "Door_Right", new Vector3(X0, HatchFloor, zm), new Vector3(X1, HatchTop, HatchZ1), 90f);
+            foreach (var leaf in new[] { leafL, leafR })
+            {
+                var open = new GameObject(leaf.name + "_Open").transform; open.SetParent(root, false);
+                open.localPosition = leaf.localPosition + new Vector3(0, 0, leaf == leafL ? -half * 2f + 0.1f : half * 2f - 0.1f);
+                open.localRotation = leaf.localRotation; open.localScale = leaf.localScale;
+            }
+            // 보이지 않는 문턱 발판 (렌더러 없음): 실내 바닥(벽 앞 y1.7) ~ 바깥 발판(y HatchFloor) 사이를 이어 줌
+            var th = new GameObject("Door_Threshold_Collider"); th.transform.SetParent(root, false);
+            th.transform.localPosition = new Vector3((3.95f + X1) * 0.5f, (DeckY + HatchFloor) * 0.5f, zm);
+            var bc = th.AddComponent<BoxCollider>(); bc.size = new Vector3(X1 - 3.95f, HatchFloor - DeckY, HatchZ1 - HatchZ0);
+        }
+
+        /// <summary>키트 프리팹의 문짝 자식(데칼/표지 포함)을 복사해서 탈출선 로컬 상자(lmin..lmax)에 맞춘다. 없으면 회색 상자.</summary>
+        static Transform MakeKitLeaf(Transform parent, string name, string prefab, string child, Vector3 lmin, Vector3 lmax, float yaw)
+        {
+            Transform src = null;
+            if (_kit.TryGetValue(prefab, out var pf) && pf != null)
+                foreach (var t in pf.GetComponentsInChildren<Transform>(true)) if (t.name == child && t.GetComponent<MeshFilter>() != null) { src = t; break; }
+            if (src == null)
+            {
+                var c = GameObject.CreatePrimitive(PrimitiveType.Cube); c.name = name; c.transform.SetParent(parent, false);
+                c.transform.localPosition = (lmin + lmax) * 0.5f; c.transform.localScale = lmax - lmin;
+                c.GetComponent<MeshRenderer>().sharedMaterial = _trim;
+                return c.transform;
+            }
+            var g = (GameObject)Object.Instantiate(src.gameObject);
+            g.name = name; g.transform.SetParent(parent, false);
+            // 복사본의 스크립트/콜라이더/조명/LOD 제거 (그리기 전용)
+            foreach (var mb in g.GetComponentsInChildren<MonoBehaviour>(true)) Object.DestroyImmediate(mb);
+            foreach (var cl in g.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(cl);
+            foreach (var l in g.GetComponentsInChildren<Light>(true)) Object.DestroyImmediate(l.gameObject);
+            foreach (var r in g.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = ShadowCastingMode.Off;
+            var mb0 = g.GetComponent<MeshFilter>().sharedMesh.bounds;
+            g.transform.localRotation = Quaternion.Euler(0, yaw, 0);
+            var want = lmax - lmin; var s = Vector3.one;
+            for (int j = 0; j < 3; j++)
+            {
+                var w = g.transform.localRotation * (j == 0 ? Vector3.right : j == 1 ? Vector3.up : Vector3.forward);
+                int wi = Mathf.Abs(w.x) > 0.5f ? 0 : Mathf.Abs(w.y) > 0.5f ? 1 : 2;
+                s[j] = mb0.size[j] > 0.0005f ? want[wi] / mb0.size[j] : 1f;
+            }
+            g.transform.localScale = s;
+            var m = Matrix4x4.TRS(Vector3.zero, g.transform.localRotation, s);
+            Vector3 mn = Vector3.one * 1e9f;
+            for (int i = 0; i < 8; i++)
+            {
+                var c = new Vector3((i & 1) == 0 ? mb0.min.x : mb0.max.x, (i & 2) == 0 ? mb0.min.y : mb0.max.y, (i & 4) == 0 ? mb0.min.z : mb0.max.z);
+                mn = Vector3.Min(mn, m.MultiplyPoint3x4(c));
+            }
+            g.transform.localPosition = lmin - mn;
+            var bc = g.AddComponent<BoxCollider>(); bc.center = mb0.center; bc.size = mb0.size;
+            return g.transform;
+        }
+
+        struct CV2 { public Vector3 p, n; public Vector4 t; public Vector2 uv, uv2; }
+
+        /// <summary>root 아래 메시 중 cut 상자와 겹치는 것을 잘라 새 메시 에셋으로 바꾼다 (같은 메시를 쓰는 MeshCollider 도 교체).</summary>
+        static int CutMeshes(Transform root, Bounds cut, string folder)
+        {
+            int made = 0;
+            foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mr = mf.GetComponent<MeshRenderer>(); var src = mf.sharedMesh;
+                if (mr == null || src == null || !src.isReadable || !mr.bounds.Intersects(cut)) continue;
+                var m = mf.transform.localToWorldMatrix; var inv = mf.transform.worldToLocalMatrix; var nm = m.inverse.transpose; var ninv = inv.inverse.transpose;
+                var v = src.vertices; var n = src.normals; var tg = src.tangents; var uv = src.uv; var uv2 = src.uv2;
+                var wv = new CV2[v.Length];
+                for (int i = 0; i < v.Length; i++)
+                    wv[i] = new CV2 { p = m.MultiplyPoint3x4(v[i]), n = n.Length > 0 ? nm.MultiplyVector(n[i]).normalized : Vector3.up, t = tg.Length > 0 ? tg[i] : new Vector4(1, 0, 0, 1), uv = uv.Length > 0 ? uv[i] : Vector2.zero, uv2 = uv2.Length > 0 ? uv2[i] : Vector2.zero };
+                var outV = new List<CV2>(); var subs = new List<int>[src.subMeshCount];
+                var remap = new Dictionary<int, int>(); bool touched = false;
+                for (int s = 0; s < src.subMeshCount; s++)
+                {
+                    subs[s] = new List<int>();
+                    var tri = src.GetTriangles(s);
+                    for (int k = 0; k + 2 < tri.Length; k += 3)
+                    {
+                        var a = wv[tri[k]]; var b = wv[tri[k + 1]]; var c = wv[tri[k + 2]];
+                        var tb = new Bounds(a.p, Vector3.zero); tb.Encapsulate(b.p); tb.Encapsulate(c.p);
+                        if (!tb.Intersects(cut))
+                        {
+                            for (int q = 0; q < 3; q++) { int vi = tri[k + q]; if (!remap.TryGetValue(vi, out int ni)) { ni = outV.Count; remap[vi] = ni; outV.Add(wv[vi]); } subs[s].Add(ni); }
+                            continue;
+                        }
+                        var polys = new List<List<CV2>>();
+                        bool inside = ClipOut(new List<CV2> { a, b, c }, cut, polys);
+                        if (inside) touched = true;
+                        foreach (var poly in polys)
+                        {
+                            int bi = outV.Count; outV.AddRange(poly);
+                            for (int q = 1; q + 1 < poly.Count; q++) { subs[s].Add(bi); subs[s].Add(bi + q); subs[s].Add(bi + q + 1); }
+                        }
+                    }
+                }
+                if (!touched) continue;
+                var mesh = new Mesh { name = src.name + "_Hatch", indexFormat = IndexFormat.UInt32 };
+                var pv = new Vector3[outV.Count]; var pn = new Vector3[outV.Count]; var pt = new Vector4[outV.Count]; var pu = new Vector2[outV.Count]; var pu2 = new Vector2[outV.Count];
+                for (int i = 0; i < outV.Count; i++) { pv[i] = inv.MultiplyPoint3x4(outV[i].p); pn[i] = ninv.MultiplyVector(outV[i].n).normalized; pt[i] = outV[i].t; pu[i] = outV[i].uv; pu2[i] = outV[i].uv2; }
+                mesh.vertices = pv; mesh.normals = pn;
+                if (tg.Length > 0) mesh.tangents = pt;
+                mesh.uv = pu; if (uv2.Length > 0) mesh.uv2 = pu2;
+                mesh.subMeshCount = subs.Length;
+                for (int s = 0; s < subs.Length; s++) mesh.SetTriangles(subs[s], s, false);
+                mesh.RecalculateBounds();
+                AssetDatabase.CreateAsset(mesh, folder + "/" + Safe(mf.name) + "_" + made + "_Hatch.asset");
+                var mc = mf.GetComponent<MeshCollider>();
+                if (mc != null && mc.sharedMesh == src) mc.sharedMesh = mesh;
+                mf.sharedMesh = mesh;
+                made++;
+            }
+            return made;
+        }
+
+        static string Safe(string s) { foreach (var c in System.IO.Path.GetInvalidFileNameChars()) s = s.Replace(c, '_'); return s.Replace(' ', '_'); }
+
+        /// <summary>볼록 다각형의 상자 바깥 부분을 outList 에 넣는다. 상자 안에 남은 부분이 있었으면 true.</summary>
+        static bool ClipOut(List<CV2> poly, Bounds b, List<List<CV2>> outList)
+        {
+            var cur = poly;
+            for (int i = 0; i < 6; i++)
+            {
+                int ax = i >> 1; bool isMin = (i & 1) == 0; float val = isMin ? b.min[ax] : b.max[ax];
+                var ins = new List<CV2>(); var outs = new List<CV2>();
+                for (int k = 0; k < cur.Count; k++)
+                {
+                    var p = cur[k]; var q = cur[(k + 1) % cur.Count];
+                    float dp = isMin ? p.p[ax] - val : val - p.p[ax], dq = isMin ? q.p[ax] - val : val - q.p[ax];
+                    if (dp >= 0) ins.Add(p); else outs.Add(p);
+                    if ((dp >= 0) != (dq >= 0))
+                    {
+                        float t = dp / (dp - dq);
+                        var mv = new CV2 { p = Vector3.Lerp(p.p, q.p, t), n = Vector3.Lerp(p.n, q.n, t).normalized, t = Vector4.Lerp(p.t, q.t, t), uv = Vector2.Lerp(p.uv, q.uv, t), uv2 = Vector2.Lerp(p.uv2, q.uv2, t) };
+                        mv.t.w = p.t.w;
+                        ins.Add(mv); outs.Add(mv);
+                    }
+                }
+                if (outs.Count >= 3) outList.Add(outs);
+                if (ins.Count < 3) return false;
+                cur = ins;
+            }
+            return true;
         }
 
         /// <summary>a→b 선분(윗면 중심선)을 따라 기울어진 상자. col 이 있으면 콜라이더, vis 가 있으면 보이는 상자.</summary>

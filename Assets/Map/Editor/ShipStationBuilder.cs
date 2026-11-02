@@ -1,7 +1,7 @@
 // VOID LAST - Stage2 외부 우주선: Demo_D_SpacePort_A 의 P_Station_Full 을 그대로 2배로 가져와 VOID_LAST_Ship 을 감싼다.
 // - 스테이션 축을 월드 x 로 눕혀(조종실 = 서쪽 -x) 2.3배로 키우고, 가운데 모듈(Hangar_01/02 의 Livable_02) 안에 1~5층 내부가 들어가도록 배치
 // - 조종실(Command_01)은 5층 NW-Cockpit 통로(z -5.5..-1.5, y32)를 서쪽으로 늘린 연결 통로로 이어지고, 앞쪽 방은 사람 크기로 다시 만든다(ShipHullBuilder.BuildBridge)
-// - 꼬리(Link/Solar, 동쪽 +x)는 그대로 가져오기만 한다. 도킹된 Discovery 우주선은 원본처럼 남쪽 베이에 둔다
+// - 꼬리(Link/Solar, 동쪽 +x)는 그대로 가져오기만 한다. 도킹돼 있던 Discovery 우주선은 북쪽 베이의 탈출선(1배)으로 옮긴다
 // - 북쪽 격납 베이(Hangar_01)가 1층에서 계단으로 내려가는 탈출 셔틀 격납고 (ShipHullBuilder.BuildBay)
 // 원본 씬의 오브젝트를 복사 → 콜라이더/조명/스크립트 없이 재질 × 칸 단위로 합치고, 내부/격납고/통로/조종실과 겹치는 삼각형은 잘라낸다.
 // 사용: ShipHullBuilder.Build() 뒤에 Copy() → Merge("Command") … Merge("Rest") → Finish()
@@ -42,7 +42,10 @@ namespace VoidLast.MapTools
         public const float ExitX0 = 35.5f, ExitX1 = 40.5f, LandX0 = 35f, LandX1 = 40.6f, LandZ0 = -88.9f;
         public const float StX0 = 36f, StX1 = 40.5f, Run = 5.5f, Land = 1.8f;
         public const int Flights = 9;
-        public const float ShipX = 0f, ShipZ = -120f;
+        // 탈출선 Discovery(1배, 폭 35.5 / 길이 67.9 / 높이 30.3) 자리: 베이 바닥 가운데, 뒷벽에서 2m 띄움
+        public const float ShipX = 0f, ShipZ = -119f, ShipHalfW = 19f, ShipHalfL = 35.5f, ShipTop = BayFloor + 31.5f;
+        // 탑승 해치(조종실 칸 동쪽, 탈출선 로컬 z -6.8..-3.8) 앞 발판/계단 자리 (월드 z)
+        public const float GangZ0 = -142.9f, GangZ1 = -139.9f;
 
         /// <summary>원본 삼각형을 잘라낼 공간: 내부 5개 층 / 발사 격납고 / 5층 연결 통로(외피 포함) / 조종실 방.</summary>
         public static readonly Bounds[] KeepOut =
@@ -53,10 +56,11 @@ namespace VoidLast.MapTools
             MinMax(new Vector3(BXF - 0.3f, BFloor - 1.1f, TZ0 - 1.5f), new Vector3(-72.5f, BFloor + TH + 1.9f, TZ1 + 1.5f)), // 3 5층 연결 통로(외피 포함)
             MinMax(new Vector3(BXR - 0.9f, BFloor - 0.8f, BZ0 - 0.9f), new Vector3(BXF + 0.7f, BTop + 1.1f, BZ1 + 0.9f)),   // 4 조종실 방
             MinMax(new Vector3(StX0 - 0.6f, BayFloor + 0.2f, LandZ0 - Flights * Run - (Flights - 1) * Land - 0.6f), new Vector3(StX1 + 0.15f, 1.6f, LandZ0)), // 5 계단
-            MinMax(new Vector3(ShipX - 12f, BayFloor + 0.2f, ShipZ - 14f), new Vector3(ShipX + 12f, BayFloor + 14f, ShipZ + 14f)),                       // 6 셔틀 자리
+            MinMax(new Vector3(ShipX - ShipHalfW, BayFloor + 0.2f, ShipZ - ShipHalfL), new Vector3(ShipX + ShipHalfW, ShipTop, ShipZ + ShipHalfL)), // 6 탈출선(Discovery) 자리
+            MinMax(new Vector3(ShipX + 6f, BayFloor + 0.2f, GangZ0 - 0.6f), new Vector3(ShipX + 32f, BayFloor + 14.5f, GangZ1 + 0.6f)),          // 7 탑승 발판 + 계단
         };
 
-        public static readonly string[] Groups = { "Command", "Hangar_01", "Hangar_02", "Discovery", "Rest" };
+        public static readonly string[] Groups = { "Command", "Hangar_01", "Hangar_02", "Rest" };   // Discovery 는 탈출선으로 격납 베이에 따로 둔다 (ShipHullBuilder.BuildBay)
 
         // ==================================================================== 1. 복사
         public static string Copy()
@@ -89,7 +93,9 @@ namespace VoidLast.MapTools
             copy.transform.SetParent(ext, false);
             copy.transform.SetPositionAndRotation(new Vector3(OX, OY, OZ), Quaternion.Euler(0f, Yaw, 0f));
             copy.transform.localScale = Vector3.one * S;
-            // 도킹된 Discovery 는 원본 그대로 남쪽 베이(Hangar_02)에 둔다 — 북쪽 베이는 탈출 셔틀 발사용으로 비워 둠
+            // 도킹된 Discovery 는 북쪽 격납 베이의 탈출선으로 옮겼으므로(ShipHullBuilder.BuildBay) 스테이션 사본에서는 뺀다
+            var disc = copy.transform.Find("P_SpaceShip_Discovery_Full"); if (disc) Object.DestroyImmediate(disc.gameObject);
+            if (AssetDatabase.IsValidFolder(BakedDir + "/Station_Discovery")) AssetDatabase.DeleteAsset(BakedDir + "/Station_Discovery");
 
             // 쓰지 않는 것: 이펙트, 반사 프로브, 조종실 모듈 실내 키트(→ 가벼운 가짜 실내로 교체)
             int removed = 0;
@@ -107,14 +113,16 @@ namespace VoidLast.MapTools
                 if (t != null && t != copy.transform && !t.gameObject.activeSelf) { Object.DestroyImmediate(t.gameObject); removed++; }
             // 조명 / 반사 프로브 / 오디오 / 스크립트 제거 (렌더링 전용 임시 사본, 합친 뒤 통째로 지운다)
             int comps = 0;
-            foreach (var c in copy.GetComponentsInChildren<Component>(true))
-            {
-                if (c == null) continue;
-                if (c is Light || c is ReflectionProbe || c is AudioSource || c is MonoBehaviour || c is LODGroup)
+            for (int pass = 0; pass < 2; pass++)   // 스크립트(UniversalAdditionalLightData 등)를 먼저 지워야 Light 를 지울 수 있다
+                foreach (var c in copy.GetComponentsInChildren<Component>(true))
                 {
-                    try { Object.DestroyImmediate(c); comps++; } catch (Exception) { }
+                    if (c == null) continue;
+                    bool script = c is MonoBehaviour;
+                    if (pass == 0 ? script : (c is Light || c is ReflectionProbe || c is AudioSource || c is LODGroup))
+                    {
+                        try { Object.DestroyImmediate(c); comps++; } catch (Exception) { }
+                    }
                 }
-            }
             copy.SetActive(true);
             Physics.SyncTransforms();
             string bayCols = ExtractBayColliders(scene, copy.transform);
