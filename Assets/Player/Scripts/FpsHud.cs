@@ -13,6 +13,7 @@ namespace VoidLast.Player
         [SerializeField] Image[] slotBorders;
         [SerializeField] Image[] slotIcons;
         [SerializeField] Sprite syringeIcon;
+        [SerializeField] Sprite radioIcon;
         [SerializeField, Min(1)] float healthBarWidth = 400;
         [SerializeField] Text contextLabel;
         [SerializeField] Text ammoLabel;
@@ -40,7 +41,7 @@ namespace VoidLast.Player
             float target = Time.unscaledTime - lastActivity <= visibleSeconds ? 1 : 0;
             hotbar.alpha = Mathf.MoveTowards(hotbar.alpha, target, Time.unscaledDeltaTime / fadeSeconds);
             contextLabel.text = !inventory.IsAlive ? "" : inventory.IsUsing ? (inventory.IsUsingOnOther ? "HEALING PLAYER  " : "HEALING SELF  ") + (inventory.UseProgress * inventory.UseDuration).ToString("F1") + " / " + inventory.UseDuration.ToString("F1") + " s"
-                : interactor.Target != null ? inventory.IsFull ? "HOTBAR FULL" : "F  PICK UP SYRINGE"
+                : interactor.Target != null ? inventory.IsFull ? "HOTBAR FULL" : interactor.Target.Item == FarmingItemKind.Radio ? "F  PICK UP RADIO" : "F  PICK UP SYRINGE"
                 : "";
         }
         void Refresh()
@@ -54,8 +55,9 @@ namespace VoidLast.Player
                 slotLabels[i].text = (i + 4).ToString();
                 if (slotIcons != null && i < slotIcons.Length)
                 {
-                    slotIcons[i].sprite = syringeIcon;
-                    slotIcons[i].enabled = inventory.ItemAt(i) == FarmingItemKind.Syringe && syringeIcon != null;
+                    var kind = inventory.ItemAt(i);
+                    slotIcons[i].sprite = kind == FarmingItemKind.Radio ? radioIcon : syringeIcon;
+                    slotIcons[i].enabled = kind != FarmingItemKind.None && slotIcons[i].sprite != null;
                 }
                 slotBorders[i].color = inventory.SelectedIndex == i ? new Color(0.35f, 0.9f, 1) : new Color(0.35f, 0.4f, 0.45f);
             }

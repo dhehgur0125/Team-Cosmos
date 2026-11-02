@@ -1,4 +1,5 @@
 /* [ 코드 설명 ] F 상호작용은 작은 SphereCast와 가림 검사로 주사기를 선택합니다. 우클릭 대상 플레이어의 거리·시야를 확인하며 Q 드랍 경로와 생성 공간을 검사합니다. */
+using System;
 using System.Linq;
 using UnityEngine;
 
@@ -9,6 +10,7 @@ namespace VoidLast.Player
     {
         [SerializeField] Camera viewCamera;
         [SerializeField] FpsWorldPickup syringePickupPrefab;
+        [SerializeField] FpsWorldPickup radioPickupPrefab;
         [SerializeField, Min(0.1f)] float pickupDistance = 2.5f;
         [SerializeField, Range(0.02f, 0.2f)] float pickupAssistRadius = 0.1f;
         [SerializeField, Min(0.5f)] float playerUseDistance = 2.2f;
@@ -20,6 +22,11 @@ namespace VoidLast.Player
         public FpsWorldPickup Target { get; private set; }
         public FpsWorldPickup LastDropped { get; private set; }
         public float PickupDistance => pickupDistance;
+        /// <summary>Q로 아이템을 바닥에 내려놓았을 때 (멀티플레이: 다른 대원 화면에도 생성하기 위해 사용)</summary>
+        public static event Action<FpsItemInteractor, FpsWorldPickup> Dropped;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() => Dropped = null;
+        public FpsWorldPickup PickupPrefabFor(FarmingItemKind kind) => kind == FarmingItemKind.Radio ? radioPickupPrefab : kind == FarmingItemKind.Syringe ? syringePickupPrefab : null;
         void Awake() { input = GetComponent<FpsInput>(); inventory = GetComponent<FpsInventory>(); capsule = GetComponent<CharacterController>(); }
         void Update()
         {
@@ -76,7 +83,9 @@ namespace VoidLast.Player
         }
         public bool TryDrop()
         {
-            if (!inventory.IsAlive || inventory.IsUsing || inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.None || syringePickupPrefab == null) return false;
+            var heldKind = inventory.ItemAt(inventory.SelectedIndex);
+            var dropPrefab = PickupPrefabFor(heldKind);
+            if (!inventory.IsAlive || inventory.IsUsing || heldKind == FarmingItemKind.None || dropPrefab == null) return false;
             Vector3 direction = Vector3.ProjectOnPlane(viewCamera.transform.forward, Vector3.up).normalized;
             if (direction.sqrMagnitude < 0.1f) direction = transform.forward;
             Vector3 start = transform.position + Vector3.up * (capsule.height * 0.65f);
@@ -84,11 +93,12 @@ namespace VoidLast.Player
             foreach (var hit in Physics.SphereCastAll(start, dropClearance, direction, Vector3.Distance(start, position), ~0, QueryTriggerInteraction.Ignore))
                 if (!hit.collider.transform.IsChildOf(transform)) return false;
             if (Physics.CheckSphere(position, dropClearance, ~0, QueryTriggerInteraction.Ignore)) return false;
-            var pickup = Instantiate(syringePickupPrefab, position, Quaternion.LookRotation(direction) * Quaternion.Euler(0, 0, 25));
+            var pickup = Instantiate(dropPrefab, position, Quaternion.LookRotation(direction) * Quaternion.Euler(0, 0, 25));
             if (!inventory.TryRemoveSelected(out _)) { Destroy(pickup.gameObject); return false; }
             pickup.ConfigureDrop(inventory);
             pickup.GetComponent<Rigidbody>().linearVelocity = direction * 0.6f + Vector3.up * 0.2f;
             LastDropped = pickup;
+            Dropped?.Invoke(this, pickup);
             return true;
         }
     }

@@ -14,11 +14,21 @@ namespace VoidLast.Player
         FpsPistol pistol;
         public EquipmentSlot SelectedSlot => selectedSlot;
         public bool IsAiming { get; private set; }
+        /// <summary>멀티플레이 복제본이면 입력 대신 네트워크 상태를 받는다.</summary>
+        public bool IsNetworkProxy { get; set; }
         public event Action MeleeRequested;
         public event Action SlotChanged;
         public event Action<int> SlotSelected;
         void Awake() { input = GetComponent<FpsInput>(); motor = GetComponent<FpsMotor>(); pistol = GetComponent<FpsPistol>(); }
-        void Update() => Process(input.Slot, input.Aim, input.Attack);
+        void Update() { if (!IsNetworkProxy) Process(input.Slot, input.Aim, input.Attack); }
+        public void ApplyNetworkState(int slot, bool aiming)
+        {
+            if (!IsNetworkProxy) return;
+            if (slot >= 1 && slot <= 6 && selectedSlot != (EquipmentSlot)slot) { selectedSlot = (EquipmentSlot)slot; SlotChanged?.Invoke(); }
+            IsAiming = aiming && (motor == null || !motor.IsDead);
+        }
+        /// <summary>복제본 전용: 주인이 근접 공격을 했다는 신호 (애니메이션만 재생).</summary>
+        public void RaiseNetworkMelee() { if (IsNetworkProxy) MeleeRequested?.Invoke(); }
         public void Process(int slot, bool aim, bool attack)
         {
             if (motor != null && motor.IsDead) { IsAiming = false; return; }

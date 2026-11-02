@@ -79,6 +79,11 @@ public class LobbyManager : MonoBehaviour
     public Button chatSendButton;
     public ScrollRect chatScroll;
 
+    [Header("음성 채팅")]
+    public Button micButton;
+    public TMP_Text micButtonText;
+    public TMP_Text voiceStatusText;
+
     ISession _session;
     bool _busy;
     bool _leaving;
@@ -89,6 +94,8 @@ public class LobbyManager : MonoBehaviour
     readonly List<LobbyRoomListItem> _roomItems = new List<LobbyRoomListItem>();
     readonly Dictionary<string, string> _knownNames = new Dictionary<string, string>();
     readonly Queue<string> _chatLines = new Queue<string>();
+    readonly string[] _slotPlayerIds = new string[4];
+    float _nextVoiceRefresh;
 
     // ------------------------------------------------------------------ lifecycle
     void Awake()
@@ -117,6 +124,7 @@ public class LobbyManager : MonoBehaviour
         }
 
         if (chat != null) chat.MessageReceived += OnChatMessage;
+        if (micButton != null) micButton.onClick.AddListener(ToggleMic);
     }
 
     async void Start()
@@ -146,7 +154,8 @@ public class LobbyManager : MonoBehaviour
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
 
             Debug.Log($"[Lobby] 로그인 완료 PlayerId: {AuthenticationService.Instance.PlayerId}");
-            SetStatus("준비 완료. 방을 만들거나 목록에서 들어가세요.");
+            SetStatus(string.IsNullOrEmpty(Stage2NetworkBootstrap.LobbyReturnMessage) ? "준비 완료. 방을 만들거나 목록에서 들어가세요." : Stage2NetworkBootstrap.LobbyReturnMessage);
+            Stage2NetworkBootstrap.LobbyReturnMessage = null;
         }
         catch (Exception e)
         {
@@ -181,6 +190,12 @@ public class LobbyManager : MonoBehaviour
         {
             _nextHostCheck = Time.unscaledTime + 0.5f;
             UpdateRoomButtons();
+        }
+
+        if (_session != null && Time.unscaledTime >= _nextVoiceRefresh)
+        {
+            _nextVoiceRefresh = Time.unscaledTime + 0.12f;
+            RefreshVoice();
         }
     }
 
@@ -402,6 +417,7 @@ public class LobbyManager : MonoBehaviour
         _chatLines.Clear();
         chatLogText.text = "";
         ShowPanel(roomPanel);
+        VoiceChatService.Instance.EnterLobby(session.Id);   // 대기방 음성 채팅 입장
         RefreshRoom();
         SetStatus(session.IsHost ? "방장입니다. 대원이 모두 준비하면 게임을 시작하세요." : "방에 들어왔어요. 준비를 눌러 주세요.");
         Debug.Log($"[Lobby] 방 입장: {session.Name} ({session.Id}) 코드 {session.Code} 방장={session.IsHost}");
@@ -509,6 +525,7 @@ public class LobbyManager : MonoBehaviour
         string myId = AuthenticationService.Instance.PlayerId;
         for (int i = 0; i < slots.Length; i++)
         {
+            _slotPlayerIds[i] = i < players.Count ? players[i].Id : null;
             if (i < players.Count)
             {
                 var p = players[i];
@@ -666,6 +683,7 @@ public class LobbyManager : MonoBehaviour
 
     void ReturnToMain(string message)
     {
+        if (VoiceChatService.Exists) VoiceChatService.Instance.LeaveLobby();
         UnbindSession();
         _session = null;
         _gameStarting = false;
@@ -679,6 +697,41 @@ public class LobbyManager : MonoBehaviour
         if (_session == null || string.IsNullOrEmpty(_session.Code)) return;
         GUIUtility.systemCopyBuffer = _session.Code;
         SetStatus($"참가 코드 {_session.Code}를 복사했어요.");
+    }
+
+    // ------------------------------------------------------------------ voice
+    void ToggleMic()
+    {
+        var voice = VoiceChatService.Instance;
+        voice.SetMicMuted(!voice.MicMuted);
+        RefreshVoice();
+    }
+
+    /// <summary>대기방 카드마다 말하는 중 표시 + 마이크 버튼/연결 상태 갱신</summary>
+    void RefreshVoice()
+    {
+        if (!VoiceChatService.Exists) return;
+        var voice = VoiceChatService.Instance;
+        string channel = voice.LobbyChannel;
+        bool inChannel = voice.IsInChannel(channel);
+        string myId = voice.MyPlayerId;
+        for (int i = 0; i < slots.Length && i < _slotPlayerIds.Length; i++)
+        {
+            string id = _slotPlayerIds[i];
+            if (string.IsNullOrEmpty(id)) { slots[i].SetVoice(false, false, false); continue; }
+            bool me = id == myId;
+            bool connected = inChannel && voice.IsConnected(channel, id);
+            bool speaking = connected && voice.IsSpeaking(channel, id) && !(me && voice.MicMuted);
+            slots[i].SetVoice(connected, speaking, me && voice.MicMuted);
+        }
+        if (micButtonText != null) micButtonText.text = voice.MicMuted ? "마이크 켜기" : "마이크 끄기";
+        if (micButton != null) micButton.image.color = voice.MicMuted ? LobbyStyle.Accent : LobbyStyle.ButtonDark;
+        if (voiceStatusText != null)
+        {
+            if (inChannel) { voiceStatusText.text = voice.MicMuted ? "음성 연결됨 · 마이크 꺼짐" : "음성 연결됨 · 말하면 대원에게 들려요"; voiceStatusText.color = voice.MicMuted ? LobbyStyle.TextDim : LobbyStyle.Ready; }
+            else if (voice.State == VoiceChatService.Status.Error) { voiceStatusText.text = "음성 연결 실패"; voiceStatusText.color = LobbyStyle.Error; }
+            else { voiceStatusText.text = "음성 연결 중..."; voiceStatusText.color = LobbyStyle.TextDim; }
+        }
     }
 
     // ------------------------------------------------------------------ chat

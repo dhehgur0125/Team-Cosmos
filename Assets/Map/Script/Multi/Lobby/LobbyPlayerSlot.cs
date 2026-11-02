@@ -14,6 +14,11 @@ public class LobbyPlayerSlot : MonoBehaviour
     public TMP_Text statusText;
     public Image statusBar;
     public Button kickButton;
+    [Header("음성 채팅 표시 (선택)")]
+    [Tooltip("말하는 동안 아바타 둘레에 켜지는 링")]
+    public Image speakingRing;
+    [Tooltip("음성 연결 상태 (말하는 중 / 마이크 꺼짐)")]
+    public TMP_Text voiceText;
 
     Action _onKick;
 
@@ -39,6 +44,21 @@ public class LobbyPlayerSlot : MonoBehaviour
         kickButton.gameObject.SetActive(canKick);
     }
 
+    /// <summary>음성 채팅 상태 표시</summary>
+    public void SetVoice(bool connected, bool speaking, bool muted)
+    {
+        if (speakingRing != null)
+        {
+            if (speakingRing.gameObject.activeSelf != speaking) speakingRing.gameObject.SetActive(speaking);
+            if (speaking) { var c = LobbyStyle.Ready; c.a = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 6f)); speakingRing.color = c; }
+        }
+        if (voiceText != null)
+        {
+            voiceText.text = !connected ? "" : muted ? "마이크 꺼짐" : speaking ? "말하는 중" : "음성 연결됨";
+            voiceText.color = muted ? LobbyStyle.Error : speaking ? LobbyStyle.Ready : LobbyStyle.TextDim;
+        }
+    }
+
     public void SetOpen()
     {
         gameObject.SetActive(true);
@@ -53,6 +73,7 @@ public class LobbyPlayerSlot : MonoBehaviour
         statusText.color = new Color(0.4f, 0.44f, 0.5f);
         statusBar.color = new Color(0.16f, 0.18f, 0.21f);
         kickButton.gameObject.SetActive(false);
+        SetVoice(false, false, false);
     }
 
     public void SetClosed()

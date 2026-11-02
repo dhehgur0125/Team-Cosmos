@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -12,8 +13,17 @@ using UnityEngine.SceneManagement;
 [RequireComponent(typeof(NetworkManager))]
 public class LobbyPlayerSpawner : MonoBehaviour
 {
+    [Serializable]
+    public class ScenePlayerPrefab
+    {
+        public string sceneName;
+        public GameObject prefab;
+    }
+
     [Tooltip("게임 씬에서 대원마다 스폰할 플레이어 프리팹 (NetworkPrefabs 목록에 있어야 함)")]
     public GameObject playerPrefab;
+    [Tooltip("씬마다 다른 플레이어 프리팹을 쓸 때 (예: Stage2_Ship → VOID_LAST_FPS_Network). 목록에 없는 씬은 playerPrefab 사용")]
+    public ScenePlayerPrefab[] scenePlayerPrefabs;
     public string lobbySceneName = "Lobby";
     [Tooltip("이 이름이 들어간 오브젝트를 스폰 지점으로 사용 (예: PlayerStart, PlayerSpawn)")]
     public string[] spawnPointKeywords = { "PlayerSpawn", "PlayerStart" };
@@ -57,7 +67,8 @@ public class LobbyPlayerSpawner : MonoBehaviour
 
     void OnLoadEventCompleted(string sceneName, LoadSceneMode mode, List<ulong> completed, List<ulong> timedOut)
     {
-        if (!_nm.IsServer || sceneName == lobbySceneName || playerPrefab == null) return;
+        var prefab = PrefabFor(sceneName);
+        if (!_nm.IsServer || sceneName == lobbySceneName || prefab == null) return;
 
         var points = FindSpawnPoints(sceneName);
         int index = 0;
@@ -74,11 +85,11 @@ public class LobbyPlayerSpawner : MonoBehaviour
             }
             else
             {
-                pos = playerPrefab.transform.position + Vector3.right * (spacing * index);
-                rot = playerPrefab.transform.rotation;
+                pos = prefab.transform.position + Vector3.right * (spacing * index);
+                rot = prefab.transform.rotation;
             }
 
-            var go = Instantiate(playerPrefab, pos, rot);
+            var go = Instantiate(prefab, pos, rot);
             go.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
             Debug.Log($"[Lobby] {sceneName}: Client {clientId} 플레이어 스폰 @ {pos}");
             index++;
@@ -87,15 +98,28 @@ public class LobbyPlayerSpawner : MonoBehaviour
             Debug.LogWarning($"[Lobby] 씬 로드 시간 초과 대원 {timedOut.Count}명");
     }
 
+    GameObject PrefabFor(string sceneName)
+    {
+        if (scenePlayerPrefabs != null)
+            foreach (var entry in scenePlayerPrefabs)
+                if (entry != null && entry.prefab != null && entry.sceneName == sceneName) return entry.prefab;
+        return playerPrefab;
+    }
+
     List<Transform> FindSpawnPoints(string sceneName)
     {
         var list = new List<Transform>();
         var scene = SceneManager.GetSceneByName(sceneName);
         if (!scene.IsValid()) return list;
-        foreach (var root in scene.GetRootGameObjects())
-            foreach (var t in root.GetComponentsInChildren<Transform>(true))
-                foreach (var k in spawnPointKeywords)
-                    if (!string.IsNullOrEmpty(k) && t.name.Contains(k)) { list.Add(t); break; }
+        // 키워드 순서가 우선순위: 앞 키워드(예: PlayerSpawn)로 찾은 지점이 있으면 뒤 키워드(PlayerStart 맵 마커)는 쓰지 않는다
+        foreach (var k in spawnPointKeywords)
+        {
+            if (string.IsNullOrEmpty(k)) continue;
+            foreach (var root in scene.GetRootGameObjects())
+                foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                    if (t.name.Contains(k)) list.Add(t);
+            if (list.Count > 0) break;
+        }
         list.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
         return list;
     }

@@ -84,7 +84,7 @@ namespace VoidLast.MapTools
             var mgrGo = new GameObject("LobbyManager");
             var lm = mgrGo.AddComponent<LobbyManager>();
             lm.chat = chat;
-            lm.gameSceneName = "MapScene";
+            lm.gameSceneName = "Stage2_Ship";
 
             // background
             var bg = Img(root, "Background", new Color(0.024f, 0.03f, 0.04f), null);
@@ -109,6 +109,8 @@ namespace VoidLast.MapTools
             BuildRoom(root, lm);
             BuildCreate(root, lm);
             BuildLoading(root, lm);
+            MultiplayerSetup.ApplyLobbyVoiceUi(lm, _font);   // 대기방 음성 채팅 UI
+            MultiplayerSetup.ApplySpawnerMapping(spawner);   // Stage2_Ship → VOID_LAST_FPS_Network
 
             Selection.activeGameObject = mgrGo;
             EditorSceneManager.MarkSceneDirty(scene);

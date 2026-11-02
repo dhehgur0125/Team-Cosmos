@@ -62,7 +62,8 @@ namespace VoidLast.Player
         {
             if (layerIndex != 1 || chest == null) return;
             bool pistol = !motor.IsDead && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol;
-            bool syringe = !motor.IsDead && inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.Syringe;
+            // 주사기·무전기 등 파밍 아이템은 오른손으로 든다
+            bool syringe = !motor.IsDead && inventory.ItemAt(inventory.SelectedIndex) != FarmingItemKind.None;
             rightWeight = Mathf.MoveTowards(rightWeight, pistol || syringe ? 1 : 0, Time.deltaTime * 8);
             leftWeight = Mathf.MoveTowards(leftWeight, pistol ? 1 : 0, Time.deltaTime * 8);
             aim = Mathf.MoveTowards(aim, pistol && equipment.IsAiming ? 1 : 0, Time.deltaTime * 8);

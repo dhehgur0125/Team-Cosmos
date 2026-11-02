@@ -68,6 +68,17 @@ namespace VoidLast.Monster
         int previousWander = -1;
 
         public Mode State { get; private set; }
+        /// <summary>멀티플레이: 방장(서버)이 아닌 화면의 복제본이면 AI를 돌리지 않고 서버가 보낸 상태로 연출만 한다.</summary>
+        public bool NetworkProxy { get; set; }
+        /// <summary>복제본 전용: 서버 AI의 상태를 받아 색·자세 연출에 쓴다.</summary>
+        public void ApplyNetworkState(int mode)
+        {
+            if (!NetworkProxy || (int)State == mode) return;
+            State = (Mode)mode;
+            stateStart = Time.time;
+            if (State == Mode.Strike) strikeStart = Time.time;   // 치켜들기 → 내려치기 연출 시간을 맞춤
+            StateChanged?.Invoke(State);
+        }
         public Vector3 Destination { get; private set; }
         public Vector3 GropeCenter => gropeCenter;
         public int ScansHeard { get; private set; }
@@ -104,12 +115,12 @@ namespace VoidLast.Monster
         void Start()
         {
             home = transform.position;
-            if (!NavigationReady) Debug.LogError("BlindMonsterAI는 생성 위치에 구워진 NavMesh가 필요합니다.", this);
+            if (!NetworkProxy && !NavigationReady) Debug.LogError("BlindMonsterAI는 생성 위치에 구워진 NavMesh가 필요합니다.", this);
         }
 
         void Update()
         {
-            if (health.IsDead || !NavigationReady) return;
+            if (NetworkProxy || health.IsDead || !NavigationReady) return;
 
             // 파동이 이 몬스터에 닿는 시간이 되면 스캔 소리를 '들은' 것으로 처리
             if (pendingScan && Time.time >= pendingScanTime)

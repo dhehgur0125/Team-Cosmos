@@ -48,6 +48,8 @@ namespace VoidLast.Player
             if (input.Reload) TryReload();
             if (input.Attack) TryFire(); // Press edge only; AttackHeld never fires the pistol.
         }
+        /// <summary>멀티플레이 복제본: 주인이 쏜 순간 총구 화염만 재생한다 (판정은 주인 클라이언트에서).</summary>
+        public void PlayNetworkShot() => Shot?.Invoke();
         public bool TryFire()
         {
             if (!Equipped || IsReloading || !view.IsEquipped || Magazine <= 0 || Time.time < nextShot || viewCamera == null) return false;

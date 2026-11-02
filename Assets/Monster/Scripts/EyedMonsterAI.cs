@@ -28,6 +28,14 @@ namespace VoidLast.Monster
         float nextSense, nextPath, waitUntil, searchEnds, deathBlend;
         int previousPatrol = -1;
         public Mode State { get; private set; }
+        /// <summary>멀티플레이: 방장(서버)이 아닌 화면의 복제본이면 AI를 돌리지 않고 서버가 보낸 상태로 연출만 한다.</summary>
+        public bool NetworkProxy { get; set; }
+        /// <summary>복제본 전용: 서버 AI의 상태를 받아 색·자세 연출에 쓴다.</summary>
+        public void ApplyNetworkState(int mode)
+        {
+            if (!NetworkProxy || (int)State == mode) return;
+            State = (Mode)mode;
+        }
         public FpsHealth Target { get; private set; }
         public Vector3 LastKnownPosition { get; private set; }
         public Vector3 Destination { get; private set; }
@@ -41,10 +49,10 @@ namespace VoidLast.Monster
         }
         void OnEnable() { health.Damaged += OnHit; health.Died += Die; }
         void OnDisable() { health.Damaged -= OnHit; health.Died -= Die; if (NavigationReady) agent.isStopped = true; }
-        void Start() { if (!NavigationReady) Debug.LogError("Monster requires a baked NavMesh at its spawn position.", this); }
+        void Start() { if (!NetworkProxy && !NavigationReady) Debug.LogError("Monster requires a baked NavMesh at its spawn position.", this); }
         void Update()
         {
-            if (health.IsDead || !NavigationReady) return;
+            if (NetworkProxy || health.IsDead || !NavigationReady) return;
             if (Time.time >= nextSense)
             {
                 nextSense = Time.time + senseInterval;

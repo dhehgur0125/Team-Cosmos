@@ -12,6 +12,23 @@ namespace VoidLast.Player
         [SerializeField] Renderer[] firstPersonRenderers;
         bool[] worldPrevious, firstPersonPrevious;
         bool overridden;
+        /// <summary>실행 중에 만들어진 렌더러(예: 무전기 모델)를 1인칭/전신 표시 규칙에 추가한다.</summary>
+        public void AddRenderers(Renderer[] world, Renderer[] firstPerson)
+        {
+            Restore();
+            worldRenderers = Concat(worldRenderers, world);
+            firstPersonRenderers = Concat(firstPersonRenderers, firstPerson);
+            worldPrevious = new bool[worldRenderers.Length];
+            firstPersonPrevious = new bool[firstPersonRenderers.Length];
+        }
+        static Renderer[] Concat(Renderer[] a, Renderer[] b)
+        {
+            if (b == null || b.Length == 0) return a ?? new Renderer[0];
+            if (a == null) return (Renderer[])b.Clone();
+            var r = new Renderer[a.Length + b.Length];
+            a.CopyTo(r, 0); b.CopyTo(r, a.Length);
+            return r;
+        }
         void OnEnable()
         {
             worldPrevious = new bool[worldRenderers == null ? 0 : worldRenderers.Length];

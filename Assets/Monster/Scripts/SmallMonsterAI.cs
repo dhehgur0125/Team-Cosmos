@@ -55,6 +55,15 @@ namespace VoidLast.Monster
         int previousSearch = -1;
 
         public Mode State { get; private set; }
+        /// <summary>멀티플레이: 방장(서버)이 아닌 화면의 복제본이면 AI를 돌리지 않고 서버가 보낸 상태로 연출만 한다.</summary>
+        public bool NetworkProxy { get; set; }
+        /// <summary>복제본 전용: 서버 AI의 상태를 받아 색·자세 연출에 쓴다.</summary>
+        public void ApplyNetworkState(int mode)
+        {
+            if (!NetworkProxy || (int)State == mode) return;
+            State = (Mode)mode;
+            StateChanged?.Invoke(State);
+        }
         public FpsHealth Target { get; private set; }
         public Vector3 LastKnownPosition { get; private set; }
         public Vector3 Destination { get; private set; }
@@ -92,12 +101,12 @@ namespace VoidLast.Monster
         void Start()
         {
             home = transform.position;
-            if (!NavigationReady) Debug.LogError("SmallMonsterAI는 생성 위치에 구워진 NavMesh가 필요합니다.", this);
+            if (!NetworkProxy && !NavigationReady) Debug.LogError("SmallMonsterAI는 생성 위치에 구워진 NavMesh가 필요합니다.", this);
         }
 
         void Update()
         {
-            if (health.IsDead || !NavigationReady) return;
+            if (NetworkProxy || health.IsDead || !NavigationReady) return;
             Sense();
 
             bool lookingAround = Time.time < lookUntil;
@@ -170,6 +179,13 @@ namespace VoidLast.Monster
             TriggerAnimator("Scream");
             AlertAllies();
             Screamed?.Invoke(this);
+        }
+
+        /// <summary>복제본 전용: 서버에서 비명을 질렀을 때 소리와 애니메이션만 재생한다.</summary>
+        public void PlayNetworkScream()
+        {
+            if (screamClip != null) AudioSource.PlayClipAtPoint(screamClip, transform.position, screamVolume);
+            TriggerAnimator("Scream");
         }
 
         void TickScream()

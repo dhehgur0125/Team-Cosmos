@@ -5842,6 +5842,7 @@ GameObject:
   - component: {fileID: 6058082756904572691}
   - component: {fileID: 5009736756988602245}
   - component: {fileID: 7250816624072708206}
+  - component: {fileID: 5121147368095427289}
   m_Layer: 0
   m_Name: VOID_LAST_FPS
   m_TagString: Untagged
@@ -6097,6 +6098,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsItemInteractor
   viewCamera: {fileID: 628056177216943509}
   syringePickupPrefab: {fileID: 9130645463824086266, guid: a3c30e68d590f9c469f7b36396f46224, type: 3}
+  radioPickupPrefab: {fileID: 6677581887503701350, guid: 4c4d48bd929fc1d43b8cca7839825b85, type: 3}
   pickupDistance: 2.5
   pickupAssistRadius: 0.1
   playerUseDistance: 2.2
@@ -6162,6 +6164,7 @@ MonoBehaviour:
   - {fileID: 8169179948685680531}
   - {fileID: 5492019360064382396}
   syringeIcon: {fileID: 21300000, guid: a22ecf75391d9fc43bc7cdb559a57ae4, type: 3}
+  radioIcon: {fileID: 0}
   healthBarWidth: 400
   contextLabel: {fileID: 828930297481520908}
   ammoLabel: {fileID: 6485482983540141405}
@@ -6186,6 +6189,7 @@ MonoBehaviour:
   startingReserve: 30
   shotInterval: 0.18
   range: 100
+  damage: 30
   reloadDuration: 1.5
 --- !u!114 &5009736756988602245
 MonoBehaviour:
@@ -6224,6 +6228,34 @@ MonoBehaviour:
   helmetAboveHead: 0.27
   ceilingMargin: 0.04
   ankleHeight: 0.145
+--- !u!114 &5121147368095427289
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4874269986630254310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dfa8b6ce3b0a3c4499d8ad405a3a9a60, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FpsRadioView
+  radioModelPrefab: {fileID: 2586973823944118268, guid: b7785d6ed3c41a646a023948e77ee4bf, type: 3}
+  firstPersonParent: {fileID: 2879311120723106359}
+  gloveSource: {fileID: 1713030135768701026}
+  worldSocket: {fileID: 5512554330277555668}
+  heldPosition: {x: 0.19, y: -0.19, z: 0.4}
+  heldEuler: {x: -12, y: -158, z: -6}
+  talkPosition: {x: 0.1, y: -0.13, z: 0.3}
+  talkEuler: {x: -28, y: -140, z: -12}
+  firstPersonScale: 1.25
+  equipDuration: 0.35
+  equipOffset: {x: 0, y: -0.35, z: -0.08}
+  worldPosition: {x: 0, y: 0, z: 0}
+  worldEuler: {x: 0, y: 0, z: 0}
+  worldScale: 1
+  ledIdle: {r: 0.15, g: 1.3499999, b: 0.45000002, a: 1.5}
+  ledTalk: {r: 4, g: 0.6, b: 0.4, a: 4}
 --- !u!1 &5023782149386011162
 GameObject:
   m_ObjectHideFlags: 0

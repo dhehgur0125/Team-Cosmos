@@ -44,7 +44,10 @@ namespace VoidLast.Monster
         public float Damage => damage;
         public int Swings { get; private set; }
         public int PlayersHit { get; private set; }
-        public float Lean => Phase == AttackPhase.Windup ? -18 * Mathf.Clamp01(elapsed / windup) : Phase == AttackPhase.Strike ? Mathf.Lerp(-18, 25, (elapsed - windup) / lungeDuration) : Phase == AttackPhase.Recovery ? 25 * (1 - Mathf.InverseLerp(windup + lungeDuration, windup + lungeDuration + recoveryDuration, elapsed)) : 0;
+        float? networkLean;
+        /// <summary>복제본 전용: 서버의 돌진 기울기를 그대로 보여준다.</summary>
+        public void ApplyNetworkLean(float lean) => networkLean = lean;
+        public float Lean => networkLean.HasValue ? networkLean.Value : Phase == AttackPhase.Windup ? -18 * Mathf.Clamp01(elapsed / windup) : Phase == AttackPhase.Strike ? Mathf.Lerp(-18, 25, (elapsed - windup) / lungeDuration) : Phase == AttackPhase.Recovery ? 25 * (1 - Mathf.InverseLerp(windup + lungeDuration, windup + lungeDuration + recoveryDuration, elapsed)) : 0;
         bool NavigationReady => agent != null && agent.enabled && agent.isOnNavMesh;
         void Awake() { health = GetComponent<MonsterHealth>(); vision = GetComponent<MonsterVision>(); agent = GetComponent<NavMeshAgent>(); body = GetComponent<CapsuleCollider>(); }
         void OnEnable() => health.Died += Cancel;

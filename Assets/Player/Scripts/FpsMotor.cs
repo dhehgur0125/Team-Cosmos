@@ -43,6 +43,8 @@ namespace VoidLast.Player
         public float WalkSpeed => walkSpeed;
         public float RunSpeed => runSpeed;
         public float CrouchFraction => controller == null ? 0 : Mathf.InverseLerp(standingHeight, crouchingHeight, controller.height);
+        /// <summary>멀티플레이: 다른 대원의 복제본이면 입력으로 움직이지 않고 네트워크 상태만 받아 애니메이션에 넘긴다.</summary>
+        public bool IsNetworkProxy { get; private set; }
 
         void Awake()
         {
@@ -52,7 +54,21 @@ namespace VoidLast.Player
             inventory = GetComponent<FpsInventory>();
         }
 
-        void Update() => Simulate(input.Move, input.Sprint && (equipment == null || !equipment.IsAiming), input.Crouch, Time.deltaTime, input.Jump);
+        void Update() { if (!IsNetworkProxy) Simulate(input.Move, input.Sprint && (equipment == null || !equipment.IsAiming), input.Crouch, Time.deltaTime, input.Jump); }
+
+        public void SetNetworkProxy(bool proxy) { IsNetworkProxy = proxy; if (proxy) verticalSpeed = 0; }
+
+        /// <summary>복제본 전용: 주인 클라이언트가 보낸 이동 상태를 그대로 반영한다 (위치는 NetworkTransform이 맞춘다).</summary>
+        public void ApplyNetworkState(Vector2 localVelocity, float vertical, bool crouching, bool grounded, float crouchFraction)
+        {
+            if (!IsNetworkProxy) return;
+            LocalVelocity = localVelocity; verticalSpeed = vertical; IsCrouching = crouching; IsGrounded = grounded;
+            IsRunning = !crouching && localVelocity.y > walkSpeed + 0.2f;
+            if (controller == null) controller = GetComponent<CharacterController>();
+            if (controller == null) return;
+            controller.height = Mathf.Lerp(standingHeight, crouchingHeight, Mathf.Clamp01(crouchFraction));
+            controller.center = Vector3.up * (controller.height * 0.5f);
+        }
 
         public void Simulate(Vector2 move, bool sprint, bool crouch, float deltaTime, bool jump = false)
         {
