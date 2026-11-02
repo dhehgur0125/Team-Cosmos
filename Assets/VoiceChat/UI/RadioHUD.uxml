@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <ui:Style src="project://database/Assets/item/voicechat/RadioHUD.uss" />
+    <ui:Style src="RadioHUD.uss" />
     <ui:VisualElement name="Root" class="root" picking-mode="Ignore">
         <ui:VisualElement name="Card" class="card">
 
@@ -22,7 +22,7 @@
 
             <ui:VisualElement class="hint-row">
                 <ui:VisualElement class="hint">
-                    <ui:Label text="R" class="keycap" />
+                    <ui:Label text="V" class="keycap" />
                     <ui:Label text="무전기 (누르는 동안)" class="hint-text" />
                 </ui:VisualElement>
                 <ui:VisualElement class="hint">

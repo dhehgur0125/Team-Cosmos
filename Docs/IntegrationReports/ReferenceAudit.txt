@@ -1,0 +1,30 @@
+Stage2 missing scripts=0 missing prefab instances=0
+Integration serialized missing references=0
+Assets/Map/Scenes/Stage2_Ship.unity external GUID references=3076 unresolved=0
+Assets/Player/Prefabs/Player/VOID_LAST_FPS.prefab external GUID references=30 unresolved=0
+Assets/Player/Prefabs/Item/VOID_LAST_SyringePickup.prefab external GUID references=2 unresolved=0
+Assets/Monster/Prefabs/VOID_LAST_EyedLargeMonster.prefab external GUID references=6 unresolved=0
+Assets/Monster/Prefabs/VOID_LAST_BlindMonster.prefab external GUID references=4 unresolved=0
+Assets/Monster/Prefabs/VOID_LAST_SmallMonster.prefab external GUID references=6 unresolved=0
+Object VOID_LAST_FPS position=(-18.00, 8.07, -28.56) yaw=90
+Object Integration Waypoints position=(0.00, 0.00, 0.00) yaw=0
+Object VOID_LAST_EyedLargeMonster position=(-20.00, 8.07, 10.00) yaw=180
+Object VOID_LAST_BlindMonster position=(-20.00, 8.07, -15.00) yaw=90
+Object VOID_LAST_SmallMonster position=(10.00, 8.07, -10.00) yaw=270
+Object Integration Pickups position=(0.00, 0.00, 0.00) yaw=0
+Object VoiceChat - Existing Vivox Prototype position=(0.00, 0.00, 0.00) yaw=0
+Agent VOID_LAST_EyedLargeMonster enabled=True radius=0.7 height=2.8
+EyedMonsterAI patrolPoints=3
+EyedMonsterAI searchPoints=23
+Agent VOID_LAST_BlindMonster enabled=True radius=0.5 height=1.6
+BlindMonsterAI wanderPoints=3
+Agent VOID_LAST_SmallMonster enabled=True radius=0.3 height=1
+SmallMonsterAI searchPoints=3
+SmallMonsterAI screamClip=unassigned
+Nav LaunchHangar -> Assets/Map/Stage2_Ship/NavMesh_LaunchHangar.asset
+Nav F3_Control -> Assets/Map/Stage2_Ship/NavMesh_F3_Control.asset
+Nav F4_Power -> Assets/Map/Stage2_Ship/NavMesh_F4_Power.asset
+Nav F1_Hangar -> Assets/Map/Stage2_Ship/NavMesh_F1_Hangar.asset
+Nav F2_Cargo -> Assets/Map/Stage2_Ship/Navigation/Stage2_Integration_F2_NavMesh.asset
+Nav F5_Crew -> Assets/Map/Stage2_Ship/NavMesh_F5_Crew.asset
+Nav Cockpit -> Assets/Map/Stage2_Ship/NavMesh_Cockpit.asset

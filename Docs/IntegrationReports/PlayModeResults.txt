@@ -1,0 +1,56 @@
+VOID LAST Stage2 integration - actual Unity Play Mode
+2026-11-02T12:48:58.4209228Z
+PASS: Stage2_Ship opened in actual Play Mode
+PASS: Automated run suppressed Vivox Start before login/microphone transmission
+PASS: One FPS player, one active camera and one AudioListener
+PASS: No duplicate test movement/look scripts or F-key flashlight on integration player
+PASS: No duplicate EventSystem
+PASS: Existing VoiceChat transform, PanelSettings, UXML and separate HUD placement are connected
+PASS: Voice UI loads and displays approved V radio key
+PASS: All three original monster types exist once
+PASS: Three monster agents are attached to Stage2 navigation
+PASS: VOID_LAST_EyedLargeMonster patrol/search physically moves on NavMesh
+PASS: VOID_LAST_SmallMonster patrol/search physically moves on NavMesh
+PASS: VOID_LAST_BlindMonster patrol/search physically moves on NavMesh
+PASS: Observed patrol paths keep all three physical capsules clear of ship walls/obstacles
+Navigation owner: VOID_LAST_EyedLargeMonster -> F2_Cargo
+Navigation owner: VOID_LAST_SmallMonster -> F2_Cargo
+Navigation owner: VOID_LAST_BlindMonster -> F2_Cargo
+PASS: Found physically clear visible position for large-monster integration test
+PASS: Large monster acquires existing FPS player through vision
+PASS: Large monster navigates closer and lands its existing attack
+PASS: Existing large-monster attack applies expected player HP damage in ship
+PASS: Found physically clear visible position for small-monster integration test
+PASS: Small monster spots FPS and enters existing scream state
+PASS: Small monster resumes existing chase after scream
+PASS: Player rests on actual F2 floor without falling
+PASS: FPS CharacterController movement works in ship geometry
+PASS: Existing jump launches and lands inside ship
+PASS: Existing crouch shrinks CharacterController
+PASS: Standing restores capsule under ship ceiling
+PASS: Existing FPS yaw/pitch API works
+PASS: Actual pistol fires a Raycast into ship geometry and spends one round
+PASS: Existing reload starts
+PASS: Timed reload finishes
+PASS: Reload preserves correct magazine/reserve transfer
+PASS: Existing health HUD has initialized values
+PASS: Hotbar responds to slot 4
+PASS: Hotbar responds to slot 5
+PASS: Hotbar responds to slot 6
+PASS: Three original syringe prefabs are scannable; Z and all three shaders connected
+PASS: Existing ItemDetector sends ScanNoise to BlindMonsterAI
+PASS: Existing detector schedules item glow for all nearby syringes
+PASS: Blind monster reacts after scan wave arrival
+PASS: Actual assisted interaction ray acquires nearby syringe through existing F action
+PASS: Equipped syringe starts existing hold use
+PASS: Releasing hold cancels without healing or consuming syringe
+PASS: Cancelled syringe can be used again
+PASS: Full three-second use heals 30 and consumes one syringe
+PASS: Second existing syringe can be acquired
+PASS: Existing Q action creates the original drop prefab
+PASS: Small integration adapter makes newly dropped syringe detectable
+PASS: Drop delay prevents immediate self pickup
+PASS: Scan cooldown becomes ready
+PASS: Dropped item remains compatible with existing scan
+
+ALL INTEGRATION PLAY MODE CHECKS PASSED. Inputs driven through existing runtime APIs. Vivox authentication, live audio, multiple peers, full-map/stair traversal and manual controls were not tested.

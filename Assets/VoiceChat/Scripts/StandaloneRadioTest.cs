@@ -1,3 +1,4 @@
+/* [ 코드 설명 ] 기존 Vivox 근접 음성·무전 채널과 HUD를 연결합니다. F 획득/R 재장전과 충돌하지 않도록 무전 송신은 V 홀딩을 사용하며, 소리 어그로 테스트는 기존 MonsterAI에만 전달합니다. */
 using System.Collections.Generic;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
@@ -17,6 +18,10 @@ public class StandaloneRadioTest : MonoBehaviour
     public float normalVoiceRadius = 10f;
     public float radioVoiceRadius = 30f;
     public LayerMask monsterLayer;
+
+    [Header("통합 씬 HUD 배치")]
+    [Tooltip("FPS의 좌측 하단 체력 UI와 겹치지 않게 우측 상단에 배치합니다. 기존 테스트 씬은 기본 위치를 유지합니다.")]
+    public bool placeHudTopRight;
 
     private enum HudState { Connecting, Proximity, Radio, Error }
 
@@ -91,14 +96,14 @@ public class StandaloneRadioTest : MonoBehaviour
             Debug.Log($"일반 말소리를 냅니다. (반경 {normalVoiceRadius}m)");
         }
 
-        // R 키: 무전기 사용 (누르는 동안만 송출)
-        if (Input.GetKeyDown(KeyCode.R)) StartRadio();
-        if (Input.GetKeyUp(KeyCode.R) && isRadioTransmitting) StopRadio();
+        // V 키: 무전기 사용 (누르는 동안만 송출). R은 FPS 재장전으로 유지한다.
+        if (Input.GetKeyDown(KeyCode.V)) StartRadio();
+        if (Input.GetKeyUp(KeyCode.V) && isRadioTransmitting) StopRadio();
     }
 
     private void OnApplicationFocus(bool hasFocus)
     {
-        // R을 누른 채 창 포커스를 잃으면 KeyUp을 놓쳐 송출이 계속되는 문제 방지
+        // 송신 키를 누른 채 창 포커스를 잃으면 KeyUp을 놓쳐 송출이 계속되는 문제 방지
         if (!hasFocus && isRadioTransmitting) StopRadio();
     }
 
@@ -192,6 +197,12 @@ private void Send3DPosition()
     private void BindUI()
     {
         var root = GetComponent<UIDocument>().rootVisualElement;
+        var panel = root.Q<VisualElement>("Root");
+        if (placeHudTopRight && panel != null)
+        {
+            panel.style.justifyContent = Justify.FlexStart;
+            panel.style.alignItems = Align.FlexEnd;
+        }
         statusLabel = root.Q<Label>("StatusLabel");
         subLabel = root.Q<Label>("SubLabel");
         memberLabel = root.Q<Label>("MemberLabel");
