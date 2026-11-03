@@ -16,6 +16,7 @@ using UnityEngine.InputSystem;
 ///  - 무전기: 무전기 아이템을 가지고 있으면 무전 채널에 들어가 다른 대원의 무전을 듣는다.
 ///            무전기를 손에 들고 V(또는 좌클릭)를 누르고 있는 동안 거리와 상관없이 무전 채널 전체에 말한다.
 ///  - M: 내 마이크 끄기/켜기
+///  - 내 대원이 죽으면 근거리·무전 채널에서 나가고, 죽은 대원끼리만 들리는 사망자 채널로 옮긴다.
 /// 화면 오른쪽 위에 음성 상태 HUD를 그린다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -37,7 +38,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
     VoiceChatService _voice;
     FpsNetworkPlayer _player;
     FpsRadioView _radioView;
-    bool _entered, _radioJoined, _transmitting, _wantRadio;
+    bool _entered, _radioJoined, _transmitting, _wantRadio, _dead;
     float _radioToggleAt, _nextPosition, _nextHud, _meter;
     readonly List<string> _speakers = new List<string>();
     readonly HashSet<string> _radioSpeakersBefore = new HashSet<string>();
@@ -79,6 +80,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
         {
             _ = _voice.LeaveAsync(_voice.NearChannel);
             _ = _voice.LeaveAsync(_voice.RadioChannel);
+            _ = _voice.LeaveAsync(_voice.DeadChannel);
         }
         if (_player != null) _player.SetRadioTalking(false);
     }
@@ -100,7 +102,17 @@ public sealed class InGameVoiceChat : MonoBehaviour
         // M: 마이크 끄기/켜기
         if (KeyDown(KeyM) && CursorLocked()) _voice.SetMicMuted(!_voice.MicMuted);
 
-        if (_player != null && _entered)
+        // 죽으면 사망자 채널로 (한 번만)
+        if (_player != null && _entered && !_dead && _player.Health != null && _player.Health.IsDead)
+        {
+            _dead = true;
+            if (_transmitting) SetTransmitting(false);
+            _radioJoined = false; _wantRadio = false;
+            _radioSpeakersBefore.Clear();
+            _ = _voice.EnterDeadAsync();
+        }
+
+        if (_player != null && _entered && !_dead)
         {
             var inv = _player.Inventory;
             bool alive = inv != null && inv.IsAlive;
@@ -322,7 +334,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
     {
         if (_mode == null) return;
         // 마이크 미터는 매 프레임
-        float target = _voice.MicMuted ? 0 : _voice.SelfEnergy(_voice.NearChannel);
+        float target = _voice.MicMuted ? 0 : _voice.SelfEnergy(_dead ? _voice.DeadChannel : _voice.NearChannel);
         _meter = Mathf.Lerp(_meter, target, 1 - Mathf.Exp(-(target > _meter ? 30f : 8f) * Time.unscaledDeltaTime));
         int lit = Mathf.RoundToInt(_meter * _meterSegs.Length);
         for (int i = 0; i < _meterSegs.Length; i++)
@@ -339,6 +351,17 @@ public sealed class InGameVoiceChat : MonoBehaviour
         bool hasRadio = inv != null && inv.HasItem(FarmingItemKind.Radio);
         bool inHand = inv != null && inv.ItemAt(inv.SelectedIndex) == FarmingItemKind.Radio;
 
+        if (_dead)
+        {
+            if (!_voice.IsInChannel(_voice.DeadChannel)) SetHud("사망자 대화 연결 중...", "죽은 대원끼리만 대화할 수 있어요", new Color(0.99f, 0.88f, 0.28f));
+            else SetHud("사망자 대화", "죽은 대원끼리만 들려요 · 살아있는 대원에게는 들리지 않아요", new Color(0.75f, 0.68f, 1f));
+            var dead = new List<string>();
+            _voice.GetSpeakers(_voice.DeadChannel, _speakers);
+            foreach (var id in _speakers) dead.Add(NameOf(id));
+            _speakingText.text = dead.Count > 0 ? "말하는 중: " + string.Join(", ", dead) : "";
+            _hint.text = "[M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
+            return;
+        }
         if (_voice.State == VoiceChatService.Status.Error && !_voice.IsInChannel(_voice.NearChannel))
             SetHud("음성 연결 실패", string.IsNullOrEmpty(_voice.LastError) ? "콘솔 로그를 확인해 주세요" : _voice.LastError, new Color(0.94f, 0.27f, 0.27f));
         else if (!_voice.IsInChannel(_voice.NearChannel))

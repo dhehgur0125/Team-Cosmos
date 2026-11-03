@@ -258763,6 +258763,8 @@ Transform:
   - {fileID: 293392003}
   - {fileID: 438878563}
   - {fileID: 1688602313}
+  - {fileID: 1926022518}
+  - {fileID: 1777666765}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &596673370
@@ -621446,6 +621448,56 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 4409516987724457323, guid: 462b126fdebb3524db61bf6fef4c1c04, type: 3}
   m_PrefabInstance: {fileID: 1777270051}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1777666764
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1777666765}
+  - component: {fileID: 1777666766}
+  m_Layer: 0
+  m_Name: Game Over
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1777666765
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1777666764}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 596118276}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1777666766
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1777666764}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1914a1bfdf910f84f98518ee3604a206, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameOverScreen
+  font: {fileID: 11400000, guid: df85765197922b6488702f4706bc6b6a, type: 2}
+  lobbySceneName: Lobby
+  triggerDelay: 1.5
+  fadeInSeconds: 1.8
+  holdSeconds: 3.5
+  fadeOutSeconds: 1.6
 --- !u!1 &1777926611
 GameObject:
   m_ObjectHideFlags: 0
@@ -662945,6 +662997,56 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 4.5, y: 0.4000001, z: 1.800003}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &1926022517
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1926022518}
+  - component: {fileID: 1926022519}
+  m_Layer: 0
+  m_Name: Spectator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1926022518
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926022517}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 596118276}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1926022519
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926022517}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ed55faad17986f4fa7447aea10a2ba0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpectatorSystem
+  font: {fileID: 11400000, guid: df85765197922b6488702f4706bc6b6a, type: 2}
+  deathDelay: 2.5
+  distance: 2.8
+  mouseSensitivity: 0.1
+  minPitch: -35
+  maxPitch: 65
 --- !u!1 &1926288042
 GameObject:
   m_ObjectHideFlags: 0

@@ -169,7 +169,52 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton != null)
             NetworkManager.Singleton.OnClientDisconnectCallback += OnNetworkDisconnected;
 
+        if (TryResumeRoom()) return;   // 게임이 끝나 같은 방으로 돌아온 경우
         await RefreshRoomListAsync(false);
+    }
+
+    /// <summary>
+    /// 게임 오버 등으로 방장이 모든 대원을 로비 씬으로 데려온 경우: 연결과 방(세션)이 그대로 남아 있으므로 바로 대기방을 보여준다.
+    /// 방장은 방을 다시 열고(잠금 해제, 상태 lobby), 모두 준비 상태를 해제한다.
+    /// </summary>
+    bool TryResumeRoom()
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening) return false;
+        ISession session = null;
+        try
+        {
+            foreach (var kv in MultiplayerService.Instance.Sessions) { session = kv.Value; break; }
+        }
+        catch (Exception) { }
+        if (session == null) return false;
+
+        EnterRoom(session);
+        AddSystemLine("게임이 끝나 대기방으로 돌아왔어요.");
+        SetStatus(session.IsHost ? "게임 오버 · 대기방으로 돌아왔어요. 대원이 모두 준비하면 다시 시작할 수 있어요." : "게임 오버 · 대기방으로 돌아왔어요. 준비를 눌러 주세요.");
+        _ = ResetRoomAfterGameAsync(session);
+        return true;
+    }
+
+    async Task ResetRoomAfterGameAsync(ISession session)
+    {
+        try
+        {
+            if (session.IsHost)
+            {
+                var host = session.AsHost();
+                host.IsLocked = false;
+                host.SetProperty(KeyState, new SessionProperty("lobby", VisibilityPropertyOptions.Public));
+                await host.SavePropertiesAsync();
+            }
+            session.CurrentPlayer.SetProperty(KeyReady, new PlayerProperty("0", VisibilityPropertyOptions.Member));
+            await session.SaveCurrentPlayerDataAsync();
+            if (_session == session) RefreshRoom();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Lobby] 대기방 복귀 정리 중 경고: {e.Message}");
+        }
     }
 
     void OnDestroy()
@@ -633,20 +678,30 @@ public class LobbyManager : MonoBehaviour
         await RunBusy("게임을 시작하는 중...", async () =>
         {
             _gameStarting = true;
-            var host = _session.AsHost();
-            host.IsLocked = true;   // 시작 후에는 새로 들어올 수 없게
-            host.SetProperty(KeyState, new SessionProperty("ingame", VisibilityPropertyOptions.Public));
-            await host.SavePropertiesAsync();
+            LoadingScreen.Show();   // 방장은 누르자마자 로딩 화면 (참가자는 씬 불러오기가 시작될 때 자동으로 뜸)
+            try
+            {
+                var host = _session.AsHost();
+                host.IsLocked = true;   // 시작 후에는 새로 들어올 수 없게
+                host.SetProperty(KeyState, new SessionProperty("ingame", VisibilityPropertyOptions.Public));
+                await host.SavePropertiesAsync();
 
-            if (chat != null) chat.SendSystem("게임을 시작합니다!");
-            var status = nm.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
-            if (status != SceneEventProgressStatus.Started)
+                if (chat != null) chat.SendSystem("게임을 시작합니다!");
+                var status = nm.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+                if (status != SceneEventProgressStatus.Started)
+                {
+                    _gameStarting = false;
+                    host.IsLocked = false;
+                    host.SetProperty(KeyState, new SessionProperty("lobby", VisibilityPropertyOptions.Public));
+                    await host.SavePropertiesAsync();
+                    throw new Exception($"씬 전환 실패: {status}");
+                }
+            }
+            catch
             {
                 _gameStarting = false;
-                host.IsLocked = false;
-                host.SetProperty(KeyState, new SessionProperty("lobby", VisibilityPropertyOptions.Public));
-                await host.SavePropertiesAsync();
-                throw new Exception($"씬 전환 실패: {status}");
+                LoadingScreen.Cancel();
+                throw;
             }
         });
     }

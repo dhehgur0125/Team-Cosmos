@@ -50,6 +50,7 @@ namespace VoidLast.MapTools
 
             // ---------------------------------------------------------- network
             var nmGo = new GameObject("NetworkManager");
+            nmGo.AddComponent<NetworkManagerDuplicateGuard>();   // 같은 방으로 복귀할 때 중복 NetworkManager 방지
             var nm = nmGo.AddComponent<NetworkManager>();
             nmGo.AddComponent<UnityTransport>();
             nm.NetworkConfig = new NetworkConfig
@@ -110,6 +111,7 @@ namespace VoidLast.MapTools
             BuildCreate(root, lm);
             BuildLoading(root, lm);
             MultiplayerSetup.ApplyLobbyVoiceUi(lm, _font);   // 대기방 음성 채팅 UI
+            MultiplayerSetup.ApplyLoadingScreen(_font);       // 게임 시작 → Stage2 로딩 화면
             MultiplayerSetup.ApplySpawnerMapping(spawner);   // Stage2_Ship → VOID_LAST_FPS_Network
 
             Selection.activeGameObject = mgrGo;

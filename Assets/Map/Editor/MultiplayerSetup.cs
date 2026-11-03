@@ -50,6 +50,7 @@ namespace VoidLast.MapTools
             log.Add(PatchStage2Scene());
             log.Add(F2MissionSetup.Build());   // 2층 임무 장치 (Stage2 씬을 다시 만들면 함께 다시 배치)
             log.Add(StairDoorSetup.Build());   // 계단 입구 문 (F로 열고 닫기)
+            log.Add(MatchFlowSetup.Build());   // 관전 모드 + 게임 오버 화면
             AssetDatabase.SaveAssets();
             string s = string.Join("\n", log);
             Debug.Log("[MultiplayerSetup]\n" + s);
@@ -353,10 +354,22 @@ namespace VoidLast.MapTools
             ApplySpawnerMapping(spawner);
             if (string.IsNullOrEmpty(lm.gameSceneName) || lm.gameSceneName == "MapScene") lm.gameSceneName = "Stage2_Ship";
             ApplyLobbyVoiceUi(lm, AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath));
+            ApplyLoadingScreen(AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath));
+            if (spawner.GetComponent<NetworkManagerDuplicateGuard>() == null) spawner.gameObject.AddComponent<NetworkManagerDuplicateGuard>();
             EditorUtility.SetDirty(lm); EditorUtility.SetDirty(spawner);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            return "lobby: spawner Stage2 → network player, voice UI";
+            return "lobby: spawner Stage2 → network player, voice UI, loading screen, NM guard";
+        }
+
+        /// <summary>로비 씬에 게임 시작 로딩 화면 오브젝트를 둔다 (UI는 실행 중에 코드로 만들어짐)</summary>
+        public static void ApplyLoadingScreen(TMP_FontAsset font)
+        {
+            var ls = Object.FindFirstObjectByType<LoadingScreen>(FindObjectsInactive.Include);
+            if (ls == null) ls = new GameObject("LoadingScreen").AddComponent<LoadingScreen>();
+            ls.font = font;
+            ls.gameSceneName = "Stage2_Ship";
+            EditorUtility.SetDirty(ls);
         }
 
         public static void ApplySpawnerMapping(LobbyPlayerSpawner spawner)

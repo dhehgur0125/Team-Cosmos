@@ -7543,6 +7543,7 @@ GameObject:
   - component: {fileID: 1051111423}
   - component: {fileID: 1051111422}
   - component: {fileID: 1051111421}
+  - component: {fileID: 1051111425}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -7660,6 +7661,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1051111425
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1051111420}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1091d93ddd5e94b4d9324b7d1c126546, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkManagerDuplicateGuard
 --- !u!1 &1056982499
 GameObject:
   m_ObjectHideFlags: 0
@@ -16205,6 +16218,68 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &1864803238
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1864803240}
+  - component: {fileID: 1864803239}
+  m_Layer: 0
+  m_Name: LoadingScreen
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1864803239
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1864803238}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca03722d8588e884ea790b98baddc5b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LoadingScreen
+  font: {fileID: 11400000, guid: df85765197922b6488702f4706bc6b6a, type: 2}
+  gameSceneName: Stage2_Ship
+  fadeSeconds: 0.5
+  tips:
+  - "<b>E</b> \uD0A4\uB85C \uAD8C\uCD1D\uC5D0 \uB2EC\uB9B0 \uC190\uC804\uB4F1\uC744
+    \uCF1C\uACE0 \uB04C \uC218 \uC788\uC5B4\uC694."
+  - "<b>F</b> \uD0A4\uB85C \uC7A5\uCE58\uB97C \uC870\uC791\uD558\uACE0, \uACC4\uB2E8
+    \uBB38\uC744 \uC5F4\uACE0 \uB2EB\uC744 \uC218 \uC788\uC5B4\uC694."
+  - "\uAC00\uAE4C\uC774 \uC788\uB294 \uB300\uC6D0\uB07C\uB9AC\uB294 \uBAA9\uC18C\uB9AC\uAC00
+    \uB4E4\uB824\uC694. <b>M</b> \uD0A4\uB85C \uB9C8\uC774\uD06C\uB97C \uB044\uACE0
+    \uCF24 \uC218 \uC788\uC5B4\uC694."
+  - "\uBB34\uC804\uAE30\uB97C \uB4E4\uACE0 <b>V</b> \uD0A4\uB97C \uB204\uB974\uACE0
+    \uC788\uC73C\uBA74 \uBA40\uB9AC \uC788\uB294 \uB300\uC6D0\uACFC\uB3C4 \uB300\uD654\uD560
+    \uC218 \uC788\uC5B4\uC694."
+  - "\uAD34\uBB3C\uC740 \uC18C\uB9AC\uC5D0 \uBC18\uC751\uD574\uC694. \uC2DC\uB044\uB7EC\uC6B4
+    \uC7A5\uCE58\uB97C \uB3CC\uB9B4 \uB54C\uB294 \uC8FC\uBCC0\uC744 \uC0B4\uD53C\uC138\uC694."
+  - "\uD769\uC5B4\uC9C0\uBA74 \uC704\uD5D8\uD574\uC694. \uC11C\uB85C\uC758 \uC704\uCE58\uB97C
+    \uC790\uC8FC \uC54C\uB824 \uC8FC\uC138\uC694."
+--- !u!4 &1864803240
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1864803238}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1921065950
 GameObject:
   m_ObjectHideFlags: 0
@@ -18100,3 +18175,4 @@ SceneRoots:
   - {fileID: 1515605705}
   - {fileID: 1732522129}
   - {fileID: 883799177}
+  - {fileID: 1864803240}

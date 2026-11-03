@@ -47,12 +47,16 @@ public sealed class VoiceChatService : MonoBehaviour
     public string LobbyChannel => "vl_lobby_" + Sanitize(SessionKey);
     public string NearChannel => "vl_near_" + Sanitize(SessionKey);
     public string RadioChannel => "vl_radio_" + Sanitize(SessionKey);
+    /// <summary>죽은 대원끼리만 쓰는 음성 채널</summary>
+    public string DeadChannel => "vl_dead_" + Sanitize(SessionKey);
 
     Task _loginTask;
     readonly HashSet<string> _wanted = new HashSet<string>();   // 들어가려는(들어간) 채널
     TransmissionMode _txMode = TransmissionMode.None;
     string _txChannel;
     bool _txApplying, _txDirty;
+    TransmissionMode _appliedMode = TransmissionMode.None;   // Vivox에 실제로 적용된 송신 대상
+    string _appliedChannel;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { s_instance = null; s_quitting = false; }
@@ -203,7 +207,17 @@ public sealed class VoiceChatService : MonoBehaviour
     {
         try
         {
-            if (IsInChannel(channel)) await VivoxService.Instance.LeaveChannelAsync(channel);
+            if (IsInChannel(channel))
+            {
+                // 지금 말하고 있는(송신 중인) 채널이면 먼저 송신을 멈춘다 (나간 채널로 송신 설정이 남아 Vivox 오류가 나는 것 방지)
+                if (_appliedMode == TransmissionMode.All || (_appliedMode == TransmissionMode.Single && _appliedChannel == channel))
+                {
+                    try { await VivoxService.Instance.SetChannelTransmissionModeAsync(TransmissionMode.None); } catch (Exception) { }
+                    _appliedMode = TransmissionMode.None; _appliedChannel = null;
+                }
+                await VivoxService.Instance.LeaveChannelAsync(channel);
+                ReapplyTransmission();
+            }
         }
         catch (Exception e) { Debug.LogWarning($"[Voice] 채널 나가기 경고 ({channel}): {e.Message}"); }
     }
@@ -214,6 +228,7 @@ public sealed class VoiceChatService : MonoBehaviour
         _wanted.Clear();
         _txMode = TransmissionMode.None; _txChannel = null;
         foreach (var ch in list) await LeaveNowAsync(ch);
+        if (list.Count > 0 || _appliedMode != TransmissionMode.None) { _appliedMode = TransmissionMode.None; _appliedChannel = null; }
     }
 
     // ------------------------------------------------------------------ lobby / game
@@ -247,6 +262,17 @@ public sealed class VoiceChatService : MonoBehaviour
     }
 
     /// <summary>
+    /// 내 대원이 죽었을 때: 근거리·무전 채널에서 나가고(살아있는 대원에게 들리지 않음) 사망자 채널에만 말하고 듣는다.
+    /// </summary>
+    public async Task EnterDeadAsync()
+    {
+        SetTransmission(TransmissionMode.Single, DeadChannel);
+        await LeaveAsync(NearChannel);
+        await LeaveAsync(RadioChannel);
+        await JoinGroupAsync(DeadChannel);
+    }
+
+    /// <summary>
     /// 송신 대상: Single(해당 채널만), All(들어간 모든 채널: 근거리 + 무전), None(말하지 않음).
     /// 채널에 아직 못 들어갔으면 입장 직후 다시 적용한다.
     /// </summary>
@@ -269,7 +295,11 @@ public sealed class VoiceChatService : MonoBehaviour
                 if (!IsLoggedIn) break;
                 var mode = _txMode; var ch = _txChannel;
                 if (mode == TransmissionMode.Single && (string.IsNullOrEmpty(ch) || !IsInChannel(ch))) break;
-                try { await VivoxService.Instance.SetChannelTransmissionModeAsync(mode, mode == TransmissionMode.Single ? ch : null); }
+                try
+                {
+                    await VivoxService.Instance.SetChannelTransmissionModeAsync(mode, mode == TransmissionMode.Single ? ch : null);
+                    _appliedMode = mode; _appliedChannel = mode == TransmissionMode.Single ? ch : null;
+                }
                 catch (Exception e) { Debug.LogWarning($"[Voice] 송신 모드 변경 실패: {e.Message}"); }
             } while (_txDirty);
         }
