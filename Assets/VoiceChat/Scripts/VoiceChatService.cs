@@ -373,6 +373,29 @@ public sealed class VoiceChatService : MonoBehaviour
         return 0;
     }
 
+    /// <summary>
+    /// 해당 채널에서 그 플레이어 목소리를 내 쪽에서만 끄거나 다시 켠다 (상대방·다른 대원에게는 영향 없음).
+    /// 무전 중인 대원의 육성을 멀리 있는 대원에게 들리지 않게 할 때 사용.
+    /// </summary>
+    /// <returns>채널에서 그 플레이어를 찾아 적용했으면 true</returns>
+    public bool SetLocalMute(string channel, string playerId, bool mute)
+    {
+        if (string.IsNullOrEmpty(playerId)) return false;
+        bool applied = false;
+        try
+        {
+            if (!IsLoggedIn || !VivoxService.Instance.ActiveChannels.TryGetValue(channel, out var list)) return false;
+            foreach (var p in list)
+            {
+                if (p.IsSelf || p.PlayerId != playerId) continue;
+                if (mute) p.MutePlayerLocally(); else p.UnmutePlayerLocally();
+                applied = true;
+            }
+        }
+        catch (Exception e) { Debug.LogWarning($"[Voice] 로컬 음소거 실패: {e.Message}"); }
+        return applied;
+    }
+
     public void Set3DPosition(GameObject listener, string channel)
     {
         if (listener == null) return;

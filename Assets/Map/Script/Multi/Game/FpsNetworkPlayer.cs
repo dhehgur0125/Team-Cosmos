@@ -215,6 +215,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     /// <summary>내 캐릭터: 무전기로 말하는 중인지 (다른 대원 화면에서 무전기를 입에 대는 연출)</summary>
     public void SetRadioTalking(bool talking)
     {
+        if (talking != _radioTalking) _nextWrite = 0f;   // 다른 대원이 바로 알 수 있게 다음 프레임에 즉시 전송
         _radioTalking = talking;
         if (_radio != null) _radio.Talking = talking;
     }
