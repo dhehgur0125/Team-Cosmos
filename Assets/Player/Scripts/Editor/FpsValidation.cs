@@ -194,7 +194,7 @@ namespace VoidLast.Player.Editor
                 report.AppendLine("\nALL AUTOMATED CHECKS PASSED. Physical keyboard/mouse feel, final weapon offsets and residual foot sliding require manual review.");
             }
         }
-        static void CaptureObserver(GameObject player, string file, bool closeUp = false)
+        internal static void CaptureObserver(GameObject player, string file, bool closeUp = false)
         {
             var go = new GameObject("Temporary validation observer");
             try
@@ -206,7 +206,7 @@ namespace VoidLast.Player.Editor
             }
             finally { Object.DestroyImmediate(go); }
         }
-        static void Capture(Camera camera, string file)
+        internal static void Capture(Camera camera, string file)
         {
             var rt = new RenderTexture(960, 720, 24); rt.Create();
             var texture = new Texture2D(960, 720, TextureFormat.RGB24, false);

@@ -1,0 +1,22 @@
+VOID LAST pistol effects - actual Character_test Play Mode
+2026-11-03T11:09:08.8448805Z
+PASS: Existing FPS test scene used; Stage2/Lobby not saved
+Visual/effect checks only; existing combat/lifetime checks were not repeated.
+PASS: Existing metal wall material identified without modifying it
+PASS: Metal wall shot succeeds through existing hitscan
+PASS: Metal wall selects existing impact prefab with short stretched sparks
+PASS: Existing local/world flash uses larger warm three-frame flame atlas
+PASS: Metal impact emits bounded spark burst
+PASS: Sparks have no collision, rigidbodies or trails
+PASS: Brief visible flame and restrained shadowless light
+PASS: Muzzle flash and light turn off promptly
+PASS: Existing nonmetal wall material identified
+PASS: ADS shot preserves aim and existing ammo/recoil path
+PASS: Nonmetal wall selects small dust burst
+PASS: Dust uses at most six nonphysical particles
+PASS: Both impact styles destroy themselves after particles expire
+PASS: Existing PlayNetworkShot replays muzzle flash without damage, hit or ammo changes
+PASS: Existing camera visibility separates first-person and world flashes
+PASS: No projectile, beam or tracer rendering added
+PASS: No new Console errors/exceptions during this run
+COMPLETE. Existing RPC code was preserved; live network peers and synchronized impact points were not tested.

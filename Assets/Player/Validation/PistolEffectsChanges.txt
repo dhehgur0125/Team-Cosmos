@@ -1,0 +1,49 @@
+VOID LAST — 권총 이펙트 개선 파일 목록 (2026-11-03)
+
+기존 파일 수정
+Assets/Player/Materials/Effects/PistolMuzzleFlash.mat
+Assets/Player/Prefabs/Effects/VOID_LAST_PistolImpact.prefab
+Assets/Player/Prefabs/Player/VOID_LAST_FPS.prefab
+Assets/Player/Scripts/FpsPistolEffects.cs
+Assets/Player/Scripts/Editor/FpsCombatValidation.cs
+Assets/Player/Scripts/Editor/FpsShootingEffectsSetup.cs
+Assets/Player/Scripts/Editor/FpsValidation.cs
+Assets/Player/Validation/Bullet_Marks_FPS.png
+Assets/Player/Validation/Pistol_Ammo_HUD.png
+Assets/Player/Validation/Pistol_Reload_FPS.png
+Assets/Player/Validation/Shot_ADS_FPS.png
+Assets/Player/Validation/Shot_Hip_FPS.png
+Assets/Player/Validation/Shot_Impact_Closeup.png
+Assets/Player/Validation/Shot_Observer.png
+
+신규 파일 (Unity .meta 포함)
+Assets/Player/Materials/Effects/PistolDustImpact.mat
+Assets/Player/Prefabs/Effects/VOID_LAST_PistolDustImpact.prefab
+Assets/Player/Scripts/Editor/FpsShotEffectsValidation.cs
+Assets/Player/Validation/PistolEffectsResults.txt
+Assets/Player/Validation/PistolFX_ADS.png
+Assets/Player/Validation/PistolFX_Dust.png
+Assets/Player/Validation/PistolFX_Hip.png
+Assets/Player/Validation/PistolFX_LocalReplay.png
+Assets/Player/Validation/PistolFX_Metal.png
+Assets/Player/Validation/PistolFX_Observer.png
+Assets/Player/Validation/PistolFX_RemoteReplay.png
+Assets/Player/Validation/PistolEffectsVisualResults.txt
+Assets/Player/Validation/PistolEffectsChanges.txt
+
+설정
+총구 화염: 기존 화염 위치, 기존 Muzzle_Flash_A 텍스처, 크기 0.2, 0.065초.
+조명: 강도 0.35, 범위 1.25m, 0.025초, 그림자 없음.
+금속 피격: 기존 PistolImpact 프리팹의 짧은 스파크 최대 9개.
+일반 벽 피격: CloudBlur 텍스처를 재사용한 먼지 최대 6개.
+금속 구분: 물리 머티리얼 이름, 맞은 렌더 머티리얼의 Metallic >= 0.5/금속 이름. 텍스처만으로 금속성을 표현하는 특수 재질은 FpsPistolEffects의 Metal Materials에 지정 가능.
+기존 총알 Raycast/피해/탄약/반동/탄흔 코드는 수정하지 않음. 탄흔 7개/30초 유지.
+기존 네트워크 ShotRpc -> PlayNetworkShot -> Shot 이벤트 경로 유지. 원격 피격 지점 동기화는 기존에도 없어 이번에 추가하지 않음. 실제 다중 클라이언트 접속은 미검증.
+
+보존 확인
+작업 시작 시 변경되어 있던 맵 폰트와 이전 크로스헤어 변경 보존.
+Stage2_Ship, Lobby, 멀티플레이/보이스챗 코드, 손전등, ProjectSettings, Packages의 파일 해시 변경 없음.
+
+검증 기록
+PistolEffectsResults.txt: 기존 전투 검사 및 실제 30초 탄흔 제거 + 새 이펙트.
+PistolEffectsVisualResults.txt: 먼지 텍스처 보정 후 짧은 이펙트 재검사. 없는 Metallic 속성을 읽던 검사 코드 오류를 HasProperty 확인으로 수정함.

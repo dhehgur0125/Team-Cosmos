@@ -1,0 +1,84 @@
+VOID LAST pistol effects - actual Character_test Play Mode
+2026-11-03T10:41:33.1456666Z
+PASS: Existing FPS test scene used; Stage2/Lobby not saved
+PASS: Initial magazine/reserve = 10 / 30
+PASS: Pistol cannot fire/reload during equip
+PASS: Both muzzle effects exist and stay off before a successful shot
+PASS: Muzzle effect is just beyond measured barrel front
+PASS: Full magazine rejects reload; white ammo UI anchored bottom-right
+PASS: One shot consumes exactly one magazine round and updates HUD
+PASS: Center-camera hitscan ignores own colliders and reports nearest wall hit
+PASS: Successful shot emits one short flash in each camera representation
+PASS: Shot enables only a weak short-range muzzle light
+PASS: Shot kicks the gun upward/backward from its base pose
+PASS: Environmental impact follows hit point and surface normal
+PASS: Effects add no colliders, projectiles, line or luminous trail renderers
+PASS: Impact emits its brief particle burst
+PASS: Muzzle visibility flags restore after local and observer rendering
+PASS: Mark follows impact point/normal with offset and no Collider
+PASS: Shot interval rejects immediate second request
+PASS: Rejected fire creates no additional impact
+PASS: Flash/light end quickly and impact destroys itself automatically
+PASS: Hip recoil returns exactly with no camera kick
+PASS: Wall shot 2 maintains global FIFO count
+PASS: Repeated shot restarts bounded recoil/flash without accumulating position: 2
+PASS: Wall shot 3 maintains global FIFO count
+PASS: Repeated shot restarts bounded recoil/flash without accumulating position: 3
+PASS: Wall shot 4 maintains global FIFO count
+PASS: Repeated shot restarts bounded recoil/flash without accumulating position: 4
+PASS: Wall shot 5 maintains global FIFO count
+PASS: Repeated shot restarts bounded recoil/flash without accumulating position: 5
+PASS: Wall shot 6 maintains global FIFO count
+PASS: Repeated shot restarts bounded recoil/flash without accumulating position: 6
+PASS: Wall shot 7 maintains global FIFO count
+PASS: Repeated shot restarts bounded recoil/flash without accumulating position: 7
+PASS: Wall shot 8 maintains global FIFO count
+PASS: Repeated shot restarts bounded recoil/flash without accumulating position: 8
+PASS: Eighth impact removes oldest mark immediately
+PASS: Second shooter shares the same world-wide seven-mark limit
+PASS: Ninth shot remains unobstructed by existing marks
+PASS: Miss creates no mark; empty magazine displays zero
+PASS: Miss still flashes but creates no impact
+PASS: Empty magazine blocks firing
+PASS: Reload starts once, clears ADS and blocks firing
+PASS: Reload clears flash and recoil before lowering
+PASS: Reload holds gun lowered without moving ammunition or allowing ADS
+PASS: Slot switch cancels reload with unchanged ammo and hides gun/UI
+PASS: Re-equipping restores pose and allows restarting reload
+PASS: Ammo stays unchanged immediately before reload completes
+PASS: Empty reload transfers 0/30 to 10/20 only at completion
+PASS: ADS recovers after completed reload
+PASS: ADS shot succeeds after reload
+PASS: ADS uses smaller model recoil on top of aim pose
+PASS: ADS recoil returns without drifting the sight alignment
+PASS: Shot before rapid slot switch succeeds
+PASS: Rapid slot switch clears flash/recoil immediately
+PASS: Re-equipping restores normal pose with no stale flash
+PASS: Reload accepts configured ammo 6/30
+PASS: Reload result 10/26
+PASS: Hitscan reaches the explicitly aimed character capsule
+PASS: Character hit produces neither environment impact nor wall mark
+PASS: Dead player cannot fire or reload
+PASS: Reload accepts configured ammo 0/5
+PASS: Reload result 5/0
+PASS: Zero reserve rejects reload
+PASS: Dead player cannot fire or reload
+Waiting for actual 30-second bullet-mark expiry (no time-scale changes).
+PASS: Every mark expires after 30 seconds of real Play Mode time
+PASS: Existing metal wall material identified without modifying it
+PASS: Metal wall shot succeeds through existing hitscan
+PASS: Metal wall selects existing impact prefab with short stretched sparks
+PASS: Existing local/world flash uses larger warm three-frame flame atlas
+PASS: Metal impact emits bounded spark burst
+PASS: Sparks have no collision, rigidbodies or trails
+PASS: Brief visible flame and restrained shadowless light
+PASS: Muzzle flash and light turn off promptly
+PASS: Existing nonmetal wall material identified
+PASS: ADS shot preserves aim and existing ammo/recoil path
+PASS: Nonmetal wall selects small dust burst
+PASS: Dust uses at most six nonphysical particles
+PASS: Both impact styles destroy themselves after particles expire
+PASS: Existing PlayNetworkShot replays muzzle flash without damage, hit or ammo changes
+PASS: Existing camera visibility separates first-person and world flashes
+PASS: No projectile, beam or tracer rendering added
+COMPLETE. Existing RPC code was preserved; live network peers and synchronized impact points were not tested.

@@ -1,0 +1,32 @@
+VOID LAST crosshair-only Play Mode checks
+2026-11-03T10:26:06.1237224Z
+PASS: Existing Character_test scene in actual Play Mode
+PASS: Crosshair inherited from existing FPS prefab
+PASS: Four non-interactive crosshair arms
+PASS: Idle pistol: four arms, gap 6, no center dot
+PASS: Walk gap transitions smoothly instead of snapping
+PASS: Walking gap 10 from actual motor velocity
+PASS: Running gap 16
+PASS: Moving while crouched uses narrow gap 3
+PASS: Stationary crouch retains narrow gap
+PASS: Real motor jump/airborne state widens gap to 22
+PASS: Landing returns to idle gap
+PASS: ADS hides all crosshair graphics
+PASS: Aim release restores pistol crosshair
+PASS: Slot 2 retains original interaction dot
+PASS: Slot 3 retains original interaction dot
+PASS: Slot 4 retains original interaction dot
+PASS: Slot 5 retains original interaction dot
+PASS: Slot 6 retains original interaction dot
+PASS: Remote motor state cannot show crosshair
+PASS: Remote equipment state cannot show crosshair
+PASS: Existing owner-only HUD switch also hides crosshair
+PASS: Unspawned network variant inherits crosshair under inactive owner-only HUD
+PASS: Local HUD restored; health/ammo unchanged
+PASS: Centered at 1280x720
+PASS: Centered at 1920x1080
+PASS: Centered at 1024x768
+PASS: Centered at 2560x1080
+PASS: Original Screen Space Overlay remains at actual screen center
+PASS: No missing crosshair components
+COMPLETE. State APIs driven in Character_test; no live multiplayer session or Stage2/Lobby edits.
