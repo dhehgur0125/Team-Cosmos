@@ -52,7 +52,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
             item0 == o.item0 && item1 == o.item1 && item2 == o.item2 && usingIndex == o.usingIndex;
     }
 
-    const byte FlagCrouch = 1, FlagGrounded = 2, FlagAim = 4, FlagUsingOther = 8, FlagRadioTalk = 16;
+    const byte FlagCrouch = 1, FlagGrounded = 2, FlagAim = 4, FlagUsingOther = 8, FlagRadioTalk = 16, FlagFlashlight = 32;
 
     [Header("내 캐릭터에서만 켜는 컴포넌트 (프리팹에서는 꺼 둠)")]
     [Tooltip("FpsInput, FpsLook, FpsHud, FpsItemInteractor, FpsPistol, ItemDetector, 카메라, AudioListener 등")]
@@ -87,6 +87,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     FpsPistol _pistol;
     FpsInput _input;
     FpsRadioView _radio;
+    FpsWeaponFlashlight _flashlight;
     bool _radioTalking;
     float _nextWrite;
 
@@ -102,6 +103,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _pistol = GetComponent<FpsPistol>();
         _input = GetComponent<FpsInput>();
         _radio = GetComponent<FpsRadioView>();
+        _flashlight = GetComponent<FpsWeaponFlashlight>();
         if (cameraPivot == null) cameraPivot = transform.Find("CameraPivot");
         if (viewCamera == null) viewCamera = GetComponentInChildren<Camera>(true);
     }
@@ -153,6 +155,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _motor.SetNetworkProxy(true);
         _equipment.IsNetworkProxy = true;
         _inventory.IsNetworkProxy = true;
+        if (_flashlight != null) _flashlight.SetNetworkProxy(true);
         _healthComp.NetworkDamageRedirect = amount => DamageRpc(amount);
         _healthComp.NetworkHealRedirect = amount => { HealRpc(amount); return true; };
         _health.OnValueChanged += OnHealthChanged;
@@ -193,6 +196,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         if (_equipment.IsAiming) s.flags |= FlagAim;
         if (_inventory.IsUsingOnOther) s.flags |= FlagUsingOther;
         if (_radioTalking) s.flags |= FlagRadioTalk;
+        if (_flashlight != null && _flashlight.On) s.flags |= FlagFlashlight;
         if (!s.Equals(_state.Value)) _state.Value = s;
     }
 
@@ -205,6 +209,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _inventory.ApplyNetworkState((FarmingItemKind)s.item0, (FarmingItemKind)s.item1, (FarmingItemKind)s.item2, s.usingIndex, s.useProgress, (s.flags & FlagUsingOther) != 0);
         if (cameraPivot != null) cameraPivot.localRotation = Quaternion.Slerp(cameraPivot.localRotation, Quaternion.Euler(s.pitch, 0, 0), 1f - Mathf.Exp(-20f * Time.deltaTime));
         if (_radio != null) _radio.Talking = (s.flags & FlagRadioTalk) != 0;
+        if (_flashlight != null) _flashlight.ApplyNetworkState((s.flags & FlagFlashlight) != 0);
     }
 
     /// <summary>내 캐릭터: 무전기로 말하는 중인지 (다른 대원 화면에서 무전기를 입에 대는 연출)</summary>

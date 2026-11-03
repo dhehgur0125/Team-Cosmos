@@ -48,6 +48,8 @@ namespace VoidLast.MapTools
             log.Add(BuildNetworkPlayer());
             log.Add(PatchLobbyScene());
             log.Add(PatchStage2Scene());
+            log.Add(F2MissionSetup.Build());   // 2층 임무 장치 (Stage2 씬을 다시 만들면 함께 다시 배치)
+            log.Add(StairDoorSetup.Build());   // 계단 입구 문 (F로 열고 닫기)
             AssetDatabase.SaveAssets();
             string s = string.Join("\n", log);
             Debug.Log("[MultiplayerSetup]\n" + s);

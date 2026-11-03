@@ -209,6 +209,20 @@ namespace VoidLast.Monster
             }
         }
 
+        /// <summary>
+        /// 큰 소음(예: 2층 연료 펌프)을 들었을 때: 지금 쫓는 대상이 없으면 소리 난 곳을 조사하러 간다.
+        /// 그 자리에서 대원을 보면 평소처럼 비명 → 추격으로 이어진다.
+        /// </summary>
+        public void HearNoise(Vector3 position)
+        {
+            if (NetworkProxy || health.IsDead || State == Mode.Scream || State == Mode.Attack || State == Mode.Chase) return;
+            if (targetVisible && Target != null && !Target.IsDead) return;
+            LastKnownPosition = position;
+            knowsLocation = true;
+            if (State == Mode.Investigate) Stop();   // 이미 조사 중이면 새 위치로 다시 경로를 잡는다
+            else Change(Mode.Investigate);
+        }
+
         void HearScream(FpsHealth player, Vector3 position)
         {
             if (health.IsDead || State == Mode.Scream || State == Mode.Attack) return;
