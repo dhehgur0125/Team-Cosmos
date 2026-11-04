@@ -33,6 +33,12 @@ public class LobbyPlayerSpawner : MonoBehaviour
     NetworkManager _nm;
     bool _hooked;
 
+    /// <summary>층 이동 때: 이 이름이 들어간 지점에 먼저 스폰 (예: "Arrival_A" = 계단 A 문 앞). null이면 기본 키워드</summary>
+    public static string[] KeywordOverride;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() { KeywordOverride = null; }
+
     void Awake()
     {
         _nm = GetComponent<NetworkManager>();
@@ -102,7 +108,7 @@ public class LobbyPlayerSpawner : MonoBehaviour
     {
         if (scenePlayerPrefabs != null)
             foreach (var entry in scenePlayerPrefabs)
-                if (entry != null && entry.prefab != null && entry.sceneName == sceneName) return entry.prefab;
+                if (entry != null && entry.prefab != null && !string.IsNullOrEmpty(entry.sceneName) && sceneName.StartsWith(entry.sceneName)) return entry.prefab;   // Stage2_Ship → Stage2_Ship_1f~5f
         return playerPrefab;
     }
 
@@ -112,7 +118,10 @@ public class LobbyPlayerSpawner : MonoBehaviour
         var scene = SceneManager.GetSceneByName(sceneName);
         if (!scene.IsValid()) return list;
         // 키워드 순서가 우선순위: 앞 키워드(예: PlayerSpawn)로 찾은 지점이 있으면 뒤 키워드(PlayerStart 맵 마커)는 쓰지 않는다
-        foreach (var k in spawnPointKeywords)
+        var keys = new List<string>();
+        if (KeywordOverride != null) keys.AddRange(KeywordOverride);
+        keys.AddRange(spawnPointKeywords);
+        foreach (var k in keys)
         {
             if (string.IsNullOrEmpty(k)) continue;
             foreach (var root in scene.GetRootGameObjects())

@@ -19,12 +19,16 @@ namespace VoidLast.Player
         public Action<float> NetworkDamageRedirect;
         public Func<float, bool> NetworkHealRedirect;
         bool deathHandled;
+        /// <summary>연출(층 이동 등) 중에는 피해를 받지 않는다</summary>
+        public static bool DamageBlocked;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() { DamageBlocked = false; }
 
         void Awake() => Current = Mathf.Clamp(startingHealth, 0, maximumHealth);
         void Start() { if (IsDead) HandleDeath(); }
         public void TakeDamage(float amount)
         {
-            if (IsDead || amount <= 0 || float.IsNaN(amount)) return;
+            if (IsDead || amount <= 0 || float.IsNaN(amount) || DamageBlocked) return;
             if (NetworkDamageRedirect != null) { NetworkDamageRedirect(amount); return; }
             Current = Mathf.Clamp(Current - amount, 0, maximumHealth);
             Changed?.Invoke();
@@ -37,6 +41,14 @@ namespace VoidLast.Player
             Current = Mathf.Clamp(Current + amount, 0, maximumHealth);
             Changed?.Invoke();
             return true;
+        }
+        /// <summary>층 이동 후: 이전 층에서의 HP를 그대로 이어받는다 (0이면 사망 상태로)</summary>
+        public void RestoreFromCarryOver(float value)
+        {
+            if (float.IsNaN(value) || NetworkDamageRedirect != null) return;
+            Current = Mathf.Clamp(value, 0, maximumHealth);
+            Changed?.Invoke();
+            if (IsDead) HandleDeath();
         }
         /// <summary>복제본 전용: 주인이 알려준 HP를 그대로 표시한다. 0이 되면 사망 연출도 한 번 재생한다.</summary>
         public void ApplyNetworkHealth(float value)

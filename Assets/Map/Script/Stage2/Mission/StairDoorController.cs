@@ -13,6 +13,8 @@ using UnityEngine.InputSystem;
 ///  - 문 앞에서 문을 보고 F → 문짝 두 장이 위로 올라가 천장 속(벽 두께 안)으로 들어가고 통과할 수 있게 된다. 다시 F → 내려와 닫힌다.
 ///  - 문 사이에 대원이 서 있으면 닫히지 않는다.
 ///  - 멀티플레이: 방장(서버)이 열림 상태를 정하고 모든 대원에게 같은 문 상태가 보인다. 오프라인에서도 그대로 동작한다.
+///  - 층별 씬(FloorTransition이 있는 씬): 문은 잠겨 있고, 이 층의 클리어 조건을 만족하면 F로 문을 열고 아래층으로 내려간다
+///    (층 이동 연출은 FloorTransition). 1층의 계단 문은 위층으로 돌아갈 수 없으므로 열리지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class StairDoorController : NetworkBehaviour
@@ -43,15 +45,35 @@ public sealed class StairDoorController : NetworkBehaviour
     public static StairDoorController Instance { get; private set; }
 
     readonly NetworkVariable<int> _mask = new NetworkVariable<int>();
-    int _offlineMask, _shownMask;
+    int _offlineMask, _shownMask, _localMask;
     readonly Dictionary<Collider, int> _byCollider = new Dictionary<Collider, int>();
     TMP_Text _prompt;
     AudioClip _openClip, _closeClip;
     float _denyUntil;
 
     int Mask => IsSpawned ? _mask.Value : _offlineMask;
+    /// <summary>화면에 보이는 열림 상태 = 네트워크 상태 + 연출용으로 내 화면에서만 연 문</summary>
+    int DisplayMask => Mask | _localMask;
     bool HasAuthority => !IsSpawned || IsServer;
-    public bool IsOpen(int index) => (Mask & (1 << index)) != 0;
+    public bool IsOpen(int index) => (DisplayMask & (1 << index)) != 0;
+
+    /// <summary>층 이동 연출: 내 화면에서만 문을 열고 닫는다</summary>
+    public void SetLocalOpen(int index, bool open)
+    {
+        if (index < 0 || index >= doors.Length) return;
+        if (open) _localMask |= 1 << index; else _localMask &= ~(1 << index);
+    }
+
+    /// <summary>계단 'A' 또는 'B'의 문 번호 (없으면 -1)</summary>
+    public int FindDoor(char side)
+    {
+        string key = "Stair" + side;
+        for (int i = 0; i < doors.Length; i++)
+            if (doors[i] != null && !string.IsNullOrEmpty(doors[i].id) && doors[i].id.EndsWith(key)) return i;
+        return -1;
+    }
+
+    static char SideOf(Door d) => d != null && d.id != null && d.id.EndsWith("StairB") ? 'B' : 'A';
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { Instance = null; }
@@ -80,7 +102,7 @@ public sealed class StairDoorController : NetworkBehaviour
     // ------------------------------------------------------------------ 매 프레임: 애니메이션 + 내 입력
     void Update()
     {
-        int mask = Mask;
+        int mask = DisplayMask;
         if (mask != _shownMask)
         {
             int changed = mask ^ _shownMask;
@@ -133,7 +155,7 @@ public sealed class StairDoorController : NetworkBehaviour
         int target = -1;
         var me = LocalPlayer();
         var cam = Camera.main;
-        if (me != null && !me.IsDead && cam != null && Cursor.lockState == CursorLockMode.Locked)
+        if (me != null && !me.IsDead && cam != null && Cursor.lockState == CursorLockMode.Locked && !FloorTransition.InCutscene)
         {
             var hits = Physics.SphereCastAll(cam.ViewportPointToRay(new Vector3(0.5f, 0.5f)), 0.2f, interactDistance, ~0, QueryTriggerInteraction.Collide);
             Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
@@ -147,6 +169,19 @@ public sealed class StairDoorController : NetworkBehaviour
 
         if (_prompt == null) return;
         if (target < 0) { _prompt.text = ""; return; }
+
+        // 층별 씬: 클리어해야 열리는 출구 문
+        var floor = FloorTransition.Instance;
+        if (floor != null)
+        {
+            if (!floor.HasNextFloor) _prompt.text = "<color=#94A3B8>위층으로는 다시 올라갈 수 없어요</color>";
+            else if (floor.IsDescending) _prompt.text = "";
+            else if (floor.CanDescend) _prompt.text = "[F] 문 열고 " + FloorTransition.FloorName(floor.floor - 1).Split(' ')[0] + "으로 내려가기";
+            else _prompt.text = "<color=#FCA5A5>잠김</color> · 이 층의 임무를 먼저 완료하세요";
+            if (InteractPressed() && floor.CanDescend) Request(target, me);
+            return;
+        }
+
         bool open = IsOpen(target);
         if (Time.unscaledTime < _denyUntil) _prompt.text = "<color=#FCA5A5>문 사이에 누가 있어서 닫을 수 없어요</color>";
         else _prompt.text = open ? "[F] 문 닫기" : "[F] 문 열기";
@@ -178,7 +213,9 @@ public sealed class StairDoorController : NetworkBehaviour
         if (index < 0 || index >= doors.Length || doors[index] == null || doors[index].root == null) return;
         var d = doors[index];
         if (checkDistance && Vector3.Distance(from, ClosestPoint(d, from)) > interactDistance + 2f) return;
-        bool open = IsOpen(index);
+        var floor = FloorTransition.Instance;
+        if (floor != null) { floor.TryBeginDescent(SideOf(d)); return; }   // 층별 씬: 문 열기 = 아래층으로 내려가기
+        bool open = (Mask & (1 << index)) != 0;
         if (open && Blocked(index)) return;   // 문 사이에 사람이 있으면 닫지 않음
         int mask = Mask ^ (1 << index);
         if (IsSpawned) _mask.Value = mask; else _offlineMask = mask;

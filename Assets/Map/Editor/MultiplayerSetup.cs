@@ -51,6 +51,7 @@ namespace VoidLast.MapTools
             log.Add(F2MissionSetup.Build());   // 2층 임무 장치 (Stage2 씬을 다시 만들면 함께 다시 배치)
             log.Add(StairDoorSetup.Build());   // 계단 입구 문 (F로 열고 닫기)
             log.Add(MatchFlowSetup.Build());   // 관전 모드 + 게임 오버 화면
+            log.Add(FloorSceneBuilder.BuildAll());   // 원본 Stage2_Ship을 층별 씬(1f~5f)으로 나누기 (마지막에)
             AssetDatabase.SaveAssets();
             string s = string.Join("\n", log);
             Debug.Log("[MultiplayerSetup]\n" + s);
@@ -352,7 +353,7 @@ namespace VoidLast.MapTools
             var spawner = Object.FindFirstObjectByType<LobbyPlayerSpawner>(FindObjectsInactive.Include);
             if (lm == null || spawner == null) throw new InvalidOperationException("Lobby scene is missing LobbyManager/LobbyPlayerSpawner");
             ApplySpawnerMapping(spawner);
-            if (string.IsNullOrEmpty(lm.gameSceneName) || lm.gameSceneName == "MapScene") lm.gameSceneName = "Stage2_Ship";
+            if (string.IsNullOrEmpty(lm.gameSceneName) || lm.gameSceneName == "MapScene" || lm.gameSceneName == "Stage2_Ship") lm.gameSceneName = FloorSceneBuilder.FirstFloorScene;   // 층별 씬: 5층부터
             ApplyLobbyVoiceUi(lm, AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath));
             ApplyLoadingScreen(AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath));
             if (spawner.GetComponent<NetworkManagerDuplicateGuard>() == null) spawner.gameObject.AddComponent<NetworkManagerDuplicateGuard>();

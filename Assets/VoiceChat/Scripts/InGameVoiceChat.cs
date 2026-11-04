@@ -69,6 +69,14 @@ public sealed class InGameVoiceChat : MonoBehaviour
 
         string key = _voice.SessionKey;
         if (string.IsNullOrEmpty(key)) key = FindSessionId();
+        // 죽은 채로 다음 층에 내려왔으면 근거리 채널에 다시 들어가지 않고 사망자 채널로 바로
+        if (FloorCarryOver.Pending && FloorCarryOver.HasPlayerState && FloorCarryOver.Dead && !string.IsNullOrEmpty(_voice.SessionKey))
+        {
+            _dead = true;
+            await _voice.EnterDeadAsync();
+            _entered = true;
+            return;
+        }
         var props = new Channel3DProperties(audibleDistance, Mathf.Min(conversationalDistance, audibleDistance - 1), fadeIntensity, fadeModel);
         await _voice.EnterGameAsync(key, props);
         _entered = true;
@@ -88,9 +96,16 @@ public sealed class InGameVoiceChat : MonoBehaviour
     {
         if (_voice != null && VoiceChatService.Exists)
         {
-            _ = _voice.LeaveAsync(_voice.NearChannel);
-            _ = _voice.LeaveAsync(_voice.RadioChannel);
-            _ = _voice.LeaveAsync(_voice.DeadChannel);
+            // 무전 때문에 내 쪽에서 꺼 둔 목소리는 다시 켜 둔다 (다음 씬에서 기억하지 못하므로)
+            foreach (var id in _nearMuted) _voice.SetLocalMute(_voice.NearChannel, id, false);
+            _nearMuted.Clear();
+            // 아래층으로 이동하는 중이면 채널을 그대로 유지한다 (다음 층 씬에서 이어서 사용)
+            if (!FloorCarryOver.Transitioning)
+            {
+                _ = _voice.LeaveAsync(_voice.NearChannel);
+                _ = _voice.LeaveAsync(_voice.RadioChannel);
+                _ = _voice.LeaveAsync(_voice.DeadChannel);
+            }
         }
         if (_player != null) _player.SetRadioTalking(false);
     }

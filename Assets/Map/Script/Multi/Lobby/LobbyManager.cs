@@ -131,6 +131,13 @@ public class LobbyManager : MonoBehaviour
     {
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+        // 이전 게임의 층 이동 정보·연출 상태 초기화
+        FloorCarryOver.ResetAll();
+        LobbyPlayerSpawner.KeywordOverride = null;
+        VoidLast.Player.FpsInput.Blocked = false;
+        VoidLast.Player.FpsHealth.DamageBlocked = false;
+        ScreenFader.Clear();
+        LoadingScreen.Subtitle = null;
 
         nicknameInput.text = PlayerPrefs.GetString(PrefsNickname, "대원" + UnityEngine.Random.Range(1000, 9999));
         ShowPanel(mainPanel);
