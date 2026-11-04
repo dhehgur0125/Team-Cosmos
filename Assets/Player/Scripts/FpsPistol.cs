@@ -73,6 +73,12 @@ namespace VoidLast.Player
             Shot?.Invoke();
             Changed?.Invoke(); return true;
         }
+        /// <summary>층 이동 후: 이전 층의 탄약을 그대로 이어받는다</summary>
+        public void RestoreAmmo(int magazine, int reserve)
+        {
+            Magazine = Mathf.Clamp(magazine, 0, magazineCapacity); Reserve = Mathf.Max(0, reserve);
+            IsReloading = false; reloadElapsed = 0; Changed?.Invoke();
+        }
         public bool TryReload()
         {
             if (!Equipped || IsReloading || !view.IsEquipped || Magazine >= magazineCapacity || Reserve <= 0) return false;

@@ -21,6 +21,15 @@ namespace VoidLast.MapTools
         public static string Build()
         {
             var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            string s = BuildInOpenScene();
+            SaveWithNetworkHashes(scene);
+            Debug.Log("[StairDoorSetup] " + s);
+            return s;
+        }
+
+        /// <summary>지금 열려 있는 씬에 남아 있는 계단 문들로 Stair Doors를 (다시) 만든다. 저장은 하지 않음</summary>
+        public static string BuildInOpenScene()
+        {
             var multi = GameObject.Find(MultiplayerSetup.MultiRootName);
             if (multi == null) throw new InvalidOperationException("먼저 Multiplayer 설정(5 Patch Stage2 Scene)을 실행하세요");
             var old = multi.transform.Find("Stair Doors");
@@ -77,7 +86,12 @@ namespace VoidLast.MapTools
                 log.Add(root.name + "(" + leaves.Length + ")");
             }
             ctrl.doors = doors.ToArray();
+            return "Stair doors: " + doors.Count + " → " + string.Join(", ", log);
+        }
 
+        /// <summary>저장 → 씬에 놓인 NetworkObject 해시 다시 계산 → 다시 저장</summary>
+        public static void SaveWithNetworkHashes(UnityEngine.SceneManagement.Scene scene)
+        {
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             // 씬에 놓인 NetworkObject 해시는 저장 후 확정 → 다시 계산하고 저장
@@ -91,9 +105,6 @@ namespace VoidLast.MapTools
             }
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            string s = "Stair doors: " + doors.Count + " → " + string.Join(", ", log);
-            Debug.Log("[StairDoorSetup] " + s);
-            return s;
         }
     }
 }

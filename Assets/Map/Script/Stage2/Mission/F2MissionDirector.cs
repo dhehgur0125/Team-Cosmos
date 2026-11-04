@@ -192,7 +192,8 @@ public sealed class F2MissionDirector : NetworkBehaviour
             foreach (var p in _players) if (Alive(p) && InRally(p.transform.position + Vector3.up * 0.5f)) inside++;
             s.rallyIn = (byte)Mathf.Min(255, inside);
             s.rallyNeed = (byte)Mathf.Min(255, alive);
-            if (alive > 0 && inside >= alive) s.phase = (byte)Phase.Cleared;
+            // 하나로 된 예전 씬에서만: 계단 안에 모두 들어가면 클리어. 층별 씬에서는 계단 문을 열면 FloorTransition이 아래층으로 이동시킨다
+            if (FloorTransition.Instance == null && alive > 0 && inside >= alive) s.phase = (byte)Phase.Cleared;
         }
         SetState(s);
     }
@@ -313,7 +314,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
         var me = LocalPlayer();
         var cam = Camera.main;
         _cooldown -= Time.deltaTime;
-        if (me != null && !me.IsDead && cam != null && Cursor.lockState == CursorLockMode.Locked)
+        if (me != null && !me.IsDead && cam != null && Cursor.lockState == CursorLockMode.Locked && !FloorTransition.InCutscene)
         {
             var hits = Physics.SphereCastAll(cam.ViewportPointToRay(new Vector3(0.5f, 0.5f)), 0.12f, 3.2f, ~0, QueryTriggerInteraction.Collide);
             Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
@@ -392,7 +393,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
         if (!_shown.trace && s.trace && !_logShownOnce) { ShowLog(); }
         if (_shown.phase != s.phase)
         {
-            if (s.phase == (byte)Phase.Rally) Toast("탈출 준비 완료 · <b>1층으로 내려가는 계단</b>으로 들어가세요 (문 앞에서 F)");
+            if (s.phase == (byte)Phase.Rally) Toast(FloorTransition.Instance != null ? "탈출 준비 완료 · <b>계단 문(A·B)을 열고 1층으로 내려가세요</b> (문 앞에서 F)" : "탈출 준비 완료 · <b>1층으로 내려가는 계단</b>으로 들어가세요 (문 앞에서 F)");
             if (s.phase == (byte)Phase.Cleared) { Banner("2층 클리어", "1층 보조 우주선 격납고로 내려가세요", Green); FloorCleared?.Invoke(); }
             if (s.phase == (byte)Phase.Failed) Banner("임무 실패", "살아남은 대원이 없습니다", Red);
         }
@@ -477,7 +478,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
         string line2 = Done(s.fuel == 2) + fuelText;
         string line3 = (s.trace ? "<color=#6EE7B7>■</color> <color=#8A96A3>" : "<color=#7FA7B8>□</color> <color=#9FB3C2>") + "(선택) 검역 보관실의 침입 흔적 조사</color>";
         string text = line1 + "\n" + line2 + "\n" + line3;
-        if (s.phase == (byte)Phase.Rally) text += "\n<color=#FCD34D>▶</color> <b>1층으로 내려가는 계단으로 이동</b> (A·B 어느 쪽이든)  " + s.rallyIn + " / " + s.rallyNeed + "명";
+        if (s.phase == (byte)Phase.Rally) text += FloorTransition.Instance != null ? "\n<color=#FCD34D>▶</color> <b>계단 문(A·B)을 열고 1층으로 내려가기</b>" : "\n<color=#FCD34D>▶</color> <b>1층으로 내려가는 계단으로 이동</b> (A·B 어느 쪽이든)  " + s.rallyIn + " / " + s.rallyNeed + "명";
         else if (s.phase == (byte)Phase.Cleared) text += "\n<color=#6EE7B7>■ 2층 클리어</color>";
         else if (s.phase == (byte)Phase.Failed) text += "\n<color=#FCA5A5>■ 임무 실패</color>";
         _objectives.text = text;

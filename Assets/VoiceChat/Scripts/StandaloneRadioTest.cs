@@ -56,14 +56,21 @@ public class StandaloneRadioTest : MonoBehaviour
             if (!AuthenticationService.Instance.IsSignedIn)
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
 
-            await VivoxService.Instance.InitializeAsync();
-            LoginOptions options = new LoginOptions { DisplayName = "Tester_" + Random.Range(100, 999) };
-            await VivoxService.Instance.LoginAsync(options);
-            Debug.Log($"[Vivox] {options.DisplayName} 서버 로그인 성공!");
+            // 오프라인으로 층(씬)을 옮기면 이미 로그인·입장된 상태일 수 있다 → 중복 입장 오류 방지
+            if (VivoxService.Instance.InitializationState == VivoxInitializationState.Uninitialized)
+                await VivoxService.Instance.InitializeAsync();
+            if (!VivoxService.Instance.IsLoggedIn)
+            {
+                LoginOptions options = new LoginOptions { DisplayName = "Tester_" + Random.Range(100, 999) };
+                await VivoxService.Instance.LoginAsync(options);
+                Debug.Log($"[Vivox] {options.DisplayName} 서버 로그인 성공!");
+            }
 
-            await VivoxService.Instance.JoinGroupChannelAsync(radioChannel, ChatCapability.AudioOnly);
+            if (!VivoxService.Instance.ActiveChannels.ContainsKey(radioChannel))
+                await VivoxService.Instance.JoinGroupChannelAsync(radioChannel, ChatCapability.AudioOnly);
             Channel3DProperties props = new Channel3DProperties(30, 1, 1.0f, AudioFadeModel.InverseByDistance);
-            await VivoxService.Instance.JoinPositionalChannelAsync(proximityChannel, ChatCapability.AudioOnly, props);
+            if (!VivoxService.Instance.ActiveChannels.ContainsKey(proximityChannel))
+                await VivoxService.Instance.JoinPositionalChannelAsync(proximityChannel, ChatCapability.AudioOnly, props);
 
             isChannelJoined = true;
             SwitchTransmissionMode(proximityChannel);

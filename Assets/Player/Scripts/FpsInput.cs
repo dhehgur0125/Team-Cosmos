@@ -28,9 +28,15 @@ namespace VoidLast.Player
         public bool ReleaseCursor { get; private set; }
         public bool CaptureCursor { get; private set; }
 
+        /// <summary>연출(층 이동 등) 중에는 모든 조작 입력을 막는다</summary>
+        public static bool Blocked;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics() { Blocked = false; }
+
         void Update()
         {
             Clear();
+            if (Blocked) return;
 #if ENABLE_INPUT_SYSTEM
             var keyboard = Keyboard.current;
             var mouse = Mouse.current;

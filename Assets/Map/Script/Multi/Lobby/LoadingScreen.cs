@@ -30,11 +30,14 @@ public sealed class LoadingScreen : MonoBehaviour
 
     public static LoadingScreen Instance { get; private set; }
     public static bool IsShowing => Instance != null && Instance._showing;
+    /// <summary>다음에 보여줄 부제 (예: "STAGE 2 · 1층 격납고"). 비우면 기본 문구</summary>
+    public static string Subtitle;
 
     enum Stage { Hidden, Starting, Loading, Waiting, Spawning, Done }
 
     Stage _stage;
-    bool _showing, _closing;
+    bool _showing, _closing, _offline;
+    string _targetScene;
     float _shown, _creep, _stageStart, _doneAt, _tipAt;
     int _tip;
     AsyncOperation _op;
@@ -58,12 +61,34 @@ public sealed class LoadingScreen : MonoBehaviour
     /// <summary>시작이 실패했을 때 닫는다</summary>
     public static void Cancel() { if (Instance != null) Instance.Abort(); }
 
+    /// <summary>로딩 화면이 없으면 만든다 (층 이동 때 사용. 로비 씬에는 미리 놓여 있음)</summary>
+    public static LoadingScreen Ensure(TMP_FontAsset font)
+    {
+        if (Instance == null)
+        {
+            var go = new GameObject("LoadingScreen");
+            DontDestroyOnLoad(go);
+            var ls = go.AddComponent<LoadingScreen>();
+            ls.font = font;
+        }
+        else if (Instance.font == null) Instance.font = font;
+        return Instance;
+    }
+
+    /// <summary>오프라인(네트워크 없이)으로 씬을 불러올 때: 직접 진행률을 넘겨준다</summary>
+    public static void BeginOffline(AsyncOperation op, string sceneName)
+    {
+        if (Instance == null) return;
+        Instance._offline = true;
+        Instance._targetScene = sceneName;
+        Instance.Begin(Stage.Loading);
+        Instance._op = op;
+    }
+
     void Awake()
     {
         if (Instance != null && Instance != this && Instance._showing) { Destroy(gameObject); return; }
         Instance = this;
-        Build();
-        _canvasGo.SetActive(false);
     }
 
     void OnDestroy()
@@ -87,11 +112,13 @@ public sealed class LoadingScreen : MonoBehaviour
     void OnSceneEvent(SceneEvent e)
     {
         var nm = NetworkManager.Singleton;
-        if (nm == null || e.SceneName != gameSceneName) return;
+        if (nm == null || string.IsNullOrEmpty(e.SceneName) || !e.SceneName.StartsWith(gameSceneName)) return;   // Stage2_Ship_5f 등 모든 층
         switch (e.SceneEventType)
         {
             case SceneEventType.Load:
                 if (e.ClientId != nm.LocalClientId) return;
+                _offline = false;
+                _targetScene = e.SceneName;
                 Begin(Stage.Loading);
                 _op = e.AsyncOperation;
                 if (_stage < Stage.Loading) SetStage(Stage.Loading);
@@ -116,6 +143,7 @@ public sealed class LoadingScreen : MonoBehaviour
             _shown = 0f; _creep = 0f; _op = null; _stage = Stage.Hidden;
             if (transform.parent != null) transform.SetParent(null, true);
             DontDestroyOnLoad(gameObject);   // 로비 씬이 내려가도 화면 유지
+            if (_canvasGo == null) Build();
             _canvasGo.SetActive(true);
             _group.alpha = 0f;
             _group.blocksRaycasts = true;
@@ -131,8 +159,7 @@ public sealed class LoadingScreen : MonoBehaviour
         if (!_showing) return;
         _showing = false;
         _stage = Stage.Hidden;
-        _canvasGo.SetActive(false);
-        _group.blocksRaycasts = false;
+        if (_canvasGo != null) { _canvasGo.SetActive(false); _group.blocksRaycasts = false; }
         // 아직 로비라면 로비 씬으로 되돌려 둔다 (다음 시작 때 다시 사용)
         if (SceneManager.GetActiveScene().IsValid()) SceneManager.MoveGameObjectToScene(gameObject, SceneManager.GetActiveScene());
     }
@@ -200,9 +227,9 @@ public sealed class LoadingScreen : MonoBehaviour
                 if (stageAge > 20f) { Abort(); return; }   // 시작 요청이 끝내 진행되지 않음
                 break;
             case Stage.Loading:
-                if (nm == null || !nm.IsListening) { SetStage(Stage.Done); break; }
-                if (_op != null) _creep = Mathf.Max(_creep, Mathf.Lerp(0.06f, 0.70f, Mathf.Clamp01(_op.progress / 0.9f)));
-                if (_op != null && _op.isDone && SceneManager.GetActiveScene().name == gameSceneName && stageAge > 0.2f) SetStage(Stage.Waiting);
+                if (!_offline && (nm == null || !nm.IsListening)) { SetStage(Stage.Done); break; }
+                if (_op != null) _creep = Mathf.Max(_creep, Mathf.Lerp(0.06f, _offline ? 0.92f : 0.70f, Mathf.Clamp01(_op.progress / 0.9f)));
+                if (_op != null && _op.isDone && SceneManager.GetActiveScene().name == _targetScene && stageAge > 0.2f) SetStage(_offline ? Stage.Done : Stage.Waiting);
                 break;
             case Stage.Waiting:
             case Stage.Spawning:
@@ -279,7 +306,7 @@ public sealed class LoadingScreen : MonoBehaviour
         var title = Txt(root, "Title", "VOID LAST", 64, Color.white, TextAlignmentOptions.Left, FontStyles.Bold);
         title.characterSpacing = 12;
         Place(title.rectTransform, new Vector2(0, 1), new Vector2(510, -50), new Vector2(800, 80));
-        var sub = Txt(root, "Subtitle", "STAGE 2 · 탈출 우주선", 24, LobbyStyle.Accent, TextAlignmentOptions.Left, FontStyles.Normal);
+        var sub = Txt(root, "Subtitle", string.IsNullOrEmpty(Subtitle) ? "STAGE 2 · 탈출 우주선" : Subtitle, 24, LobbyStyle.Accent, TextAlignmentOptions.Left, FontStyles.Normal);
         Place(sub.rectTransform, new Vector2(0, 1), new Vector2(510, -102), new Vector2(800, 34));
         var line = Img(root, "HeaderLine", new Color(1, 1, 1, 0.08f), null);
         Place(line.rectTransform, new Vector2(0.5f, 1), new Vector2(0, -140), new Vector2(1760, 2));

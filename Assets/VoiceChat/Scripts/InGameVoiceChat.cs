@@ -14,7 +14,12 @@ using UnityEngine.InputSystem;
 /// Stage2 멀티플레이 음성 채팅.
 ///  - 근거리 음성: Vivox 3D 채널. 내 카메라 위치를 계속 알려서 가까운 대원끼리만 들린다 (멀어질수록 작아짐).
 ///  - 무전기: 무전기 아이템을 가지고 있으면 무전 채널에 들어가 다른 대원의 무전을 듣는다.
-///            무전기를 손에 들고 V(또는 좌클릭)를 누르고 있는 동안 거리와 상관없이 무전 채널 전체에 말한다.
+///            무전기를 가지고 있으면 손에 무엇을 들었든(총·주사기·맨손) V를 누르고 있는 동안 무전 채널에 말한다.
+///            (무전기를 손에 들고 있을 때는 좌클릭으로도 송신)
+///            무전으로 말하는 동안 무전기를 가진 대원에게는 무전으로, 바로 옆(radioVoiceNearDistance) 대원에게는 육성으로 들린다.
+///            그보다 멀리 있는 대원에게는 그 사람의 육성을 내 쪽에서 꺼서, 무전기가 없으면 무전 내용이 들리지 않는다.
+///            새어 나감 방지: V를 누르면 먼저 '무전 중' 신호를 보내고 무전 채널로만 말하다가, 신호가 다른 대원에게 도착할 만큼
+///            (네트워크 왕복 시간 기준) 기다린 뒤에 육성(근거리 채널)을 함께 켠다. 그래서 멀리 있는 대원이 음소거하기 전에 목소리가 새지 않는다.
 ///  - M: 내 마이크 끄기/켜기
 ///  - 내 대원이 죽으면 근거리·무전 채널에서 나가고, 죽은 대원끼리만 들리는 사망자 채널로 옮긴다.
 /// 화면 오른쪽 위에 음성 상태 HUD를 그린다.
@@ -28,6 +33,8 @@ public sealed class InGameVoiceChat : MonoBehaviour
     [Tooltip("이 거리(m) 안에서는 원래 크기로 들림")]
     [Min(1)] public int conversationalDistance = 3;
     [Range(0.1f, 3f)] public float fadeIntensity = 1f;
+    [Tooltip("무전으로 말하는 대원의 육성이 들리는 거리(m). 이보다 멀면 무전기가 있어야 들림")]
+    [Min(0.5f)] public float radioVoiceNearDistance = 4f;
     public AudioFadeModel fadeModel = AudioFadeModel.InverseByDistance;
 
     [Header("UI")]
@@ -42,6 +49,9 @@ public sealed class InGameVoiceChat : MonoBehaviour
     float _radioToggleAt, _nextPosition, _nextHud, _meter;
     readonly List<string> _speakers = new List<string>();
     readonly HashSet<string> _radioSpeakersBefore = new HashSet<string>();
+    readonly HashSet<string> _nearMuted = new HashSet<string>();   // 무전 중이라 내 쪽에서 육성을 끈 대원
+    bool _nearPending;      // 무전 시작 직후: 육성(근거리)은 아직 끈 상태
+    float _nearOnAt;
     AudioSource _sfx;
     AudioClip _clickOn, _clickOff, _squelch;
 
@@ -59,6 +69,14 @@ public sealed class InGameVoiceChat : MonoBehaviour
 
         string key = _voice.SessionKey;
         if (string.IsNullOrEmpty(key)) key = FindSessionId();
+        // 죽은 채로 다음 층에 내려왔으면 근거리 채널에 다시 들어가지 않고 사망자 채널로 바로
+        if (FloorCarryOver.Pending && FloorCarryOver.HasPlayerState && FloorCarryOver.Dead && !string.IsNullOrEmpty(_voice.SessionKey))
+        {
+            _dead = true;
+            await _voice.EnterDeadAsync();
+            _entered = true;
+            return;
+        }
         var props = new Channel3DProperties(audibleDistance, Mathf.Min(conversationalDistance, audibleDistance - 1), fadeIntensity, fadeModel);
         await _voice.EnterGameAsync(key, props);
         _entered = true;
@@ -78,9 +96,16 @@ public sealed class InGameVoiceChat : MonoBehaviour
     {
         if (_voice != null && VoiceChatService.Exists)
         {
-            _ = _voice.LeaveAsync(_voice.NearChannel);
-            _ = _voice.LeaveAsync(_voice.RadioChannel);
-            _ = _voice.LeaveAsync(_voice.DeadChannel);
+            // 무전 때문에 내 쪽에서 꺼 둔 목소리는 다시 켜 둔다 (다음 씬에서 기억하지 못하므로)
+            foreach (var id in _nearMuted) _voice.SetLocalMute(_voice.NearChannel, id, false);
+            _nearMuted.Clear();
+            // 아래층으로 이동하는 중이면 채널을 그대로 유지한다 (다음 층 씬에서 이어서 사용)
+            if (!FloorCarryOver.Transitioning)
+            {
+                _ = _voice.LeaveAsync(_voice.NearChannel);
+                _ = _voice.LeaveAsync(_voice.RadioChannel);
+                _ = _voice.LeaveAsync(_voice.DeadChannel);
+            }
         }
         if (_player != null) _player.SetRadioTalking(false);
     }
@@ -109,6 +134,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
             if (_transmitting) SetTransmitting(false);
             _radioJoined = false; _wantRadio = false;
             _radioSpeakersBefore.Clear();
+            _nearMuted.Clear();
             _ = _voice.EnterDeadAsync();
         }
 
@@ -121,9 +147,15 @@ public sealed class InGameVoiceChat : MonoBehaviour
 
             UpdateRadioChannel(hasRadio);
 
-            bool pttHeld = CursorLocked() && (KeyHeld(KeyV) || (_player.PlayerInput != null && _player.PlayerInput.AttackHeld));
-            bool wantTx = radioInHand && _radioJoined && pttHeld;
+            bool pttHeld = CursorLocked() && (KeyHeld(KeyV) || (radioInHand && _player.PlayerInput != null && _player.PlayerInput.AttackHeld));
+            bool wantTx = alive && hasRadio && _radioJoined && pttHeld;
             if (wantTx != _transmitting) SetTransmitting(wantTx);
+            // 무전 신호가 다른 대원에게 도착했을 시간이 지나면 육성도 함께 내보낸다
+            if (_transmitting && _nearPending && Time.unscaledTime >= _nearOnAt)
+            {
+                _nearPending = false;
+                _voice.SetTransmission(TransmissionMode.All);
+            }
 
             // 3D 위치: 내 머리(카메라)를 말하는 위치이자 듣는 위치로
             if (Time.unscaledTime >= _nextPosition)
@@ -134,6 +166,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
             }
 
             RadioSquelch(hasRadio);
+            UpdateRadioVoiceMutes();
         }
 
         UpdateHud();
@@ -156,12 +189,69 @@ public sealed class InGameVoiceChat : MonoBehaviour
     void SetTransmitting(bool on)
     {
         _transmitting = on;
-        // 무전 중에는 근거리 + 무전 채널 모두로 말한다 (옆에 있는 대원에게도 직접 들림)
-        if (on) _voice.SetTransmission(TransmissionMode.All);
-        else _voice.SetTransmission(TransmissionMode.Single, _voice.NearChannel);
+        // 무전 중에는 근거리 + 무전 채널 모두로 말한다.
+        // 근거리 채널 육성은 듣는 쪽에서 바로 옆(radioVoiceNearDistance) 대원만 들리도록 거른다 (UpdateRadioVoiceMutes).
+        // 시작 직후에는 듣는 쪽이 아직 '무전 중'을 모를 수 있으므로 잠깐 무전 채널로만 말한다.
+        if (on)
+        {
+            _voice.SetTransmission(TransmissionMode.Single, _voice.RadioChannel);
+            _nearPending = true;
+            _nearOnAt = Time.unscaledTime + NearVoiceDelay();
+        }
+        else
+        {
+            _nearPending = false;
+            _voice.SetTransmission(TransmissionMode.Single, _voice.NearChannel);
+        }
         if (_player != null) _player.SetRadioTalking(on);
         if (_radioView != null) _radioView.Talking = on;
         PlayClip(on ? _clickOn : _clickOff);
+    }
+
+    /// <summary>
+    /// 듣는 쪽 처리: 무전으로 말하고 있는 대원이 바로 옆(radioVoiceNearDistance)보다 멀리 있으면
+    /// 근거리 채널의 그 사람 목소리를 내 쪽에서 끈다 → 무전기가 없으면 무전 내용이 들리지 않는다 (무전기가 있으면 무전 채널로 들림).
+    /// </summary>
+    void UpdateRadioVoiceMutes()
+    {
+        var cam = _player.ViewCamera;
+        Vector3 me = cam != null ? cam.transform.position : _player.transform.position + Vector3.up * 1.6f;
+        foreach (var p in FpsNetworkPlayer.All)
+        {
+            if (p == null || p == _player) continue;
+            string id = p.AuthPlayerId;
+            if (string.IsNullOrEmpty(id)) continue;
+            Vector3 head = p.cameraPivot != null ? p.cameraPivot.position : p.transform.position + Vector3.up * 1.6f;
+            bool mute = p.IsRadioTalking && Vector3.Distance(me, head) > radioVoiceNearDistance;
+            if (mute == _nearMuted.Contains(id)) continue;
+            if (!_voice.SetLocalMute(_voice.NearChannel, id, mute) && mute) continue;   // 아직 채널에 없으면 다음에 다시 시도
+            if (mute) _nearMuted.Add(id); else _nearMuted.Remove(id);
+        }
+    }
+
+    /// <summary>
+    /// '무전 중' 신호가 다른 대원에게 도착하기까지 걸리는 시간(초).
+    /// 내 신호는 방장을 거쳐 다른 대원에게 가므로 왕복 시간(RTT) 정도 + 여유. (0.2~0.6초)
+    /// </summary>
+    static float NearVoiceDelay()
+    {
+        float rttMs = 0f;
+        try
+        {
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            var transport = nm != null ? nm.NetworkConfig.NetworkTransport : null;
+            if (transport != null)
+            {
+                if (nm.IsServer)
+                {
+                    foreach (var id in nm.ConnectedClientsIds)
+                        if (id != Unity.Netcode.NetworkManager.ServerClientId) rttMs = Mathf.Max(rttMs, transport.GetCurrentRtt(id));
+                }
+                else rttMs = transport.GetCurrentRtt(Unity.Netcode.NetworkManager.ServerClientId) * 2f;   // 나→방장→다른 대원
+            }
+        }
+        catch (System.Exception) { }
+        return Mathf.Clamp(0.12f + rttMs / 1000f, 0.2f, 0.6f);
     }
 
     /// <summary>다른 대원이 무전을 시작하면 짧은 잡음 소리</summary>
@@ -349,7 +439,6 @@ public sealed class InGameVoiceChat : MonoBehaviour
         _mic.text = _voice.MicMuted ? "<color=#F87171>MIC OFF</color>" : "MIC ON";
         var inv = _player != null ? _player.Inventory : null;
         bool hasRadio = inv != null && inv.HasItem(FarmingItemKind.Radio);
-        bool inHand = inv != null && inv.ItemAt(inv.SelectedIndex) == FarmingItemKind.Radio;
 
         if (_dead)
         {
@@ -367,11 +456,9 @@ public sealed class InGameVoiceChat : MonoBehaviour
         else if (!_voice.IsInChannel(_voice.NearChannel))
             SetHud("음성 연결 중...", "Vivox 채널에 들어가는 중", new Color(0.99f, 0.88f, 0.28f));
         else if (_transmitting)
-            SetHud("무전 송신 중", "무전기를 가진 모든 대원에게 들려요", new Color(0.99f, 0.65f, 0.65f));
-        else if (inHand)
-            SetHud("근거리 대화", _radioJoined ? "무전기를 들고 있어요 · V(또는 좌클릭)를 누르는 동안 무전" : "무전 채널에 연결하는 중...", new Color(0.43f, 0.91f, 0.72f));
+            SetHud("무전 송신 중", "무전기를 가진 대원 + 바로 옆(" + radioVoiceNearDistance.ToString("0.#") + "m) 대원에게 들려요", new Color(0.99f, 0.65f, 0.65f));
         else if (hasRadio)
-            SetHud("근거리 대화", "무전기 보유 · 무전이 들려요 (손에 들면 송신 가능)", new Color(0.43f, 0.91f, 0.72f));
+            SetHud("근거리 대화", _radioJoined ? "무전기 보유 · V를 누르는 동안 무전 (무전기를 가진 대원 + 바로 옆 대원에게 들림)" : "무전 채널에 연결하는 중...", new Color(0.43f, 0.91f, 0.72f));
         else
             SetHud("근거리 대화", "가까이 있는 대원에게만 들려요 · 무전기를 주우면 멀리서도 대화", new Color(0.43f, 0.91f, 0.72f));
 
@@ -385,7 +472,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
             foreach (var id in _speakers) parts.Add(NameOf(id) + " <color=#FCA5A5>(무전)</color>");
         }
         _speakingText.text = parts.Count > 0 ? "말하는 중: " + string.Join(", ", parts) : "";
-        _hint.text = inHand ? "[V] 무전   [M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기") : "[M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
+        _hint.text = hasRadio ? "[V] 무전   [M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기") : "[M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
     }
 
     static string NameOf(string playerId)

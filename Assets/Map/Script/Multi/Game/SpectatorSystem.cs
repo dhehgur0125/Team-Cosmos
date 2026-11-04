@@ -51,12 +51,24 @@ public sealed class SpectatorSystem : MonoBehaviour
     void Update()
     {
         if (!Stage2NetworkBootstrap.IsOnline) return;
+        // 층 이동 연출 중에는 관전 화면을 잠시 숨긴다
+        if (FloorTransition.InCutscene)
+        {
+            if (_cam != null && _cam.gameObject.activeSelf) _cam.gameObject.SetActive(false);
+            if (_panel != null && _panel.activeSelf) _panel.SetActive(false);
+            return;
+        }
+        if (_spectating)
+        {
+            if (_cam != null && !_cam.gameObject.activeSelf) _cam.gameObject.SetActive(true);
+            if (_panel != null && !_panel.activeSelf) _panel.SetActive(true);
+        }
         if (_me == null) { _me = FpsNetworkPlayer.Local; _diedAt = -1f; if (_me == null) return; }
         var myHealth = _me.Health;
         if (myHealth == null || !myHealth.IsDead) { if (_spectating) Stop(); _diedAt = -1f; return; }
 
         if (_diedAt < 0f) _diedAt = Time.time;
-        if (Time.time - _diedAt < deathDelay) return;
+        if (Time.time - _diedAt < (FloorCarryOver.ArrivedDead ? 0f : deathDelay)) return;   // 죽은 채로 다음 층에 왔으면 바로 관전
 
         CollectAlive();
         if (_alive.Count == 0)

@@ -69,6 +69,14 @@ namespace VoidLast.Player
             elapsed = usingIndex >= 0 ? Mathf.Clamp01(progress) * useDuration : 0;
             if (changed) Changed?.Invoke();
         }
+        /// <summary>층 이동 후: 이전 층의 핫바 내용을 그대로 이어받는다</summary>
+        public void RestoreItems(FarmingItemKind[] list)
+        {
+            if (IsNetworkProxy || list == null) return;
+            CancelUse();
+            for (int i = 0; i < Capacity; i++) items[i] = i < list.Length ? list[i] : FarmingItemKind.None;
+            Changed?.Invoke();
+        }
         public bool TryAdd(FarmingItemKind item)
         {
             if (IsNetworkProxy) return false;
