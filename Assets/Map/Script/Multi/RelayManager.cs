@@ -331,20 +331,9 @@ public class RelayManager : MonoBehaviour
     // ==========================================
     private void LockGameCursor()
     {
-        ShoulderCamera shoulderCamera =
-            Camera.main != null
-                ? Camera.main.GetComponent<ShoulderCamera>()
-                : null;
-
-        if (shoulderCamera != null)
-        {
-            shoulderCamera.EnableGameCursorLock();
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
+        // 예전 3인칭 카메라(ShoulderCamera)는 삭제됨 → 커서만 잠근다
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 
     private void HideUIAfterConnection()
