@@ -1,0 +1,46 @@
+Medical kit - Character_test Play Mode
+2026-11-04T15:40:49.1012820Z
+PASS: Slot 3 cannot heal before equip finishes
+PASS: Slot 3 equips from below and starts self treatment with three uses
+PASS: No early healing or consumption during 1.5-second treatment
+PASS: Self treatment heals exactly 50 after 1.5 seconds and consumes once
+PASS: Second self treatment can start
+PASS: Changing equipment cancels without healing or consuming
+PASS: Camera-center teammate detection starts treatment within 2m
+PASS: Leaving range cancels without consumption
+PASS: Wall blocks treatment start
+PASS: Visible teammate can be treated again
+PASS: A wall appearing during treatment cancels it
+PASS: Teammate treatment restarts
+PASS: Teammate gains 50 and shares the same remaining uses
+PASS: Full-health teammate is rejected
+PASS: Final self treatment starts
+PASS: Final use clamps HP to maximum and shows zero uses
+PASS: Empty medical kit cannot heal an injured player
+PASS: Farming syringe still equips separately and uses its existing three-second action
+PASS: Existing syringe heals 30 and consumes only that item
+PASS: Pistol firing, damage and reload still operate after medical kit use
+PASS: Flashlight and reload completion remain functional
+PASS: Disabling medical component leaves slot 3 empty safely
+PASS: Removing the medical component leaves pistol and base slots operational
+PASS: Existing network prefab starts as a local UDP host
+PASS: Second NGO instance starts as a local UDP client
+PASS: Actual host/client transport connection established
+PASS: Network owner 0 starts self treatment
+PASS: Network owner 1 starts self treatment
+PASS: Both peers agree on owner 0 self HP and uses
+PASS: Both peers agree on owner 1 self HP and uses
+PASS: Both peers agree on owner 0 self HP and uses
+PASS: Both peers agree on owner 1 self HP and uses
+PASS: Owner 0 starts teammate treatment through server
+PASS: Duplicate in-flight request is rejected
+PASS: Owner 0 teammate HP and one-use deduction replicate to host
+PASS: Owner 0 teammate HP and one-use deduction replicate to client
+PASS: Owner 1 starts teammate treatment through server
+PASS: Duplicate in-flight request is rejected
+PASS: Owner 1 teammate HP and one-use deduction replicate to host
+PASS: Owner 1 teammate HP and one-use deduction replicate to client
+PASS: Client starts cancellable network treatment
+PASS: Server cancellation preserves client HP and use count
+PASS: No new Console error or exception during these tests
+COMPLETE. Local UDP host/client tested in Editor; Relay, Lobby voice and separate machines were not tested or changed.

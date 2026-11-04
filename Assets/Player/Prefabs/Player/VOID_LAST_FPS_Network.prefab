@@ -106,6 +106,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4874269986630254310, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4648143869768396150}
+    - targetCorrespondingSourceObject: {fileID: 4874269986630254310, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1530549595181415037}
   m_SourcePrefab: {fileID: 100100000, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
 --- !u!4 &189474309189043150 stripped
 Transform:
@@ -345,3 +348,16 @@ MonoBehaviour:
   - {fileID: 6168004139636763996}
   cameraPivot: {fileID: 189474309189043150}
   viewCamera: {fileID: 3609345654346492137}
+--- !u!114 &1530549595181415037
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8720472763344413594}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b376c9dea5fb7d34a8ee0b36c6e697e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsMedicalKitNetwork
+  ShowTopMostFoldoutHeaderGroup: 1
