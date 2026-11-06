@@ -10,7 +10,7 @@ namespace VoidLast.Monster
     [RequireComponent(typeof(MonsterMelee))]
     public sealed class SmallMonsterAI : MonoBehaviour
     {
-        public enum Mode { Search, Scream, Chase, Attack, Investigate, Hunt, Dead }
+        public enum Mode { Search, Scream, Chase, Attack, Investigate, Hunt, Dead, Stunned }
 
         static readonly List<SmallMonsterAI> All = new List<SmallMonsterAI>();
 
@@ -47,6 +47,7 @@ namespace VoidLast.Monster
         MonsterHealth health;
         MonsterVision vision;
         MonsterMelee melee;
+        MonsterStun stun;
         MaterialPropertyBlock colors;
         bool targetVisible, knowsLocation, hasGoal, aggro;
         float nextSense, nextPath, waitUntil, huntEnds, screamEnds, lookUntil, lookStart, lookDuration, deathBlend;
@@ -107,6 +108,11 @@ namespace VoidLast.Monster
         void Update()
         {
             if (NetworkProxy || health.IsDead || !NavigationReady) return;
+            if (State == Mode.Stunned)
+            {
+                if (stun != null && stun.IsStunned) return;
+                targetVisible = false; nextSense = 0; Change(knowsLocation ? Mode.Investigate : Mode.Search);
+            }
             Sense();
 
             bool lookingAround = Time.time < lookUntil;
@@ -215,6 +221,7 @@ namespace VoidLast.Monster
         /// </summary>
         public void HearNoise(Vector3 position)
         {
+            if (State == Mode.Stunned) return;
             if (NetworkProxy || health.IsDead || State == Mode.Scream || State == Mode.Attack || State == Mode.Chase) return;
             if (targetVisible && Target != null && !Target.IsDead) return;
             LastKnownPosition = position;
@@ -225,6 +232,7 @@ namespace VoidLast.Monster
 
         void HearScream(FpsHealth player, Vector3 position)
         {
+            if (State == Mode.Stunned) return;
             if (health.IsDead || State == Mode.Scream || State == Mode.Attack) return;
             if (targetVisible && Target != null && !Target.IsDead) { aggro = true; return; } // 이미 보고 있으면 계속 추격
 
@@ -360,6 +368,7 @@ namespace VoidLast.Monster
 
         void OnHit(GameObject attacker, Vector3 position)
         {
+            if (State == Mode.Stunned) return;
             if (State == Mode.Scream || State == Mode.Attack) return;
 
             var shooter = attacker != null ? attacker.GetComponent<FpsHealth>() : null;
@@ -375,6 +384,12 @@ namespace VoidLast.Monster
             }
         }
 
+        public void BeginStun(MonsterStun effect)
+        {
+            if (health.IsDead || NetworkProxy) return;
+            stun = effect; melee.Cancel(); lookUntil = 0; Change(Mode.Stunned); Stop();
+            if (NavigationReady) { agent.velocity = Vector3.zero; agent.updateRotation = false; }
+        }
         void Die()
         {
             Change(Mode.Dead);
@@ -396,6 +411,7 @@ namespace VoidLast.Monster
                     : State == Mode.Chase ? new Color(0.8f, 0.08f, 0.06f)
                     : State == Mode.Investigate || State == Mode.Hunt ? new Color(0.85f, 0.65f, 0.04f)
                     : new Color(0.3f, 0.7f, 0.4f);
+                if (State == Mode.Stunned) color = new Color(0.45f, 0.8f, 1);
                 colors.SetColor("_BaseColor", color);
                 bodyRenderer.SetPropertyBlock(colors);
             }

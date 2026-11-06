@@ -54,6 +54,7 @@ namespace VoidLast.Monster
         void OnDisable() { health.Died -= Cancel; Cancel(); }
         public bool TryStart(FpsHealth target)
         {
+            if (GetComponent<MonsterStun>() is MonsterStun stun && stun.IsStunned) return false;
             if (IsBusy || health.IsDead || !NavigationReady || body == null || target == null || target.IsDead || !vision.CanSee(target)) return false;
             if (Vector3.ProjectOnPlane(target.transform.position - transform.position, Vector3.up).magnitude > attackDistance) return false;
             victim = target; elapsed = 0; lungeBlocked = false; struck.Clear(); DirectionLocked = false; IsBusy = true; Phase = AttackPhase.Windup; Swings++;
@@ -64,6 +65,7 @@ namespace VoidLast.Monster
         void Update()
         {
             if (!IsBusy) return;
+            if (GetComponent<MonsterStun>() is MonsterStun stun && stun.IsStunned) { Cancel(); return; }
             if (health.IsDead || !NavigationReady) { Cancel(); return; }
             float previous = elapsed;
             elapsed += Time.deltaTime;

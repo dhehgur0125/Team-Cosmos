@@ -9,7 +9,7 @@ namespace VoidLast.Monster
     [RequireComponent(typeof(NavMeshAgent), typeof(MonsterHealth))]
     public sealed class BlindMonsterAI : MonoBehaviour
     {
-        public enum Mode { Wander, Approach, Grope, Strike, Dead }
+        public enum Mode { Wander, Approach, Grope, Strike, Dead, Stunned }
 
         struct Segment { public Transform transform; public Quaternion baseRotation; }
         struct TentaclePose { public float yawAmp, pitch, pitchAmp, speed, curl; }
@@ -59,6 +59,7 @@ namespace VoidLast.Monster
 
         NavMeshAgent agent;
         MonsterHealth health;
+        MonsterStun stun;
         MaterialPropertyBlock colors;
         Segment[][] chains;
         FpsHealth strikeVictim;
@@ -121,6 +122,11 @@ namespace VoidLast.Monster
         void Update()
         {
             if (NetworkProxy || health.IsDead || !NavigationReady) return;
+            if (State == Mode.Stunned)
+            {
+                if (stun != null && stun.IsStunned) return;
+                Change(Mode.Wander); nextProximity = nextSense = 0;
+            }
 
             // 파동이 이 몬스터에 닿는 시간이 되면 스캔 소리를 '들은' 것으로 처리
             if (pendingScan && Time.time >= pendingScanTime)
@@ -161,7 +167,7 @@ namespace VoidLast.Monster
 
         void OnScanHeard(Vector3 origin, float radius, float waveSpeed)
         {
-            if (health.IsDead) return;
+            if (health.IsDead || State == Mode.Stunned) return;
             float distance = Vector3.Distance(transform.position, origin);
             if (distance > radius) return;
 
@@ -418,10 +424,17 @@ namespace VoidLast.Monster
         // 눈이 없어도 맞은 방향은 느낀다 -> 그쪽으로 가서 더듬는다
         void OnHit(GameObject attacker, Vector3 position)
         {
-            if (State == Mode.Strike) return;
+            if (State == Mode.Strike || State == Mode.Stunned) return;
             HearAt(position);
         }
 
+        public void BeginStun(MonsterStun effect)
+        {
+            if (health.IsDead || NetworkProxy) return;
+            stun = effect; pendingScan = false; strikeVictim = null; struck = true;
+            Change(Mode.Stunned); Stop();
+            if (NavigationReady) { agent.velocity = Vector3.zero; agent.updateRotation = false; }
+        }
         void Die()
         {
             Change(Mode.Dead);
@@ -470,11 +483,12 @@ namespace VoidLast.Monster
             if (bodyRenderer != null)
             {
                 Color color = State == Mode.Dead ? DeadColor : State == Mode.Strike ? StrikeColor : State == Mode.Grope ? GropeColor : State == Mode.Approach ? ApproachColor : WanderColor;
+                if (State == Mode.Stunned) color = new Color(0.45f, 0.8f, 1);
                 colors.SetColor("_BaseColor", color);
                 bodyRenderer.SetPropertyBlock(colors);
             }
 
-            if (chains == null || chains.Length == 0) return;
+            if (State == Mode.Stunned || chains == null || chains.Length == 0) return;
 
             TentaclePose pose = CurrentPose();
             float time = Time.time;

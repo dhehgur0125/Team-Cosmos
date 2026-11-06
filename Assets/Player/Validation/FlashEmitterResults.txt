@@ -1,0 +1,66 @@
+Flash emitter - actual Play Mode / local UDP host+client
+2026-11-06T10:06:45.6606196Z
+PASS: Cannot charge during equip motion
+PASS: Capsule model equips with three uses; idle gauge hidden
+PASS: Left press starts 1.5-second charge
+PASS: Gauge fills only while charging
+PASS: Early release cancels freely and immediately hides gauge
+PASS: Charge can restart after cancellation
+PASS: Slot change cancels charge without consuming
+PASS: Full charge begins
+PASS: Full charge holds without auto-firing
+PASS: Release emits once and consumes even with no target
+PASS: Duplicate release and charging during five-second cooldown rejected
+PASS: Equipment switching preserves uses and cooldown
+PASS: Charge becomes available after five-second cooldown
+PASS: Zero-cooldown charge 1
+PASS: Zero cooldown allows immediate next use
+PASS: Zero-cooldown charge 2
+PASS: Zero cooldown allows immediate next use
+PASS: Exactly three successful releases; exhausted device cannot charge
+PASS: Test monster uses the existing baked NavMesh
+PASS: Charge before interrupting attack
+PASS: Monster attack windup starts before flash
+PASS: Flash stuns without damage and cancels attack windup
+PASS: Stunned monster stays still and cannot hurt nearby player
+PASS: Duplicate shorter stun does not shorten or corrupt active stun
+PASS: After five seconds AI resumes normal behavior
+PASS: Wall blocks stun inside radius
+PASS: Monster farther than five metres is excluded
+PASS: Visible monster inside five metres is affected
+PASS: Death during stun cannot resume AI or accept another stun
+PASS: Small monster accepts shared stun
+PASS: Small monster resumes after shared stun timer
+PASS: Blind monster accepts shared stun
+PASS: Blind monster resumes after shared stun timer
+PASS: Charge starts before player death
+PASS: Player death cancels charge without consuming
+PASS: Local UDP host starts
+PASS: Local UDP client starts
+PASS: Two NGO peers connected through real transport
+PASS: Existing MonsterNetworkSync spawns on client
+PASS: Owner 0 starts one charge; duplicate begin rejected
+PASS: Charging owner's gauge is visible
+PASS: Remote replica never displays a charge gauge
+PASS: Network early release cancels
+PASS: Server preserves uses after cancellation
+PASS: Server-timed full charge releases only once
+PASS: Owner 0 has synchronized one-use cost, cooldown and one flash on host
+PASS: Owner 0 has synchronized one-use cost, cooldown and one flash on client
+PASS: Server applies radius stun without damage; client receives Stunned state
+PASS: Network cooldown rejects new charge
+PASS: Owner 1 starts one charge; duplicate begin rejected
+PASS: Charging owner's gauge is visible
+PASS: Remote replica never displays a charge gauge
+PASS: Network early release cancels
+PASS: Server preserves uses after cancellation
+PASS: Server-timed full charge releases only once
+PASS: Owner 1 has synchronized one-use cost, cooldown and one flash on host
+PASS: Owner 1 has synchronized one-use cost, cooldown and one flash on client
+PASS: Server applies radius stun without damage; client receives Stunned state
+PASS: Network cooldown rejects new charge
+PASS: Stun recovery state replicates through existing monster sync
+PASS: Client starts charge before equipment cancellation
+PASS: Slot cancellation reaches server and preserves remaining uses
+PASS: No Console errors or exceptions during completed tests
+COMPLETE. Two actual NGO peers over local UDP in one Editor. Separate PCs / Relay / Lobby / Stage2 were not exercised or changed.

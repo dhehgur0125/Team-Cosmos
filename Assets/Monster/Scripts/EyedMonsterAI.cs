@@ -8,7 +8,7 @@ namespace VoidLast.Monster
     [RequireComponent(typeof(NavMeshAgent), typeof(MonsterHealth), typeof(MonsterVision))]
     public sealed class EyedMonsterAI : MonoBehaviour
     {
-        public enum Mode { Patrol, Chase, Attack, Investigate, Search, Return, Dead }
+        public enum Mode { Patrol, Chase, Attack, Investigate, Search, Return, Dead, Stunned }
         [SerializeField] Transform[] patrolPoints;
         [SerializeField] Transform[] searchPoints;
         [SerializeField] Transform visualPivot;
@@ -23,6 +23,7 @@ namespace VoidLast.Monster
         MonsterHealth health;
         MonsterVision vision;
         MonsterMelee melee;
+        MonsterStun stun;
         MaterialPropertyBlock colors;
         bool targetVisible, knowsLocation, hasGoal;
         float nextSense, nextPath, waitUntil, searchEnds, deathBlend;
@@ -53,6 +54,11 @@ namespace VoidLast.Monster
         void Update()
         {
             if (NetworkProxy || health.IsDead || !NavigationReady) return;
+            if (State == Mode.Stunned)
+            {
+                if (stun != null && stun.IsStunned) return;
+                targetVisible = false; nextSense = 0; Change(knowsLocation ? Mode.Investigate : Mode.Return);
+            }
             if (Time.time >= nextSense)
             {
                 nextSense = Time.time + senseInterval;
@@ -145,6 +151,7 @@ namespace VoidLast.Monster
         }
         void OnHit(GameObject attacker, Vector3 position)
         {
+            if (State == Mode.Stunned) return;
             if (Target != null && !Target.IsDead && vision.CanSee(Target)) return;
             var shooter = attacker != null ? attacker.GetComponent<FpsHealth>() : null;
             if (vision.CanSee(shooter, true))
@@ -158,6 +165,12 @@ namespace VoidLast.Monster
                 LastKnownPosition = position; knowsLocation = true; targetVisible = false; Change(Mode.Investigate);
             }
         }
+        public void BeginStun(MonsterStun effect)
+        {
+            if (health.IsDead || NetworkProxy) return;
+            stun = effect; melee.Cancel(); Change(Mode.Stunned); Stop();
+            if (NavigationReady) { agent.velocity = Vector3.zero; agent.updateRotation = false; }
+        }
         void Die()
         {
             Change(Mode.Dead); melee.Cancel(); Target = null; targetVisible = false;
@@ -169,6 +182,7 @@ namespace VoidLast.Monster
             if (bodyRenderer != null)
             {
                 Color color = State == Mode.Dead ? new Color(0.09f, 0.09f, 0.1f) : State == Mode.Attack ? new Color(1, 0.35f, 0.05f) : State == Mode.Chase ? new Color(0.8f, 0.08f, 0.06f) : State == Mode.Search || State == Mode.Investigate ? new Color(0.85f, 0.65f, 0.04f) : new Color(0.22f, 0.45f, 0.52f);
+                if (State == Mode.Stunned) color = new Color(0.45f, 0.8f, 1);
                 colors.SetColor("_BaseColor", color); bodyRenderer.SetPropertyBlock(colors);
             }
             if (visualPivot == null) return;
