@@ -353,7 +353,7 @@ namespace VoidLast.MapTools
             var spawner = Object.FindFirstObjectByType<LobbyPlayerSpawner>(FindObjectsInactive.Include);
             if (lm == null || spawner == null) throw new InvalidOperationException("Lobby scene is missing LobbyManager/LobbyPlayerSpawner");
             ApplySpawnerMapping(spawner);
-            if (string.IsNullOrEmpty(lm.gameSceneName) || lm.gameSceneName == "MapScene" || lm.gameSceneName == "Stage2_Ship") lm.gameSceneName = FloorSceneBuilder.FirstFloorScene;   // 층별 씬: 5층부터
+            if (string.IsNullOrEmpty(lm.gameSceneName) || lm.gameSceneName == "Stage2_Ship") lm.gameSceneName = FloorSceneBuilder.FirstFloorScene;   // 층별 씬: 5층부터
             ApplyLobbyVoiceUi(lm, AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath));
             ApplyLoadingScreen(AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath));
             if (spawner.GetComponent<NetworkManagerDuplicateGuard>() == null) spawner.gameObject.AddComponent<NetworkManagerDuplicateGuard>();

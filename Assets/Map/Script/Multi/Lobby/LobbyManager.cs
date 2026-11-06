@@ -28,7 +28,7 @@ public class LobbyManager : MonoBehaviour
 
     [Header("설정")]
     [Tooltip("게임 시작 시 불러올 씬 (빌드 설정에 등록되어 있어야 함)")]
-    public string gameSceneName = "MapScene";
+    public string gameSceneName = "Stage2_Ship_5f";
     [Range(2, 4)] public int defaultMaxPlayers = 4;
     [Tooltip("방 목록 자동 새로고침 간격(초)")]
     [Min(3f)] public float listRefreshInterval = 8f;

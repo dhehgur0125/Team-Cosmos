@@ -136,7 +136,7 @@ public class LobbyPlayerSpawner : MonoBehaviour
     void OnUnitySceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (scene.name == lobbySceneName) return;
-        // 게임 씬(예: MapScene)에 따로 놓인 NetworkManager는 로비에서 넘어왔을 때 쓰지 않는다.
+        // 게임 씬(예: Stage2_Ship_5f)에 따로 놓인 NetworkManager는 로비에서 넘어왔을 때 쓰지 않는다.
         // (NetworkManager는 OnEnable에서 스스로 DontDestroyOnLoad로 옮겨지므로 전체에서 찾는다)
         foreach (var other in FindObjectsByType<NetworkManager>(FindObjectsInactive.Exclude))
         {

@@ -628,8 +628,6 @@ namespace VoidLast.MapTools
             var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
             scenes.RemoveAll(s => s.path == ScenePath);
             scenes.Insert(0, new EditorBuildSettingsScene(ScenePath, true));   // 게임 실행 시 로비부터 시작
-            if (!scenes.Exists(s => s.path == "Assets/Map/Scenes/MapScene.unity"))
-                scenes.Add(new EditorBuildSettingsScene("Assets/Map/Scenes/MapScene.unity", true));
             EditorBuildSettings.scenes = scenes.ToArray();
         }
     }
