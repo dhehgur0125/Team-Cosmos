@@ -1,11 +1,12 @@
 /*
 [ 코드 설명 ]
-1. 빛 방출기의 기존 FPS 손·임시 모델 장착과 로컬 충전 막대만 표시합니다.
+1. 빛 방출기의 기존 FPS 손·Torch 모델 장착과 로컬 충전 막대만 표시합니다.
 2. 충전 발광·짧은 입자·한 개의 Point Light를 재생합니다. 스턴·횟수 판정은 하지 않으며 카메라별로 FPS/전신 모델을 구분합니다.
 */
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
+using System.Collections.Generic;
 
 namespace VoidLast.Player
 {
@@ -15,6 +16,7 @@ namespace VoidLast.Player
         [SerializeField] Camera localCamera;
         [SerializeField] Transform localRoot, worldRoot;
         [SerializeField] Transform localMuzzle, worldMuzzle;
+        [SerializeField, Tooltip("시각적 발광부와 분리된 기존 스턴 판정 원점")] Transform stunOrigin;
         [SerializeField] Renderer localLens, worldLens;
         [SerializeField] ParticleSystem localFlash, worldFlash;
         [SerializeField] Light flashLight;
@@ -27,6 +29,7 @@ namespace VoidLast.Player
         [SerializeField, Min(0)] float flashIntensity = 6;
         [SerializeField, Min(0.1f)] float lightRange = 4;
         readonly FpsEquipMotion equip = new FpsEquipMotion();
+        readonly Dictionary<Renderer, Color> baseEmission = new Dictionary<Renderer, Color>();
         MaterialPropertyBlock lensColor;
         FpsEquipment equipment;
         float flashEnds;
@@ -34,12 +37,26 @@ namespace VoidLast.Player
         Vector3 previousLightPosition;
         bool lightMoved;
         public bool IsEquipped => localRoot != null && emitter != null && emitter.IsSelected && equip.IsReady;
-        public Vector3 EmissionPoint => localMuzzle != null ? localMuzzle.position : transform.position;
+        public Vector3 EmissionPoint => stunOrigin != null ? stunOrigin.position : localMuzzle != null ? localMuzzle.position : transform.position;
         public bool GaugeVisible => chargeGauge != null && chargeGauge.enabled;
         public int FlashesPlayed { get; private set; }
         public Transform LocalRoot => localRoot;
         public Transform WorldRoot => worldRoot;
-        void Awake() { equipment = GetComponent<FpsEquipment>(); lensColor = new MaterialPropertyBlock(); }
+        void Awake()
+        {
+            equipment = GetComponent<FpsEquipment>(); lensColor = new MaterialPropertyBlock();
+            CacheEmission(localLens); CacheEmission(worldLens);
+        }
+        void CacheEmission(Renderer root)
+        {
+            if (root == null) return;
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                var material = renderer.sharedMaterial;
+                if (material != null && material.HasProperty("_EmissionColor") && material.IsKeywordEnabled("_EMISSION"))
+                    baseEmission[renderer] = material.GetColor("_EmissionColor");
+            }
+        }
         void OnEnable()
         {
             equipment.SlotChanged += SelectionChanged;
@@ -53,6 +70,7 @@ namespace VoidLast.Player
             RenderPipelineManager.beginCameraRendering -= BeginSrp; RenderPipelineManager.endCameraRendering -= EndSrp;
             Camera.onPreCull -= BeginCamera; Camera.onPostRender -= EndCamera;
             RestoreLight(); HideGauge(); equip.Reset(); flashEnds = 0;
+            SetEmission(1);
             if (flashLight != null) flashLight.enabled = false;
             if (localRoot != null) localRoot.gameObject.SetActive(false);
             if (worldRoot != null) worldRoot.gameObject.SetActive(false);
@@ -82,8 +100,8 @@ namespace VoidLast.Player
                 chargeGauge.color = progress >= 1 ? new Color(0.85f, 1, 1) : new Color(0.3f, 0.75f, 0.9f);
             }
             float flash = flashFrame == Time.frameCount ? 1 : Mathf.Clamp01((flashEnds - Time.time) / Mathf.Max(0.01f, flashDuration));
-            float glow = 0.08f + (charging ? Mathf.Lerp(0.2f, 3, progress) : 0) + 8 * flash;
-            SetLens(localLens, glow); SetLens(worldLens, glow);
+            float glow = 1 + (charging ? 3 * progress : 0) + 8 * flash;
+            SetEmission(glow);
             if (flashLight != null)
             {
                 flashLight.enabled = visible && (charging || flash > 0);
@@ -91,10 +109,15 @@ namespace VoidLast.Player
                 flashLight.range = flash > 0 ? lightRange : 1.2f;
             }
         }
-        void SetLens(Renderer lens, float glow)
+        void SetEmission(float multiplier)
         {
-            if (lens == null) return;
-            lens.GetPropertyBlock(lensColor); lensColor.SetColor("_EmissionColor", new Color(0.65f, 0.9f, 1) * glow); lens.SetPropertyBlock(lensColor);
+            foreach (var surface in baseEmission)
+            {
+                if (surface.Key == null) continue;
+                surface.Key.GetPropertyBlock(lensColor);
+                lensColor.SetColor("_EmissionColor", surface.Value * multiplier);
+                surface.Key.SetPropertyBlock(lensColor);
+            }
         }
         public void PlayFlash()
         {

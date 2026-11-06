@@ -1,6 +1,6 @@
 /*
 [ 코드 설명 ]
-1. 기본 도형으로 빛 방출기 모델과 장비 테스트용 FPS 변형 프리팹을 만듭니다.
+1. 원본 URP Torch를 빛 방출기 표시 프리팹에 연결하고 테스트용 FPS 변형의 손·발광부 참조를 구성합니다.
 2. 기존 의료 키트·원본 플레이어·맵은 보존하고 Monster_test 복사본에만 테스트용 플레이어를 배치합니다.
 */
 using System;
@@ -50,48 +50,33 @@ namespace VoidLast.Player.Editor
             }
             finally { EditorSceneManager.ClosePreviewScene(preview); }
         }
-        static Material Material(string name, Color color, bool glowing = false)
-        {
-            string path = "Assets/Player/Materials/" + name + ".mat";
-            var material = AssetDatabase.LoadAssetAtPath<Material>(path); if (material != null) return material;
-            material = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = name, color = color };
-            material.SetFloat("_Metallic", glowing ? 0 : 0.75f); material.SetFloat("_Smoothness", 0.5f);
-            if (glowing) { material.EnableKeyword("_EMISSION"); material.SetColor("_EmissionColor", color * 0.08f); }
-            AssetDatabase.CreateAsset(material, path); return material;
-        }
         static void BuildModel()
         {
-            if (AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath) != null)
-            {
-                var existing = PrefabUtility.LoadPrefabContents(ModelPath);
-                try
-                {
-                    var lensTransform = existing.transform.Find("Emissive lens");
-                    lensTransform.localPosition = new Vector3(0, 0, 0.145f); lensTransform.localScale = new Vector3(0.1f, 0.1f, 0.07f);
-                    existing.transform.Find("EmissionPoint").localPosition = new Vector3(0, 0, 0.185f);
-                    PrefabUtility.SaveAsPrefabAsset(existing, ModelPath);
-                }
-                finally { PrefabUtility.UnloadPrefabContents(existing); }
-                return;
-            }
-            var body = Material("FlashEmitter_Body", new Color(0.09f, 0.11f, 0.13f));
-            var lens = Material("FlashEmitter_Lens", new Color(0.65f, 0.9f, 1), true);
-            var root = new GameObject("VOID_LAST_FlashEmitter");
+            // Resolve by GUID so moving the original URP asset does not break this setup.
+            var torch = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath("c290ea15c38597b4893a844f3a1411da"));
+            if (torch == null) throw new InvalidOperationException("URP Torch source is missing.");
+            bool existing = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath) != null;
+            var root = existing ? PrefabUtility.LoadPrefabContents(ModelPath) : new GameObject("VOID_LAST_FlashEmitter");
             try
             {
-                Primitive(root.transform, "Capsule body", PrimitiveType.Capsule, Vector3.zero, new Vector3(0.08f, 0.12f, 0.08f), new Vector3(90, 0, 0), body);
-                Primitive(root.transform, "Emitter rim", PrimitiveType.Cylinder, new Vector3(0, 0, 0.115f), new Vector3(0.086f, 0.012f, 0.086f), new Vector3(90, 0, 0), body);
-                Primitive(root.transform, "Emissive lens", PrimitiveType.Sphere, new Vector3(0, 0, 0.145f), new Vector3(0.1f, 0.1f, 0.07f), Vector3.zero, lens);
-                var muzzle = new GameObject("EmissionPoint").transform; muzzle.SetParent(root.transform, false); muzzle.localPosition = new Vector3(0, 0, 0.185f);
+                foreach (string name in new[] { "Capsule body", "Emitter rim", "Emissive lens" })
+                {
+                    var primitive = root.transform.Find(name);
+                    if (primitive != null) Object.DestroyImmediate(primitive.gameObject);
+                }
+                var model = root.transform.Find("Torch");
+                if (model == null)
+                {
+                    model = ((GameObject)PrefabUtility.InstantiatePrefab(torch, root.scene)).transform;
+                    model.SetParent(root.transform, false); model.name = "Torch";
+                }
+                model.localPosition = new Vector3(0, -0.08f, 0); model.localRotation = Quaternion.identity; model.localScale = Vector3.one;
+                // Keep the original gameplay origin; only the visible flash moves to the long upper emitter.
+                Child(root.transform, "EmissionPoint").localPosition = new Vector3(0, 0, 0.185f);
+                Child(root.transform, "VisualEmissionPoint").localPosition = new Vector3(0, 0.15f, 0.045f);
                 PrefabUtility.SaveAsPrefabAsset(root, ModelPath);
             }
-            finally { Object.DestroyImmediate(root); }
-        }
-        static void Primitive(Transform parent, string name, PrimitiveType type, Vector3 position, Vector3 scale, Vector3 euler, Material material)
-        {
-            var go = GameObject.CreatePrimitive(type); go.name = name; go.transform.SetParent(parent, false);
-            go.transform.localPosition = position; go.transform.localEulerAngles = euler; go.transform.localScale = scale;
-            Object.DestroyImmediate(go.GetComponent<Collider>()); go.GetComponent<Renderer>().sharedMaterial = material;
+            finally { if (existing) PrefabUtility.UnloadPrefabContents(root); else Object.DestroyImmediate(root); }
         }
         static void ConfigurePlayer(string path, string sourcePath, bool online)
         {
@@ -114,11 +99,15 @@ namespace VoidLast.Player.Editor
                     var clean = AssetDatabase.LoadAssetAtPath<Mesh>("Assets/Player/Prefabs/Player/Visuals/FPS_MedicalGlove.asset");
                     if (clean != null) glove.GetComponent<MeshFilter>().sharedMesh = clean;
                 }
+                var grip = local.Find("FPS Right Glove");
+                grip.localPosition = new Vector3(0.008f, -0.015f, -0.012f); grip.localEulerAngles = new Vector3(90, 0, 0);
                 var hand = root.GetComponentInChildren<Animator>(true).GetBoneTransform(HumanBodyBones.RightHand);
                 var world = Child(hand, "WorldFlashEmitterSocket"); var existingSocket = hand.Find("WorldWeaponSocket");
                 world.localPosition = existingSocket.localPosition; world.localRotation = existingSocket.localRotation;
                 var worldModel = Model(world);
-                var localMuzzle = localModel.Find("EmissionPoint"); var worldMuzzle = worldModel.Find("EmissionPoint");
+                var localMuzzle = localModel.Find("VisualEmissionPoint"); var worldMuzzle = worldModel.Find("VisualEmissionPoint");
+                MoveEffectChildren(localModel.Find("EmissionPoint"), localMuzzle);
+                MoveEffectChildren(worldModel.Find("EmissionPoint"), worldMuzzle);
                 var localParticles = Particles(localMuzzle); var worldParticles = Particles(worldMuzzle);
                 var lightRoot = Child(worldMuzzle, "Flash Light"); var light = lightRoot.GetComponent<Light>(); if (light == null) light = lightRoot.gameObject.AddComponent<Light>();
                 light.type = LightType.Point; light.color = new Color(0.8f, 0.92f, 1); light.range = 4; light.intensity = 0; light.shadows = LightShadows.None; light.enabled = false;
@@ -129,7 +118,8 @@ namespace VoidLast.Player.Editor
                 Reference(emitter, "view", view); Reference(emitter, "viewCamera", camera);
                 Reference(view, "emitter", emitter); Reference(view, "localCamera", camera); Reference(view, "localRoot", local); Reference(view, "worldRoot", world);
                 Reference(view, "localMuzzle", localMuzzle); Reference(view, "worldMuzzle", worldMuzzle);
-                Reference(view, "localLens", localModel.Find("Emissive lens").GetComponent<Renderer>()); Reference(view, "worldLens", worldModel.Find("Emissive lens").GetComponent<Renderer>());
+                Reference(view, "stunOrigin", localModel.Find("EmissionPoint"));
+                Reference(view, "localLens", localModel.Find("Torch").GetComponent<Renderer>()); Reference(view, "worldLens", worldModel.Find("Torch").GetComponent<Renderer>());
                 Reference(view, "localFlash", localParticles); Reference(view, "worldFlash", worldParticles); Reference(view, "flashLight", light); Reference(view, "chargeGauge", gauge);
                 var visibility = new SerializedObject(root.GetComponent<FpsLocalVisibility>());
                 Append(visibility.FindProperty("firstPersonRenderers"), local.GetComponentsInChildren<Renderer>(true)); Append(visibility.FindProperty("worldRenderers"), world.GetComponentsInChildren<Renderer>(true)); visibility.ApplyModifiedPropertiesWithoutUndo();
@@ -142,6 +132,10 @@ namespace VoidLast.Player.Editor
         {
             var model = parent.Find("VOID_LAST_FlashEmitter"); if (model != null) return model;
             model = ((GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath), parent.gameObject.scene)).transform; model.SetParent(parent, false); return model;
+        }
+        static void MoveEffectChildren(Transform previous, Transform destination)
+        {
+            while (previous.childCount > 0) previous.GetChild(0).SetParent(destination, false);
         }
         static ParticleSystem Particles(Transform parent)
         {
@@ -163,6 +157,12 @@ namespace VoidLast.Player.Editor
         static void Reference(Object target, string name, Object value) { var fields = new SerializedObject(target); fields.FindProperty(name).objectReferenceValue = value; fields.ApplyModifiedPropertiesWithoutUndo(); }
         static void Append(SerializedProperty list, Renderer[] renderers)
         {
+            for (int i = list.arraySize - 1; i >= 0; i--)
+                if (list.GetArrayElementAtIndex(i).objectReferenceValue == null)
+                {
+                    int before = list.arraySize; list.DeleteArrayElementAtIndex(i);
+                    if (list.arraySize == before) list.DeleteArrayElementAtIndex(i);
+                }
             foreach (var renderer in renderers)
             {
                 bool found = false; for (int i = 0; i < list.arraySize; i++) if (list.GetArrayElementAtIndex(i).objectReferenceValue == renderer) found = true;
