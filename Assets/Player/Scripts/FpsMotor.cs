@@ -114,6 +114,7 @@ namespace VoidLast.Player
         }
 
         public void StopForDeath() { IsDead = true; IsRunning = false; LocalVelocity = Vector2.zero; }
+        public void ResumeAfterRevive() { IsDead = false; verticalSpeed = 0; }
         void OnValidate()
         {
             var capsule = GetComponent<CharacterController>();

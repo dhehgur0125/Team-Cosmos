@@ -77,10 +77,11 @@ public sealed class InGameVoiceChat : MonoBehaviour
             _entered = true;
             return;
         }
-        var props = new Channel3DProperties(audibleDistance, Mathf.Min(conversationalDistance, audibleDistance - 1), fadeIntensity, fadeModel);
-        await _voice.EnterGameAsync(key, props);
+        await _voice.EnterGameAsync(key, NearProperties());
         _entered = true;
     }
+
+    Channel3DProperties NearProperties() => new Channel3DProperties(audibleDistance, Mathf.Min(conversationalDistance, audibleDistance - 1), fadeIntensity, fadeModel);
 
     static string FindSessionId()
     {
@@ -136,6 +137,12 @@ public sealed class InGameVoiceChat : MonoBehaviour
             _radioSpeakersBefore.Clear();
             _nearMuted.Clear();
             _ = _voice.EnterDeadAsync();
+        }
+        // 고치에서 구출되면 근거리 채널로 돌아간다
+        else if (_player != null && _entered && _dead && _player.Health != null && !_player.Health.IsDead)
+        {
+            _dead = false;
+            _ = _voice.LeaveDeadAsync(NearProperties());
         }
 
         if (_player != null && _entered && !_dead)

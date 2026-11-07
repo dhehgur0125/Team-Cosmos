@@ -69,5 +69,11 @@ namespace VoidLast.Player
             equipment.Process(0, false, false);
             if (animator != null) { animator.ResetTrigger(Melee); animator.SetBool(Dead, true); animator.SetLayerWeight(1, 0); animator.SetLayerWeight(2, 0); }
         }
+        /// <summary>고치에서 구출: 쓰러진 자세를 풀고 처음 상태로 되돌린다</summary>
+        public void Revive()
+        {
+            motor.ResumeAfterRevive();
+            if (animator != null) { animator.SetBool(Dead, false); animator.Rebind(); animator.Update(0f); }
+        }
     }
 }

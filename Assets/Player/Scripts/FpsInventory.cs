@@ -4,7 +4,8 @@ using UnityEngine;
 
 namespace VoidLast.Player
 {
-    public enum FarmingItemKind { None, Syringe, Radio }
+    // 프리팹·씬에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
+    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler }
 
     [DefaultExecutionOrder(-50)]
     public sealed class FpsInventory : MonoBehaviour
@@ -104,6 +105,14 @@ namespace VoidLast.Player
             items[SelectedIndex] = FarmingItemKind.None;
             Changed?.Invoke(); ShowHotbar();
             return true;
+        }
+        /// <summary>죽을 때 물건을 떨어뜨리려고 칸을 비운다 (살아 있는지 검사하지 않음)</summary>
+        public void ClearSlot(int index)
+        {
+            if (index < 0 || index >= Capacity || items[index] == FarmingItemKind.None) return;
+            if (usingIndex == index) CancelUse();
+            items[index] = FarmingItemKind.None;
+            Changed?.Invoke();
         }
         public bool TryStartUse(FpsHealth target = null)
         {

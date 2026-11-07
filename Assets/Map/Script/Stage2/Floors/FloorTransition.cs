@@ -23,6 +23,7 @@ public sealed class FloorTransition : NetworkBehaviour
 {
     [Tooltip("이 씬의 층 (1~5)")] [Range(1, 5)] public int floor = 2;
     [Tooltip("아래층 씬 이름 (1층이면 비움)")] public string nextSceneName;
+    [Tooltip("내려갈 수 있는 계단 (예: A, AB)")] public string descentSides = "AB";
     public TMP_FontAsset font;
     [Tooltip("연출 중 걷는 속도 (m/s)")] [Min(0.5f)] public float walkSpeed = 2.4f;
     [Tooltip("내려갈 때 화면이 검게 되는 시간")] [Min(0.2f)] public float fadeOutSeconds = 1.6f;
@@ -51,6 +52,8 @@ public sealed class FloorTransition : NetworkBehaviour
         }
     }
     public bool IsDescending => _descending;
+    /// <summary>이 계단(A/B)으로 내려갈 수 있는지</summary>
+    public bool AllowsSide(char side) => string.IsNullOrEmpty(descentSides) || descentSides.IndexOf(side) >= 0;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { Instance = null; InCutscene = false; }
@@ -60,7 +63,7 @@ public sealed class FloorTransition : NetworkBehaviour
         switch (f)
         {
             case 1: return "1층 · 격납고";
-            case 2: return "2층 · 정비 및 화물 구역";
+            case 2: return "2층 · 화물 및 검역 구역";
             case 3: return "3층 · 관제 구역";
             case 4: return "4층 · 동력 구역";
             case 5: return "5층 · 승무원 구역";
@@ -105,7 +108,7 @@ public sealed class FloorTransition : NetworkBehaviour
     public bool TryBeginDescent(char side)
     {
         bool authority = !IsSpawned || IsServer;
-        if (!authority || !CanDescend) return false;
+        if (!authority || !CanDescend || !AllowsSide(side)) return false;
         _descending = true;
         if (IsSpawned) DescendRpc((byte)side);
         else StartCoroutine(Descent(side));

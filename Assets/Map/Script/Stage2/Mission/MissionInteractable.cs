@@ -8,7 +8,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class MissionInteractable : MonoBehaviour
 {
-    public enum Kind { PowerModule = 1, FuelPump = 2, IntrusionLog = 3 }
+    // 씬에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
+    public enum Kind { PowerModule = 1, FuelPump = 2, IntrusionLog = 3, QuarantineConsole = 4, CargoLift = 5, FuelValve = 6, LockdownDoor = 7 }
 
     public Kind kind = Kind.PowerModule;
     [Tooltip("화면 아래 안내 (예: 전력 모듈 꺼내기)")]

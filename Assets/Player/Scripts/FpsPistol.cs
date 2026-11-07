@@ -16,6 +16,8 @@ namespace VoidLast.Player
         [SerializeField, Min(1)] float range = 100;
         [SerializeField, Min(0)] float damage = 30;
         [SerializeField, Min(0.1f)] float reloadDuration = 1.5f;
+        [Tooltip("사격 소리가 몬스터에게 들리는 반경(m, 같은 층만)")]
+        [SerializeField, Min(0)] float noiseRadius = 18;
         FpsInput input;
         FpsEquipment equipment;
         FpsMotor motor;
@@ -71,6 +73,7 @@ namespace VoidLast.Player
                 if (bulletMarkPrefab != null && damageTarget == null && LastHit.collider.GetComponentInParent<FpsHealth>() == null) FpsBulletMark.Spawn(bulletMarkPrefab, LastHit);
             }
             Shot?.Invoke();
+            VoidLast.Monster.GunNoise.Emit(transform.position, noiseRadius);
             Changed?.Invoke(); return true;
         }
         /// <summary>층 이동 후: 이전 층의 탄약을 그대로 이어받는다</summary>

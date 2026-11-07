@@ -272,6 +272,14 @@ public sealed class VoiceChatService : MonoBehaviour
         await JoinGroupAsync(DeadChannel);
     }
 
+    /// <summary>고치에서 구출됐을 때: 사망자 채널에서 나와 근거리 채널로 돌아간다.</summary>
+    public async Task LeaveDeadAsync(Channel3DProperties props)
+    {
+        SetTransmission(TransmissionMode.Single, NearChannel);
+        await LeaveAsync(DeadChannel);
+        await JoinPositionalAsync(NearChannel, props);
+    }
+
     /// <summary>
     /// 송신 대상: Single(해당 채널만), All(들어간 모든 채널: 근거리 + 무전), None(말하지 않음).
     /// 채널에 아직 못 들어갔으면 입장 직후 다시 적용한다.

@@ -87,6 +87,7 @@ namespace VoidLast.Monster
         void OnEnable()
         {
             All.Add(this);
+            GunNoise.Emitted += OnGunHeard;
             health.Damaged += OnHit;
             health.Died += Die;
         }
@@ -94,6 +95,7 @@ namespace VoidLast.Monster
         void OnDisable()
         {
             All.Remove(this);
+            GunNoise.Emitted -= OnGunHeard;
             health.Damaged -= OnHit;
             health.Died -= Die;
             if (NavigationReady) agent.isStopped = true;
@@ -228,6 +230,13 @@ namespace VoidLast.Monster
             knowsLocation = true;
             if (State == Mode.Investigate) Stop();   // 이미 조사 중이면 새 위치로 다시 경로를 잡는다
             else Change(Mode.Investigate);
+        }
+
+        void OnGunHeard(Vector3 origin, float radius)
+        {
+            Vector3 d = transform.position - origin;
+            if (Mathf.Abs(d.y) > 3.5f || d.sqrMagnitude > radius * radius) return;
+            HearNoise(origin);
         }
 
         void HearScream(FpsHealth player, Vector3 position)

@@ -56,10 +56,23 @@ namespace VoidLast.Player
             if (float.IsNaN(value)) return;
             value = Mathf.Clamp(value, 0, maximumHealth);
             if (Mathf.Approximately(value, Current)) return;
-            if (deathHandled && value > 0) return; // 부활은 아직 지원하지 않음
+            if (deathHandled && value > 0) { ApplyRevive(value); return; }
             Current = value;
             Changed?.Invoke();
             if (IsDead) HandleDeath();
+        }
+        /// <summary>고치에서 구출: 죽은 대원을 주어진 HP로 되살린다. 복제본은 주인이 알려 준 HP로 함께 되살아난다.</summary>
+        public void Revive(float value)
+        {
+            if (!IsDead || float.IsNaN(value) || value <= 0 || NetworkDamageRedirect != null) return;
+            ApplyRevive(value);
+        }
+        void ApplyRevive(float value)
+        {
+            Current = Mathf.Clamp(value, 1, maximumHealth);
+            deathHandled = false;
+            GetComponent<FpsAnimation>()?.Revive();
+            Changed?.Invoke();
         }
         void HandleDeath()
         {

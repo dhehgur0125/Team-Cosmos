@@ -174,11 +174,13 @@ public sealed class StairDoorController : NetworkBehaviour
         var floor = FloorTransition.Instance;
         if (floor != null)
         {
+            bool allowed = floor.AllowsSide(SideOf(doors[target]));
             if (!floor.HasNextFloor) _prompt.text = "<color=#94A3B8>위층으로는 다시 올라갈 수 없어요</color>";
             else if (floor.IsDescending) _prompt.text = "";
+            else if (!allowed) _prompt.text = "<color=#FCA5A5>잠김</color> · 이 계단은 막혀 있어요. 다른 계단으로 가세요";
             else if (floor.CanDescend) _prompt.text = "[F] 문 열고 " + FloorTransition.FloorName(floor.floor - 1).Split(' ')[0] + "으로 내려가기";
             else _prompt.text = "<color=#FCA5A5>잠김</color> · 이 층의 임무를 먼저 완료하세요";
-            if (InteractPressed() && floor.CanDescend) Request(target, me);
+            if (InteractPressed() && floor.CanDescend && allowed) Request(target, me);
             return;
         }
 

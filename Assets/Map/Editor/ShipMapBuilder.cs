@@ -603,8 +603,8 @@ namespace VoidLast.MapTools
                         foreach (var cl in door.GetComponentsInChildren<Collider>()) UnityEngine.Object.DestroyImmediate(cl);
                         foreach (var r in door.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
                     }
-                    // 문짝 모서리 틈을 막는 뒷판
-                    VisBox(vis, center + Vector3.up * (dh / 2) - N * 0.12f, d.o == "x" ? new Vector3(0.05f, dh, dw) : new Vector3(dw, dh, 0.05f), _trim);
+                    // 문짝 모서리 틈을 막는 뒷판: 문이 열릴 때 함께 올라가야 하므로 벽 메시에 합치지 않고 문에 붙인다
+                    StairDoorSetup.EnsureBackPlate(holder.transform);
                 }
             }
         }
@@ -696,9 +696,9 @@ namespace VoidLast.MapTools
                     VisBox(vis, new Vector3(rx, Y + 1.05f, -4.1f), new Vector3(0.08f, 0.08f, 7.8f), _trim);
                     for (int i = 0; i <= 4; i++) VisBox(vis, new Vector3(rx, Y + 0.55f, -0.3f - i * 1.9f), new Vector3(0.06f, 1.1f, 0.06f), _trim);
                 }
-                // landing light + mid landing light
-                MakeLight(c, new Vector3(doorX + d * 2f, Y + 3.3f, 5.5f), 1.3f, 8f, 0);
-                if (c.F.n > 1) MakeLight(c, new Vector3(far - d * 3f, Y - 4f + 3.3f, 0f), 1.2f, 8f, 1);
+                // landing light + mid landing light (계단실은 위가 뚫려 있어 천장이 없으므로 벽에 붙인다)
+                StairLampSetup.MountOnDoorWall(MakeLight(c, new Vector3(doorX + d * 2f, Y + 3.3f, 5.5f), 1.3f, 8f, 0));
+                if (c.F.n > 1) StairLampSetup.MountOnFarWall(MakeLight(c, new Vector3(far - d * 3f, Y - 4f + 3.3f, 0f), 1.2f, 8f, 1));
             }
         }
 
@@ -823,7 +823,7 @@ namespace VoidLast.MapTools
         }
 
         // ------------------------------------------------------------------ lights
-        static void MakeLight(Ctx c, Vector3 pos, float intensity, float range, int modeHint, Color? color = null)
+        static GameObject MakeLight(Ctx c, Vector3 pos, float intensity, float range, int modeHint, Color? color = null)
         {
             var go = (GameObject)PrefabUtility.InstantiatePrefab(_lightPf, c.lights);
             go.name = "F" + c.F.n + "_EmergencyLight_" + c.lights.childCount.ToString("00");
@@ -839,6 +839,7 @@ namespace VoidLast.MapTools
             so.FindProperty("baseIntensity").floatValue = intensity;
             so.FindProperty("seed").intValue = 0;
             so.ApplyModifiedPropertiesWithoutUndo();
+            return go;
         }
 
         static void BuildLights(Ctx c)

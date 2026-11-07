@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
 using UnityEngine;
@@ -125,6 +126,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         if (_pistol != null) _pistol.Shot -= OnLocalShot;
         if (_equipment != null) _equipment.MeleeRequested -= OnLocalMelee;
         ScanNoise.Emitted -= OnLocalScan;
+        GunNoise.Emitted -= OnLocalGunNoise;
         _health.OnValueChanged -= OnHealthChanged;
     }
 
@@ -144,7 +146,11 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _healthComp.Changed += PushHealth;
         _pistol.Shot += OnLocalShot;
         _equipment.MeleeRequested += OnLocalMelee;
-        if (!IsServer) ScanNoise.Emitted += OnLocalScan;   // 방장은 자기 화면의 몬스터가 바로 듣는다
+        if (!IsServer)
+        {
+            ScanNoise.Emitted += OnLocalScan;   // 방장은 자기 화면의 몬스터가 바로 듣는다
+            GunNoise.Emitted += OnLocalGunNoise;
+        }
         LocalSpawned?.Invoke(this);
     }
 
@@ -263,6 +269,30 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     void ScanRpc(Vector3 origin, float radius, float waveSpeed)
     {
         ScanNoise.Emit(origin, radius, waveSpeed);
+    }
+
+    // ------------------------------------------------------------------ 사격 소리 → 서버 몬스터
+    void OnLocalGunNoise(Vector3 origin, float radius) => GunNoiseRpc(origin, radius);
+
+    [Rpc(SendTo.Server)]
+    void GunNoiseRpc(Vector3 origin, float radius)
+    {
+        GunNoise.Emit(origin, radius);
+    }
+
+    // ------------------------------------------------------------------ 고치에서 구출
+    /// <summary>내 대원 전용: 고치 자리에서 되살아난다. HP는 네트워크로 다른 대원 화면에도 전달된다.</summary>
+    public void ReviveFromCocoon(Vector3 position, float healthFraction)
+    {
+        if (!IsOwner || _healthComp == null || !_healthComp.IsDead) return;
+        var controller = GetComponent<CharacterController>();
+        if (controller != null) controller.enabled = false;
+        transform.position = position;
+        var networkTransform = GetComponent<NetworkTransform>();
+        if (networkTransform != null) networkTransform.Teleport(position, transform.rotation, transform.localScale);   // 다른 대원 화면에서 미끄러지지 않게
+        if (controller != null) controller.enabled = true;
+        FloorCarryOver.ArrivedDead = false;
+        _healthComp.Revive(_healthComp.Maximum * healthFraction);
     }
 
     /// <summary>클라이언트 ID로 대원 찾기 (몬스터 피격자 확인 등)</summary>

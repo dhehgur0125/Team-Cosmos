@@ -19,6 +19,7 @@ namespace VoidLast.Player
         FpsInput input;
         FpsInventory inventory;
         CharacterController capsule;
+        FpsHealth health;
         public FpsWorldPickup Target { get; private set; }
         public FpsWorldPickup LastDropped { get; private set; }
         public float PickupDistance => pickupDistance;
@@ -26,8 +27,10 @@ namespace VoidLast.Player
         public static event Action<FpsItemInteractor, FpsWorldPickup> Dropped;
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics() => Dropped = null;
-        public FpsWorldPickup PickupPrefabFor(FarmingItemKind kind) => kind == FarmingItemKind.Radio ? radioPickupPrefab : kind == FarmingItemKind.Syringe ? syringePickupPrefab : null;
-        void Awake() { input = GetComponent<FpsInput>(); inventory = GetComponent<FpsInventory>(); capsule = GetComponent<CharacterController>(); }
+        public FpsWorldPickup PickupPrefabFor(FarmingItemKind kind) => kind == FarmingItemKind.Radio ? radioPickupPrefab : kind == FarmingItemKind.Syringe ? syringePickupPrefab : FarmingItems.PickupPrefab(kind);
+        void Awake() { input = GetComponent<FpsInput>(); inventory = GetComponent<FpsInventory>(); capsule = GetComponent<CharacterController>(); health = GetComponent<FpsHealth>(); }
+        void OnEnable() { if (health != null) health.Died += DropAllOnDeath; }
+        void OnDisable() { if (health != null) health.Died -= DropAllOnDeath; }
         void Update()
         {
             UpdateTarget();
@@ -100,6 +103,26 @@ namespace VoidLast.Player
             LastDropped = pickup;
             Dropped?.Invoke(this, pickup);
             return true;
+        }
+        /// <summary>죽으면 인벤토리 물건을 죽은 자리에 전부 떨어뜨린다 (임무 물건을 잃어 진행이 막히지 않도록). 복제본은 주인 화면에서 처리한다.</summary>
+        void DropAllOnDeath()
+        {
+            if (inventory == null || inventory.IsNetworkProxy) return;
+            Vector3 center = transform.position + Vector3.up * 0.6f;
+            for (int i = 0; i < FpsInventory.Capacity; i++)
+            {
+                var prefab = PickupPrefabFor(inventory.ItemAt(i));
+                if (prefab == null) continue;
+                float angle = i * Mathf.PI * 2f / FpsInventory.Capacity;
+                Vector3 offset = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * 0.4f;
+                // 벽 뒤로 넘어가지 않을 때만 조금씩 벌려 놓는다 (같은 자리에 겹치지 않도록)
+                Vector3 position = Physics.Raycast(center, offset.normalized, offset.magnitude + dropClearance, ~0, QueryTriggerInteraction.Ignore) ? center : center + offset;
+                var pickup = Instantiate(prefab, position, Quaternion.Euler(0, i * 120f, 0));
+                inventory.ClearSlot(i);
+                pickup.ConfigureDrop(inventory);
+                LastDropped = pickup;
+                Dropped?.Invoke(this, pickup);
+            }
         }
     }
 }

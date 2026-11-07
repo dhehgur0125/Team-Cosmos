@@ -103,6 +103,7 @@ namespace VoidLast.Monster
             health.Damaged += OnHit;
             health.Died += Die;
             ScanNoise.Emitted += OnScanHeard; // 탐지기 스캔 소리는 눈 없는 몬스터만 듣는다
+            GunNoise.Emitted += OnGunHeard;
         }
 
         void OnDisable()
@@ -110,6 +111,7 @@ namespace VoidLast.Monster
             health.Damaged -= OnHit;
             health.Died -= Die;
             ScanNoise.Emitted -= OnScanHeard;
+            GunNoise.Emitted -= OnGunHeard;
             if (NavigationReady) agent.isStopped = true;
         }
 
@@ -175,6 +177,13 @@ namespace VoidLast.Monster
             pendingScan = true;
             pendingScanPoint = origin;
             pendingScanTime = Time.time + (waveSpeed > 0f ? distance / waveSpeed : 0f);
+        }
+
+        // 사격 소리: 같은 층에서 들리는 거리 안이면 쏜 위치로 간다 (실제 이동은 Update에서 처리하므로 복제본은 움직이지 않는다)
+        void OnGunHeard(Vector3 origin, float radius)
+        {
+            if (Mathf.Abs(transform.position.y - origin.y) > 3.5f) return;
+            OnScanHeard(origin, radius, 0f);
         }
 
         // 소리가 난 위치(또는 맞은 방향)로 달려간다

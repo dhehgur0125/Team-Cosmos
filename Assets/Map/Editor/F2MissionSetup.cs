@@ -1,5 +1,5 @@
-// 2층(정비 및 화물 구역) 임무 장치 배치
-// 메뉴: Tools/VOID LAST/Multiplayer/6 Build F2 Mission
+// 2층(화물 및 검역 구역) 임무 장치 배치
+// 메뉴: Tools/VOID LAST/Multiplayer/6 Build F2 Mission (원본 씬과 2층 씬에 모두 적용)
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
@@ -9,7 +9,9 @@ using Unity.Netcode;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Rendering;
+using VoidLast.Player;
 using Object = UnityEngine.Object;
 
 namespace VoidLast.MapTools
@@ -24,7 +26,22 @@ namespace VoidLast.MapTools
         [MenuItem("Tools/VOID LAST/Multiplayer/6 Build F2 Mission")]
         public static string Build()
         {
-            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            F2MissionItemAssets.BuildAll();
+            var log = new List<string>();
+            foreach (var path in new[] { ScenePath, FloorSceneBuilder.ScenePath(2) })
+            {
+                var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+                log.Add(scene.name + ": " + BuildInOpenScene());
+                StairDoorSetup.SaveWithNetworkHashes(scene);
+            }
+            string s = string.Join("\n", log);
+            Debug.Log("[F2MissionSetup] " + s);
+            return s;
+        }
+
+        /// <summary>지금 열려 있는 씬에 2층 임무를 (다시) 만든다. 저장은 하지 않음</summary>
+        public static string BuildInOpenScene()
+        {
             var multi = GameObject.Find(MultiplayerSetup.MultiRootName);
             if (multi == null) throw new InvalidOperationException("먼저 Multiplayer 설정(5 Patch Stage2 Scene)을 실행하세요");
             var old = multi.transform.Find("F2 Mission");
@@ -41,17 +58,59 @@ namespace VoidLast.MapTools
                 var p = m.transform.position; p.y = Floor; return p;
             }
 
-            // 1) 정비 보관실: 전력 모듈 보관함
+            Physics.SyncTransforms();
+
+            // 0) 화물 분류실: 검역 카드 / 검역 관제실: 봉쇄 해제 콘솔 / 장비 작업실: 봉쇄 문 2개, 절단기
+            Item(root, FarmingItemKind.QuarantineCard, "Quarantine Card", new Vector3(31.9f, 0, 27.7f), true);
+            var console = Device(root, "Quarantine Console", "P_Technic_Console_01", new Vector3(29f, Floor, -41f), 0f, lamp,
+                MissionInteractable.Kind.QuarantineConsole, "검역 카드로 봉쇄 해제", 2f);
+            log.Add(Describe(console));
+            var lockdownDoors = new[]
+            {
+                LockdownDoor(root, "Lockdown Door N-NE", new Vector3(11f, Floor, -19f), true),
+                LockdownDoor(root, "Lockdown Door N-C", new Vector3(1f, Floor, -14f), false),
+            };
+            Item(root, FarmingItemKind.Cutter, "Cutter", new Vector3(10.5f, 0, -14.2f), true);
+
+            // 1) 정비 보관실: 전력 모듈 보관함 (절단기로 자르면 앞에 모듈이 나타남)
             // 방 가운데(마커)에는 바닥 안개 효과가 짙어서, 같은 방 북쪽 벽 앞에 둔다
             var moduleAt = Marker("F2_Mission_PowerModule_NW") + new Vector3(0f, 0f, -6.7f);
             var module = Device(root, "Power Module Rack", "P_Electric_Battery_01", moduleAt, 0f, lamp,
-                MissionInteractable.Kind.PowerModule, "보조 우주선용 전력 모듈 꺼내기", 3f);
+                MissionInteractable.Kind.PowerModule, "절단기로 보관함을 잘라 전력 모듈 꺼내기", 3f);
             log.Add(Describe(module));
+            var modulePickup = Item(root, FarmingItemKind.PowerModule, "Power Module", moduleAt + new Vector3(0f, 0f, 1.8f), false);
+            modulePickup.gameObject.SetActive(false);
+
+            // 중앙 화물창: 전력 모듈을 1층으로 내려보내는 리프트
+            var liftAt = new Vector3(8f, Floor, 27.1f);
+            var liftPlatform = CargoLift(root, liftAt, out var liftCargo);
+            var liftConsole = Device(root, "Cargo Lift Console", "P_Technic_Console_01", liftAt + new Vector3(-2.5f, 0f, 0.9f), 0f, lamp,
+                MissionInteractable.Kind.CargoLift, "전력 모듈을 싣고 1층으로 내려보내기", 3f);
+            log.Add(Describe(liftConsole));
+
+            // 연료 커플러 후보 위치 (상자 위 또는 바닥). 판마다 이 중 한 곳에만 나타난다
+            var couplerSpots = new List<FpsWorldPickup>();
+            foreach (var at in new[]
+            {
+                new Vector3(-28.9f, 0, 30.2f),   // 컨테이너 보관실
+                new Vector3(17.2f, 0, 26.5f),    // 중앙 화물창
+                new Vector3(-35.2f, 0, -25.7f),  // A 계단 대기실
+                new Vector3(-9.5f, 0, -41.7f),   // 정비 보관실
+                new Vector3(8.8f, 0, 50.8f),     // 검역 보관실
+                new Vector3(17.9f, 0, -16.6f),   // 장비 작업실
+                new Vector3(34.5f, 0, -45f),     // 검역 관제실
+                new Vector3(45.6f, 0, 26.4f),    // 화물 분류실
+            })
+            {
+                var spot = Item(root, FarmingItemKind.FuelCoupler, "Fuel Coupler " + (couplerSpots.Count + 1), at, true);
+                spot.gameObject.SetActive(false);
+                couplerSpots.Add(spot);
+            }
 
             // 2) 연료 공급실: 연료 공급 제어반 + 밸브
             var fuelAt = Marker("F2_Mission_FuelSupply_SW");
             var fuel = Device(root, "Fuel Supply Console", "P_Technic_Console_01_B", fuelAt, 90f, lamp,
-                MissionInteractable.Kind.FuelPump, "연료 공급 장치 가동", 2f);
+                MissionInteractable.Kind.FuelPump, "연료 커플러를 끼우고 충전 시작", 2f);
             var valve = Kit("P_Pipe_Valve_01");
             if (valve != null)
             {
@@ -62,15 +121,23 @@ namespace VoidLast.MapTools
             }
             log.Add(Describe(fuel));
 
-            // 3) 검역 보관실: 승무원 기록 단말기 (선택)
-            var trace = Device(root, "Crew Log Terminal", "P_Info_Terminal_01", Marker("F2_Mission_IntrusionTrace_SE"), 180f, lamp,
+            // 컨테이너 보관실: 충전 중간에 고장 나는 연료 밸브
+            var valve2 = Device(root, "Fuel Valve Junction", "P_Pipe_Valve_01", new Vector3(-41.6f, Floor, 28.5f), 90f, lamp,
+                MissionInteractable.Kind.FuelValve, "연료 밸브 고치기", 4f);
+            log.Add(Describe(valve2));
+
+            // 3) 검역 보관실: 승무원 기록 단말기 (선택). 조사하면 옆에 배터리가 나타남
+            var traceAt = Marker("F2_Mission_IntrusionTrace_SE");
+            var trace = Device(root, "Crew Log Terminal", "P_Info_Terminal_01", traceAt, 180f, lamp,
                 MissionInteractable.Kind.IntrusionLog, "승무원 기록 확인", 1f);
             trace.statusLight.color = new Color(0.3f, 0.85f, 1f);
             log.Add(Describe(trace));
+            var batteryReward = Item(root, FarmingItemKind.Battery, "Battery Reward", traceAt + new Vector3(1.3f, 0f, -1f), false);
+            batteryReward.gameObject.SetActive(false);
 
-            // 4) 2층 → 1층 계단 입구 안내등 (탈출 준비가 끝나면 켜짐)
+            // 4) 2층 → 1층 계단 입구 안내등 (탈출 준비가 끝나면 켜짐). 2층은 A 계단으로만 내려간다
             var rallyLights = new List<Light>();
-            foreach (var x in new[] { -41.2f, 41.2f })
+            foreach (var x in new[] { -41.2f })
             {
                 var lg = new GameObject(x < 0 ? "Stair A Rally Light" : "Stair B Rally Light").transform;
                 lg.SetParent(root, false);
@@ -86,7 +153,11 @@ namespace VoidLast.MapTools
             dirGo.transform.SetParent(root, false);
             dirGo.AddComponent<NetworkObject>();
             var dir = dirGo.AddComponent<F2MissionDirector>();
-            dir.powerModule = module; dir.fuelPump = fuel; dir.intrusionLog = trace; dir.rallyLights = rallyLights.ToArray();
+            dir.quarantineConsole = console; dir.powerModule = module; dir.cargoLift = liftConsole;
+            dir.fuelPump = fuel; dir.fuelValve = valve2; dir.intrusionLog = trace; dir.rallyLights = rallyLights.ToArray();
+            dir.modulePickup = modulePickup; dir.couplerSpots = couplerSpots.ToArray(); dir.batteryReward = batteryReward;
+            dir.lockdownDoors = lockdownDoors;
+            dir.liftPlatform = liftPlatform; dir.liftCargo = liftCargo;
             dir.fuelRoom = new Bounds(new Vector3(-62f, 10.2f, 26f), new Vector3(21f, 5f, 17f));     // 연료 공급실 (x -72~-52, z 18~34)
             dir.rallyZones = new[]
             {
@@ -95,25 +166,153 @@ namespace VoidLast.MapTools
             };
             dir.font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MultiplayerSetup.FontAssetPath);
 
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
-            // 씬에 놓인 NetworkObject 해시는 저장 후 확정 → 다시 계산하고 저장
-            var validate = typeof(NetworkObject).GetMethod("OnValidate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-            foreach (var no in Object.FindObjectsByType<NetworkObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            // 2층은 A 계단으로만 내려간다 (층별 씬에만 있음)
+            var floorTransition = Object.FindFirstObjectByType<FloorTransition>(FindObjectsInactive.Include);
+            if (floorTransition != null) { floorTransition.descentSides = "A"; EditorUtility.SetDirty(floorTransition); }
+
+            // 쪼꼬미가 봉쇄된 장비 작업실 안에서 시작하지 않도록 중앙 화물창으로 옮긴다
+            var small = GameObject.Find("VOID_LAST_Integration_Test/VOID_LAST_SmallMonster");
+            if (small != null)
             {
-                if (no.gameObject.scene != scene) continue;
-                validate?.Invoke(no, null);
-                EditorUtility.SetDirty(no);
-                if (PrefabUtility.IsPartOfPrefabInstance(no)) PrefabUtility.RecordPrefabInstancePropertyModifications(no);
+                small.transform.position = new Vector3(3f, Floor + 0.07f, 18f);
+                EditorUtility.SetDirty(small.transform);
+                if (PrefabUtility.IsPartOfPrefabInstance(small)) PrefabUtility.RecordPrefabInstancePropertyModifications(small.transform);
             }
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
-            string s = "F2 mission: " + string.Join(" | ", log);
-            Debug.Log("[F2MissionSetup] " + s);
-            return s;
+
+            return "F2 mission: " + string.Join(" | ", log);
         }
 
         static string Describe(MissionInteractable d) => d.name + " @" + d.transform.position.ToString("F1");
+
+        /// <summary>임무 물건을 놓는다. onTop이면 그 지점 위에 있는 소품(상자·탁자) 위에, 아니면 바닥에 놓는다.</summary>
+        static FpsWorldPickup Item(Transform parent, FarmingItemKind kind, string name, Vector3 at, bool onTop)
+        {
+            var prefab = F2MissionItemAssets.Load(kind);
+            if (prefab == null) throw new InvalidOperationException("임무 물건 프리팹 없음: " + kind);
+            var pickup = (FpsWorldPickup)PrefabUtility.InstantiatePrefab(prefab, parent);
+            pickup.name = name;
+            float y = Floor;
+            if (onTop && Physics.Raycast(new Vector3(at.x, Floor + 3.2f, at.z), Vector3.down, out var hit, 3.4f, ~0, QueryTriggerInteraction.Ignore)) y = hit.point.y;
+            pickup.transform.position = new Vector3(at.x, y + 0.01f, at.z);
+            return pickup;
+        }
+
+        /// <summary>검역 봉쇄 문: 복도 폭을 재서 그 크기에 맞춘다. widthAlongX면 x축 방향으로 넓은 문.</summary>
+        static F2MissionDirector.LockdownDoor LockdownDoor(Transform parent, string name, Vector3 at, bool widthAlongX)
+        {
+            Vector3 side = widthAlongX ? Vector3.right : Vector3.forward;
+            Vector3 probe = at + Vector3.up * 1.5f;
+            float a = Physics.Raycast(probe, side, out var h1, 3.5f, ~0, QueryTriggerInteraction.Ignore) ? h1.distance : 2.5f;
+            float b = Physics.Raycast(probe, -side, out var h2, 3.5f, ~0, QueryTriggerInteraction.Ignore) ? h2.distance : 2.5f;
+            float width = a + b;
+            Vector3 center = at + side * ((a - b) * 0.5f);
+
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.SetPositionAndRotation(center, Quaternion.Euler(0, widthAlongX ? 0f : 90f, 0));
+
+            // 문짝 (계단 문과 같은 모델)
+            var leaf = new GameObject("Leaf").transform;
+            leaf.SetParent(go.transform, false);
+            var src = Kit("P_Ship_BigDoors_Fake_01");
+            if (src != null)
+            {
+                var model = (GameObject)PrefabUtility.InstantiatePrefab(src, leaf);
+                model.transform.localPosition = Vector3.zero;
+                model.transform.localRotation = Quaternion.identity;
+                model.transform.localScale = new Vector3(0.88f, 0.88f, 0.6f);
+                foreach (var t in model.GetComponentsInChildren<Transform>(true)) GameObjectUtility.SetStaticEditorFlags(t.gameObject, 0);
+                var rs = model.GetComponentsInChildren<MeshRenderer>();
+                if (rs.Length > 0)
+                {
+                    var bounds = rs[0].bounds; foreach (var r in rs) bounds.Encapsulate(r.bounds);
+                    float current = widthAlongX ? bounds.size.x : bounds.size.z;
+                    if (current > 0.1f) { var s = model.transform.localScale; s.x *= width / current; model.transform.localScale = s; }
+                }
+            }
+            // 문짝 모서리가 비스듬해서 뒤가 비쳐 보이므로 뒤에 철판을 댄다
+            F2MissionItemAssets.Part(leaf, "Back Plate", PrimitiveType.Cube, new Vector3(0, 2f, 0), new Vector3(width + 0.1f, 4f, 0.08f),
+                F2MissionItemAssets.Mat("M_Item_Dark", new Color(0.09f, 0.1f, 0.11f), 0.6f, 0.45f));
+            var warning = new GameObject("Warning Light");
+            warning.transform.SetParent(leaf, false);
+            warning.transform.localPosition = new Vector3(0, 3.2f, 0);
+            var light = warning.AddComponent<Light>();
+            light.type = LightType.Point; light.range = 6f; light.intensity = 1.6f; light.color = new Color(1f, 0.15f, 0.1f); light.shadows = LightShadows.None;
+
+            // 길을 막는 콜라이더 + 조준 판정 + 몬스터 길찾기 차단
+            var blockerGo = new GameObject("Blocker");
+            blockerGo.transform.SetParent(go.transform, false);
+            var blocker = blockerGo.AddComponent<BoxCollider>();
+            blocker.center = new Vector3(0, 2f, 0);
+            blocker.size = new Vector3(width + 0.1f, 4f, 0.35f);
+            var obstacle = blockerGo.AddComponent<NavMeshObstacle>();
+            obstacle.shape = NavMeshObstacleShape.Box;
+            obstacle.center = blocker.center;
+            obstacle.size = blocker.size + new Vector3(0, 0, 0.3f);
+            obstacle.carving = true;
+
+            var triggerGo = new GameObject("Interact Trigger");
+            triggerGo.layer = 2;   // Ignore Raycast: 총알에는 걸리지 않음
+            triggerGo.transform.SetParent(go.transform, false);
+            var trigger = triggerGo.AddComponent<BoxCollider>();
+            trigger.isTrigger = true;
+            trigger.center = blocker.center;
+            trigger.size = new Vector3(width, 4f, 0.8f);
+
+            var info = go.AddComponent<MissionInteractable>();
+            info.kind = MissionInteractable.Kind.LockdownDoor;
+            info.maxDistance = 3f;
+
+            return new F2MissionDirector.LockdownDoor { leaf = leaf, blocker = blocker, interactTrigger = trigger, obstacle = obstacle, openOffset = new Vector3(0, 4f, 0) };
+        }
+
+        /// <summary>화물 리프트: 바닥 구멍 + 기둥과 윗보. 발판은 허리 높이에서 시작해 구멍 아래로 내려간다.</summary>
+        static Transform CargoLift(Transform parent, Vector3 at, out GameObject cargo)
+        {
+            var dark = F2MissionItemAssets.Mat("M_Item_Dark", new Color(0.09f, 0.1f, 0.11f), 0.6f, 0.45f);
+            var metal = F2MissionItemAssets.Mat("M_Item_Metal", new Color(0.62f, 0.64f, 0.67f), 0.95f, 0.6f);
+            var yellow = F2MissionItemAssets.Mat("M_Item_Yellow", new Color(0.95f, 0.75f, 0.1f), 0.05f, 0.55f);
+            var pit = F2MissionItemAssets.Mat("M_Item_Pit", Color.black, 0f, 0f);
+            var root = new GameObject("Cargo Lift").transform;
+            root.SetParent(parent, false);
+            root.position = at;
+
+            const float half = 1.45f, height = 3.1f;
+            F2MissionItemAssets.Part(root, "Pit", PrimitiveType.Cube, new Vector3(0, 0.012f, 0), new Vector3(half * 2, 0.012f, half * 2), pit);
+            foreach (var s in new[] { -1, 1 })
+            {
+                F2MissionItemAssets.Part(root, "Edge X", PrimitiveType.Cube, new Vector3(0, 0.02f, s * half), new Vector3(half * 2 + 0.2f, 0.03f, 0.2f), yellow);
+                F2MissionItemAssets.Part(root, "Edge Z", PrimitiveType.Cube, new Vector3(s * half, 0.02f, 0), new Vector3(0.2f, 0.03f, half * 2 + 0.2f), yellow);
+                F2MissionItemAssets.Part(root, "Beam", PrimitiveType.Cube, new Vector3(0, height, s * half), new Vector3(half * 2 + 0.2f, 0.16f, 0.16f), dark);
+                foreach (var u in new[] { -1, 1 })
+                    F2MissionItemAssets.Part(root, "Post", PrimitiveType.Cube, new Vector3(u * half, height * 0.5f, s * half), new Vector3(0.16f, height, 0.16f), dark);
+            }
+
+            var platform = new GameObject("Lift Platform").transform;
+            platform.SetParent(root, false);
+            platform.localPosition = new Vector3(0, 0.95f, 0);
+            F2MissionItemAssets.Part(platform, "Deck", PrimitiveType.Cube, Vector3.zero, new Vector3(half * 2 - 0.25f, 0.1f, half * 2 - 0.25f), metal);
+
+            // 실은 전력 모듈 (보낼 때만 보임)
+            var modulePrefab = F2MissionItemAssets.Load(FarmingItemKind.PowerModule);
+            var model = Object.Instantiate(modulePrefab.transform.Find("Model").gameObject, platform, false);
+            model.name = "Loaded Module";
+            model.transform.localPosition = new Vector3(0, 0.05f, 0);
+            model.transform.localScale = Vector3.one * 1.3f;
+            model.SetActive(false);
+            cargo = model;
+
+            // 기둥 안쪽으로 못 들어가게 막는다 (몬스터 길찾기도 돌아가게)
+            var box = root.gameObject.AddComponent<BoxCollider>();
+            box.center = new Vector3(0, height * 0.5f, 0);
+            box.size = new Vector3(half * 2 + 0.2f, height, half * 2 + 0.2f);
+            var obstacle = root.gameObject.AddComponent<NavMeshObstacle>();
+            obstacle.shape = NavMeshObstacleShape.Box;
+            obstacle.center = box.center;
+            obstacle.size = box.size;
+            obstacle.carving = true;
+            return platform;
+        }
 
         static GameObject Kit(string name)
         {

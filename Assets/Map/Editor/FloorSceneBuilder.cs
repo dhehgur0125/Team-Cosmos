@@ -132,6 +132,10 @@ namespace VoidLast.MapTools
             var ft = ftGo.AddComponent<FloorTransition>();
             ft.floor = floor;
             ft.nextSceneName = floor > 1 ? SceneName(floor - 1) : "";
+            ft.descentSides = floor == 2 ? "A" : "AB";   // 2층은 기획상 A 계단으로만 내려간다
+
+            // 7) 고치 (그 층에서 걸어갈 수 있는 자리를 골라 저장)
+            log.Add(CocoonSetup.BuildInOpenScene(floor));
             ft.font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MultiplayerSetup.FontAssetPath);
 
             StairDoorSetup.SaveWithNetworkHashes(scene);

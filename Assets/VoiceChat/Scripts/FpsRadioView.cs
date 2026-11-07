@@ -53,6 +53,10 @@ public sealed class FpsRadioView : MonoBehaviour
     {
         inventory = GetComponent<FpsInventory>();
         block = new MaterialPropertyBlock();
+        // 배터리·임무 물건도 무전기와 같은 자리에 들고 있는 모습을 보여 준다
+        var carried = GetComponent<FpsCarriedItemView>();
+        if (carried == null) carried = gameObject.AddComponent<FpsCarriedItemView>();
+        carried.Configure(firstPersonParent, gloveSource, worldSocket);
         if (radioModelPrefab == null) return;
 
         var fpRenderers = new System.Collections.Generic.List<Renderer>();

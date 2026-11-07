@@ -49,7 +49,12 @@ public static class FloorCarryOver
         HasPlayerState = true;
         Health = health.Current;
         Dead = health.IsDead;
-        for (int i = 0; i < Items.Length; i++) Items[i] = inv != null ? inv.ItemAt(i) : FarmingItemKind.None;
+        // 임무 물건은 그 층에서만 쓴다: 아래층으로 가져가지 않는다
+        for (int i = 0; i < Items.Length; i++)
+        {
+            var kind = inv != null ? inv.ItemAt(i) : FarmingItemKind.None;
+            Items[i] = FarmingItems.IsMissionItem(kind) ? FarmingItemKind.None : kind;
+        }
         if (pistol != null) { Magazine = pistol.Magazine; Reserve = pistol.Reserve; }
         Flashlight = light != null && light.On;
     }

@@ -4,10 +4,10 @@ using UnityEngine;
 using VoidLast.Player;
 
 /// <summary>
-/// 바닥에 놓인 아이템(주사기·무전기)을 모든 대원 화면에서 똑같이 유지한다.
-///  - 씬에 배치된 아이템: 모든 화면에서 같은 순서(위치 기준)로 번호를 매긴다.
+/// 바닥에 놓인 아이템(주사기·무전기·배터리·임무 물건)을 모든 대원 화면에서 똑같이 유지한다.
+///  - 씬에 배치된 아이템: 모든 화면에서 같은 순서(위치 기준)로 번호를 매긴다. 아직 꺼져 있는 물건(임무가 진행되면 나타나는 물건)도 포함한다.
 ///  - 누가 주우면: 서버에 알려서 다른 대원 화면에서도 사라지게 한다. (같은 순간 두 명이 주우면 서버가 먼저 받은 쪽만 인정)
-///  - Q로 내려놓으면: 다른 대원 화면에도 같은 자리에 같은 아이템을 만든다.
+///  - Q로 내려놓거나 죽어서 떨어뜨리면: 다른 대원 화면에도 같은 자리에 같은 아이템을 만든다.
 /// 아이템 자체는 NetworkObject가 아니어서 기존 FpsWorldPickup/FpsItemInteractor 동작을 그대로 쓴다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -123,13 +123,27 @@ public sealed class NetworkPickupRegistry : NetworkBehaviour
     [Rpc(SendTo.NotMe)]
     void DropRpc(int id, byte kind, Vector3 position, Quaternion rotation, Vector3 velocity)
     {
-        var prefab = (FarmingItemKind)kind == FarmingItemKind.Radio ? radioPickupPrefab : syringePickupPrefab;
+        SpawnDrop(id, (FarmingItemKind)kind, position, rotation, velocity);
+    }
+
+    /// <summary>방장 전용: 게임을 나간 대원의 물건을 마지막 위치에 떨어뜨린다</summary>
+    public void ServerSpawnDrop(FarmingItemKind kind, Vector3 position)
+    {
+        if (!IsSpawned || !IsServer) return;
+        int id = 900000000 + (++_dropCounter);
+        SpawnDrop(id, kind, position, Quaternion.identity, Vector3.zero);
+        DropRpc(id, (byte)kind, position, Quaternion.identity, Vector3.zero);
+    }
+
+    void SpawnDrop(int id, FarmingItemKind kind, Vector3 position, Quaternion rotation, Vector3 velocity)
+    {
+        var prefab = kind == FarmingItemKind.Radio ? radioPickupPrefab : kind == FarmingItemKind.Syringe ? syringePickupPrefab : FarmingItems.PickupPrefab(kind);
         if (prefab == null || _byId.ContainsKey(id)) return;
         var pickup = Instantiate(prefab, position, rotation);
         pickup.ConfigureDrop(null);
         var body = pickup.GetComponent<Rigidbody>();
         if (body != null) body.linearVelocity = velocity;
-        if (pickup.GetComponent<DetectableItem>() == null) pickup.gameObject.AddComponent<DetectableItem>();
+        if (FarmingItems.IsScannable(kind) && pickup.GetComponent<DetectableItem>() == null) pickup.gameObject.AddComponent<DetectableItem>();
         Register(id, pickup);
     }
 }
