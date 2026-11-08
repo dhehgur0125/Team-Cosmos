@@ -11,6 +11,24 @@ public class LobbyChat : NetworkBehaviour
 {
     /// <summary>(보낸 사람, 내용, 시스템 메시지 여부)</summary>
     public event Action<string, string, bool> MessageReceived;
+    /// <summary>방장이 게임 시작을 눌렀거나(true) 시작이 실패했을 때(false). 참가자가 로딩 화면을 바로 띄우는 데 쓴다</summary>
+    public event Action<bool> GameStartChanged;
+
+    /// <summary>
+    /// 방장만 호출: 게임 시작을 모든 대원에게 바로 알린다.
+    /// 네트워크 씬 불러오기는 방장이 씬을 다 불러온 뒤에야 참가자에게 신호를 보내므로, 그 사이 참가자 화면이 대기실에 멈춰 있지 않게 한다.
+    /// </summary>
+    public void AnnounceGameStart(bool starting)
+    {
+        if (!IsSpawned || !IsServer) return;
+        GameStartRpc(starting);
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void GameStartRpc(bool starting)
+    {
+        GameStartChanged?.Invoke(starting);
+    }
 
     public void Send(string sender, string text)
     {

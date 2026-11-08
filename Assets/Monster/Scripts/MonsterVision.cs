@@ -23,19 +23,42 @@ namespace VoidLast.Monster
             if (!turnTowardHit && flat.sqrMagnitude > 0.001f && Vector3.Angle(transform.forward, flat) > fieldOfView * 0.5f) return false;
             return ClearLine(Eye, capsule.bounds.center, target.transform) || ClearLine(Eye, capsule.bounds.center + Vector3.up * capsule.bounds.extents.y * 0.7f, target.transform);
         }
+        // 최적화: 레이캐스트 결과를 담을 배열을 재사용해 매번 새 메모리를 만들지 않는다 (GC 끊김 방지)
+        static readonly RaycastHit[] hitBuffer = new RaycastHit[64];
         public bool ClearLine(Vector3 origin, Vector3 point, Transform target)
         {
             Vector3 delta = point - origin;
-            foreach (var hit in Physics.RaycastAll(origin, delta.normalized, delta.magnitude, sightMask, QueryTriggerInteraction.Ignore))
-                if (!hit.transform.IsChildOf(transform) && !hit.transform.IsChildOf(target)) return false;
+            int count = Physics.RaycastNonAlloc(origin, delta.normalized, hitBuffer, delta.magnitude, sightMask, QueryTriggerInteraction.Ignore);
+            if (count >= hitBuffer.Length)   // 너무 많이 맞으면 예전 방식으로 전부 확인
+            {
+                foreach (var hit in Physics.RaycastAll(origin, delta.normalized, delta.magnitude, sightMask, QueryTriggerInteraction.Ignore))
+                    if (!hit.transform.IsChildOf(transform) && !hit.transform.IsChildOf(target)) return false;
+                return true;
+            }
+            for (int i = 0; i < count; i++)
+                if (!hitBuffer[i].transform.IsChildOf(transform) && !hitBuffer[i].transform.IsChildOf(target)) return false;
             return true;
+        }
+
+        // 최적화: 씬 전체에서 대원을 찾는 일을 0.5초에 한 번만 하고, 모든 몬스터가 같은 목록을 나눠 쓴다
+        static FpsHealth[] playerCache = new FpsHealth[0];
+        static float playerCacheTime = float.NegativeInfinity;
+        static FpsHealth[] Players()
+        {
+            if (Time.time - playerCacheTime > 0.5f || Time.time < playerCacheTime)
+            {
+                playerCache = FindObjectsByType<FpsHealth>(FindObjectsInactive.Exclude);
+                playerCacheTime = Time.time;
+            }
+            return playerCache;
         }
         public FpsHealth FindVisible(FpsHealth preferred = null)
         {
             if (CanSee(preferred)) return preferred;
             FpsHealth nearest = null; float distance = float.PositiveInfinity;
-            foreach (var candidate in FindObjectsByType<FpsHealth>(FindObjectsSortMode.InstanceID))
+            foreach (var candidate in Players())
             {
+                if (candidate == null) continue;   // 목록을 만든 뒤 사라진 대원
                 float d = (candidate.transform.position - transform.position).sqrMagnitude;
                 if (d < distance && CanSee(candidate)) { nearest = candidate; distance = d; }
             }

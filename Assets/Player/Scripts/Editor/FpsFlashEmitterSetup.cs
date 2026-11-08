@@ -78,18 +78,46 @@ namespace VoidLast.Player.Editor
             }
             finally { if (existing) PrefabUtility.UnloadPrefabContents(root); else Object.DestroyImmediate(root); }
         }
-        static void ConfigurePlayer(string path, string sourcePath, bool online)
+        /// <summary>
+        /// 고유 아이템 선택용: 원래 대원 프리팹(VOID_LAST_FPS)에 빛 방출기(스턴)를 함께 넣고, 네트워크 프리팹에 동기화 컴포넌트를 붙인다.
+        /// 구급상자는 그대로 두며, 3번 칸에서 무엇을 꺼낼지는 대기실에서 고른 고유 아이템(FpsUniqueItem)이 정한다.
+        /// </summary>
+        [MenuItem("VOID LAST/Player/Add Flash Emitter To Main Players (Unique Items)")]
+        public static void ApplyToMainPlayers()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play Mode first.");
+            FpsAssetSaveGuard.Active = true;
+            try
+            {
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath) == null) BuildModel();
+                ConfigurePlayer(FpsAssetSetup.PrefabPath, FpsAssetSetup.PrefabPath, false, false);
+                var network = PrefabUtility.LoadPrefabContents(FpsMedicalKitSetup.NetworkPath);
+                try
+                {
+                    if (network.GetComponent<FpsFlashEmitterNetwork>() == null) network.AddComponent<FpsFlashEmitterNetwork>();
+                    PrefabUtility.SaveAsPrefabAsset(network, FpsMedicalKitSetup.NetworkPath);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(network); }
+                AssetDatabase.SaveAssets();
+                Debug.Log("[고유 아이템] VOID_LAST_FPS에 빛 방출기, VOID_LAST_FPS_Network에 FpsFlashEmitterNetwork를 넣었습니다.");
+            }
+            finally { FpsAssetSaveGuard.Active = false; }
+        }
+        static void ConfigurePlayer(string path, string sourcePath, bool online, bool testVariant = true)
         {
             var preview = EditorSceneManager.NewPreviewScene(); GameObject root = null; bool existing = AssetDatabase.LoadAssetAtPath<GameObject>(path) != null;
             try
             {
                 root = existing ? PrefabUtility.LoadPrefabContents(path) : (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(sourcePath), preview);
-                root.name = online ? "VOID_LAST_FPS_FlashEmitter_Network_Test" : "VOID_LAST_FPS_FlashEmitter_Test";
-                root.GetComponent<FpsMedicalKit>().enabled = false; // Only this test variant; original healer prefab stays intact.
+                if (testVariant)
+                {
+                    root.name = online ? "VOID_LAST_FPS_FlashEmitter_Network_Test" : "VOID_LAST_FPS_FlashEmitter_Test";
+                    root.GetComponent<FpsMedicalKit>().enabled = false; // Only this test variant; original healer prefab stays intact.
+                }
                 var emitter = root.GetComponent<FpsFlashEmitter>(); if (emitter == null) emitter = root.AddComponent<FpsFlashEmitter>();
                 var view = root.GetComponent<FpsFlashEmitterView>(); if (view == null) view = root.AddComponent<FpsFlashEmitterView>();
                 if (online && root.GetComponent<FpsFlashEmitterNetwork>() == null) root.AddComponent<FpsFlashEmitterNetwork>();
-                var equipment = new SerializedObject(root.GetComponent<FpsEquipment>()); equipment.FindProperty("selectedSlot").intValue = 3; equipment.ApplyModifiedPropertiesWithoutUndo();
+                if (testVariant) { var equipment = new SerializedObject(root.GetComponent<FpsEquipment>()); equipment.FindProperty("selectedSlot").intValue = 3; equipment.ApplyModifiedPropertiesWithoutUndo(); }
                 var camera = root.GetComponentInChildren<Camera>(true); var local = Child(camera.transform, "FlashEmitterRoot");
                 var localModel = Model(local);
                 if (local.Find("FPS Right Glove") == null)

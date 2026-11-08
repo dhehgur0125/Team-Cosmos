@@ -25,7 +25,10 @@ namespace VoidLast.Player
         public int RemainingUses => Online ? network.RemainingUses : remaining;
         public float HealAmount => healAmount;
         public float UseDuration => useDuration;
-        public bool IsSelected => isActiveAndEnabled && health != null && !health.IsDead && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Item;
+        FpsUniqueItem unique;
+        FpsUniqueItem Unique => unique != null ? unique : unique = FpsUniqueItem.For(gameObject);
+        // 고유 아이템으로 힐러를 고른 대원만 3번 칸에서 꺼낸다
+        public bool IsSelected => isActiveAndEnabled && health != null && !health.IsDead && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Item && Unique.Has(UniqueItemKind.Healer);
         public bool IsUsing => Online ? network.IsUsing : recipient != null;
         public bool UsingOnOther => Online ? network.UsingOnOther : recipient != null && recipient != health;
         public float UseProgress => Online ? network.UseProgress : IsUsing ? Mathf.Clamp01(elapsed / useDuration) : 0;

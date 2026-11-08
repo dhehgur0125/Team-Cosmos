@@ -78,6 +78,16 @@ namespace VoidLast.Player
             for (int i = 0; i < Capacity; i++) items[i] = i < list.Length ? list[i] : FarmingItemKind.None;
             Changed?.Invoke();
         }
+        /// <summary>게임 시작 때 받는 물건을 정해진 칸에 넣는다 (무전 고유 아이템: 4번 칸에 동료에게 줄 무전기). 칸이 차 있으면 빈 칸에 넣는다</summary>
+        public bool GiveStartingItem(int index, FarmingItemKind item)
+        {
+            if (IsNetworkProxy || item == FarmingItemKind.None) return false;
+            if (index < 0 || index >= Capacity || items[index] != FarmingItemKind.None) index = Array.IndexOf(items, FarmingItemKind.None);
+            if (index < 0) return false;
+            items[index] = item;
+            Changed?.Invoke(); ShowHotbar();
+            return true;
+        }
         public bool TryAdd(FarmingItemKind item)
         {
             if (IsNetworkProxy) return false;

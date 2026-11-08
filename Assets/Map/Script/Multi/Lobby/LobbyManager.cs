@@ -9,6 +9,7 @@ using Unity.Services.Multiplayer;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using VoidLast.Player;
 
 /// <summary>
 /// 멀티 대기실(로비).
@@ -24,6 +25,7 @@ public class LobbyManager : MonoBehaviour
     const string KeyReady = "ready";
     const string KeyHostName = "host";
     const string KeyState = "state";
+    const string KeyUnique = "unique";   // 고른 고유 아이템 (UniqueItems.Code)
     const string PrefsNickname = "VL_Nickname";
 
     [Header("설정")]
@@ -97,6 +99,12 @@ public class LobbyManager : MonoBehaviour
     readonly string[] _slotPlayerIds = new string[4];
     float _nextVoiceRefresh;
 
+    // 고유 아이템 고르기 (대기방 오른쪽 아래 카드에 코드로 만든다)
+    Button[] _uniqueButtons;
+    TMP_Text[] _uniqueLabels;
+    readonly Dictionary<UniqueItemKind, string> _uniqueOwners = new Dictionary<UniqueItemKind, string>();
+    bool _savingUnique;
+
     // ------------------------------------------------------------------ lifecycle
     void Awake()
     {
@@ -123,8 +131,10 @@ public class LobbyManager : MonoBehaviour
             maxPlayerButtons[i].onClick.AddListener(() => SelectMaxPlayers(count));
         }
 
-        if (chat != null) chat.MessageReceived += OnChatMessage;
+        if (chat != null) { chat.MessageReceived += OnChatMessage; chat.GameStartChanged += OnGameStartChanged; }
         if (micButton != null) micButton.onClick.AddListener(ToggleMic);
+        BuildUniquePicker();
+        BuildGraphicsButton();
     }
 
     async void Start()
@@ -226,7 +236,7 @@ public class LobbyManager : MonoBehaviour
 
     void OnDestroy()
     {
-        if (chat != null) chat.MessageReceived -= OnChatMessage;
+        if (chat != null) { chat.MessageReceived -= OnChatMessage; chat.GameStartChanged -= OnGameStartChanged; }
         if (NetworkManager.Singleton != null)
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnNetworkDisconnected;
         UnbindSession();
@@ -280,11 +290,17 @@ public class LobbyManager : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    Dictionary<string, PlayerProperty> MyPlayerProperties(bool ready) => new Dictionary<string, PlayerProperty>
+    /// <summary>방을 만들거나 들어갈 때의 내 정보. 고유 아이템은 방에 들어간 뒤 고른다</summary>
+    Dictionary<string, PlayerProperty> MyPlayerProperties(bool ready)
     {
-        { KeyName, new PlayerProperty(Nickname, VisibilityPropertyOptions.Member) },
-        { KeyReady, new PlayerProperty(ready ? "1" : "0", VisibilityPropertyOptions.Member) },
-    };
+        UniqueItems.LocalChoice = UniqueItemKind.None;
+        return new Dictionary<string, PlayerProperty>
+        {
+            { KeyName, new PlayerProperty(Nickname, VisibilityPropertyOptions.Member) },
+            { KeyReady, new PlayerProperty(ready ? "1" : "0", VisibilityPropertyOptions.Member) },
+            { KeyUnique, new PlayerProperty("", VisibilityPropertyOptions.Member) },
+        };
+    }
 
     void OpenCreatePanel()
     {
@@ -505,6 +521,9 @@ public class LobbyManager : MonoBehaviour
     static bool PlayerReady(IReadOnlyPlayer p) =>
         p.Properties != null && p.Properties.TryGetValue(KeyReady, out var prop) && prop.Value == "1";
 
+    static UniqueItemKind PlayerUnique(IReadOnlyPlayer p) =>
+        p.Properties != null && p.Properties.TryGetValue(KeyUnique, out var prop) ? UniqueItems.Parse(prop.Value) : UniqueItemKind.None;
+
     void OnPlayerJoined(string playerId)
     {
         // 이름은 다음 Changed 이벤트에서 들어오므로 잠시 뒤 표시
@@ -574,6 +593,14 @@ public class LobbyManager : MonoBehaviour
             return a.Joined.CompareTo(b.Joined);
         });
 
+        // 고유 아이템 주인: 같은 아이템을 둘이 동시에 골랐으면 방장 → 먼저 들어온 대원이 가진다
+        _uniqueOwners.Clear();
+        foreach (var p in players)
+        {
+            var kind = PlayerUnique(p);
+            if (kind != UniqueItemKind.None && !_uniqueOwners.ContainsKey(kind)) _uniqueOwners[kind] = p.Id;
+        }
+
         string myId = AuthenticationService.Instance.PlayerId;
         for (int i = 0; i < slots.Length; i++)
         {
@@ -587,9 +614,25 @@ public class LobbyManager : MonoBehaviour
                 _knownNames[p.Id] = PlayerName(p);
                 slots[i].SetPlayer(PlayerName(p), isHost, isHost || PlayerReady(p), isMe,
                     _session.IsHost && !isMe, () => _ = KickAsync(pid));
+                var kind = PlayerUnique(p);
+                slots[i].SetUniqueItem(kind != UniqueItemKind.None ? UniqueItems.DisplayName(kind) : null);
             }
             else if (i < _session.MaxPlayers) slots[i].SetOpen();
             else slots[i].SetClosed();
+        }
+
+        // 내 선택 확인: 다른 대원이 먼저 같은 아이템을 골랐으면 내 선택을 지운다
+        var me = players.Find(p => p.Id == myId);
+        if (me != null && !_savingUnique)
+        {
+            var mine = PlayerUnique(me);
+            if (mine != UniqueItemKind.None && _uniqueOwners.TryGetValue(mine, out var owner) && owner != myId)
+            {
+                string other = _knownNames.TryGetValue(owner, out var n) ? n : "다른 대원";
+                SetStatus($"{other} 님이 먼저 '{UniqueItems.DisplayName(mine)}'을(를) 골랐어요. 다른 고유 아이템을 골라 주세요.", true);
+                _ = SaveUniqueAsync(UniqueItemKind.None, true);
+            }
+            else UniqueItems.LocalChoice = mine;
         }
         UpdateRoomButtons();
     }
@@ -609,14 +652,17 @@ public class LobbyManager : MonoBehaviour
         readyButton.gameObject.SetActive(!host);
         startButton.gameObject.SetActive(host);
 
+        UpdateUniquePicker();
+        var myPlayer = _session.GetPlayer(AuthenticationService.Instance.PlayerId);
+        bool picked = myPlayer != null && PlayerUnique(myPlayer) != UniqueItemKind.None;
+
         if (!host)
         {
-            var me = _session.GetPlayer(AuthenticationService.Instance.PlayerId);
-            bool ready = me != null && PlayerReady(me);
+            bool ready = myPlayer != null && PlayerReady(myPlayer);
             readyButtonText.text = ready ? "준비 취소" : "준비";
             readyButton.image.color = ready ? LobbyStyle.ButtonDark : LobbyStyle.Accent;
-            readyButton.interactable = !_busy;
-            startHintText.text = ready ? "방장이 시작하기를 기다리는 중..." : "준비를 누르면 방장이 게임을 시작할 수 있어요.";
+            readyButton.interactable = !_busy && !_savingUnique && (ready || picked);   // 고유 아이템을 골라야 준비할 수 있다
+            startHintText.text = ready ? "방장이 시작하기를 기다리는 중..." : !picked ? "고유 아이템을 하나 고른 뒤 준비를 눌러 주세요." : "준비를 누르면 방장이 게임을 시작할 수 있어요.";
             return;
         }
 
@@ -624,10 +670,199 @@ public class LobbyManager : MonoBehaviour
         int connected = nm != null && nm.IsServer ? nm.ConnectedClientsIds.Count : 0;
         bool allReady = AllGuestsReady(out int notReady);
         bool allConnected = connected >= _session.PlayerCount;
-        startButton.interactable = !_busy && allReady && allConnected;
+        bool allPicked = AllPickedUniqueItems(out int notPicked);
+        startButton.interactable = !_busy && !_savingUnique && allReady && allConnected && allPicked;
         if (!allConnected) startHintText.text = "들어오는 대원의 연결을 기다리는 중...";
+        else if (!picked) startHintText.text = "고유 아이템을 하나 골라 주세요.";
         else if (!allReady) startHintText.text = $"준비하지 않은 대원이 {notReady}명 있어요.";
+        else if (!allPicked) startHintText.text = $"고유 아이템을 고르지 않은 대원이 {notPicked}명 있어요.";
         else startHintText.text = _session.PlayerCount == 1 ? "혼자서도 시작할 수 있어요." : "모두 준비됐어요. 게임을 시작하세요!";
+    }
+
+    /// <summary>모든 대원이 서로 다른 고유 아이템을 골랐는지</summary>
+    bool AllPickedUniqueItems(out int notPicked)
+    {
+        notPicked = 0;
+        var used = new HashSet<UniqueItemKind>();
+        foreach (var p in _session.Players)
+        {
+            var kind = PlayerUnique(p);
+            if (kind == UniqueItemKind.None || !used.Add(kind)) notPicked++;
+        }
+        return notPicked == 0;
+    }
+
+    // ------------------------------------------------------------------ unique item picker
+    /// <summary>
+    /// 대기방 오른쪽 아래 카드(준비·게임 시작 버튼이 있는 곳)에 고유 아이템 버튼 4개를 만든다.
+    /// 로비 씬을 다시 만들지 않아도 되도록 실행할 때 코드로 만들고, 기존 버튼은 조금 아래로 줄여 자리를 만든다.
+    /// </summary>
+    void BuildUniquePicker()
+    {
+        if (readyButton == null || _uniqueButtons != null) return;
+        var card = readyButton.transform.parent as RectTransform;
+        if (card == null) return;
+
+        if (startHintText != null)
+        {
+            var sh = startHintText.rectTransform;
+            sh.anchoredPosition = new Vector2(sh.anchoredPosition.x, -10);
+            sh.sizeDelta = new Vector2(sh.sizeDelta.x, 44);
+            startHintText.fontSize = Mathf.Min(startHintText.fontSize, 19);
+        }
+        ResizeBottom(readyButton, 84, 74);
+        ResizeBottom(startButton, 84, 74);
+        ResizeBottom(leaveButton, 18, 56);
+
+        var row = new GameObject("UniqueItemPicker", typeof(RectTransform)).GetComponent<RectTransform>();
+        row.SetParent(card, false);
+        row.anchorMin = new Vector2(0, 1); row.anchorMax = new Vector2(1, 1); row.pivot = new Vector2(0.5f, 1);
+        row.offsetMin = new Vector2(24, -60 - 66); row.offsetMax = new Vector2(-24, -60);
+        var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 10; layout.childControlWidth = true; layout.childControlHeight = true;
+        layout.childForceExpandWidth = true; layout.childForceExpandHeight = true;
+
+        var kinds = UniqueItems.Selectable;
+        _uniqueButtons = new Button[kinds.Length];
+        _uniqueLabels = new TMP_Text[kinds.Length];
+        for (int i = 0; i < kinds.Length; i++)
+        {
+            var kind = kinds[i];
+            var go = new GameObject("Unique_" + UniqueItems.Code(kind), typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            go.transform.SetParent(row, false);
+            var image = go.GetComponent<Image>();
+            image.sprite = readyButton.image.sprite; image.type = readyButton.image.type;
+            image.color = LobbyStyle.ButtonDark;
+            var button = go.GetComponent<Button>();
+            button.colors = readyButton.colors;
+            button.targetGraphic = image;
+            button.onClick.AddListener(() => _ = PickUniqueAsync(kind));
+
+            var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer));
+            labelGo.transform.SetParent(go.transform, false);
+            var label = labelGo.AddComponent<TextMeshProUGUI>();
+            if (startHintText != null) label.font = startHintText.font;
+            label.fontSize = 22; label.alignment = TextAlignmentOptions.Center; label.richText = true;
+            label.raycastTarget = false; label.textWrappingMode = TextWrappingModes.NoWrap; label.overflowMode = TextOverflowModes.Ellipsis;
+            var lr = label.rectTransform; lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.offsetMin = new Vector2(4, 2); lr.offsetMax = new Vector2(-4, -2);
+            _uniqueButtons[i] = button; _uniqueLabels[i] = label;
+        }
+        UpdateUniquePicker();
+    }
+
+    // ------------------------------------------------------------------ graphics quality
+    TMP_Text _graphicsLabel;
+
+    /// <summary>로비 화면 오른쪽 위에 그래픽 품질 버튼(높음 ↔ 노트북)을 코드로 만든다</summary>
+    void BuildGraphicsButton()
+    {
+        var root = mainPanel != null ? mainPanel.transform.parent as RectTransform : null;
+        if (root == null || readyButton == null) return;
+        var go = new GameObject("GraphicsQualityButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        go.transform.SetParent(root, false);
+        var r = (RectTransform)go.transform;
+        r.anchorMin = r.anchorMax = new Vector2(1, 1); r.pivot = new Vector2(1, 1);
+        r.anchoredPosition = new Vector2(-80, -44); r.sizeDelta = new Vector2(300, 56);
+        var image = go.GetComponent<Image>();
+        image.sprite = readyButton.image.sprite; image.type = readyButton.image.type; image.color = LobbyStyle.ButtonDark;
+        var button = go.GetComponent<Button>();
+        button.colors = readyButton.colors; button.targetGraphic = image;
+        button.onClick.AddListener(() =>
+        {
+            GraphicsQuality.Toggle();
+            RefreshGraphicsButton();
+            SetStatus(GraphicsQuality.IsLaptop
+                ? "그래픽: 노트북 · 텍스처 절반, 화면 80% 해상도, 그림자·화면 효과를 줄여 가볍게 돌아가요."
+                : "그래픽: 높음 · 원래 화질로 그려요.");
+        });
+        var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer));
+        labelGo.transform.SetParent(go.transform, false);
+        _graphicsLabel = labelGo.AddComponent<TextMeshProUGUI>();
+        if (startHintText != null) _graphicsLabel.font = startHintText.font;
+        _graphicsLabel.fontSize = 22; _graphicsLabel.alignment = TextAlignmentOptions.Center; _graphicsLabel.richText = true; _graphicsLabel.raycastTarget = false;
+        var lr = _graphicsLabel.rectTransform; lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.offsetMin = lr.offsetMax = Vector2.zero;
+        RefreshGraphicsButton();
+    }
+
+    void RefreshGraphicsButton()
+    {
+        if (_graphicsLabel != null)
+            _graphicsLabel.text = "그래픽: <b>" + GraphicsQuality.DisplayName + "</b>" + (GraphicsQuality.IsAuto ? " <size=16><color=#8A949E>(자동)</color></size>" : "");
+    }
+
+    static void ResizeBottom(Button button, float y, float height)
+    {
+        if (button == null) return;
+        var r = (RectTransform)button.transform;
+        r.offsetMin = new Vector2(r.offsetMin.x, y); r.offsetMax = new Vector2(r.offsetMax.x, y + height);
+    }
+
+    void UpdateUniquePicker()
+    {
+        if (_uniqueButtons == null) return;
+        string myId = _session != null && AuthenticationService.Instance.IsSignedIn ? AuthenticationService.Instance.PlayerId : null;
+        var me = _session != null && myId != null ? _session.GetPlayer(myId) : null;
+        bool locked = _session == null || _busy || _savingUnique || (!_session.IsHost && me != null && PlayerReady(me));   // 준비한 대원은 준비를 취소해야 바꿀 수 있다
+        var kinds = UniqueItems.Selectable;
+        for (int i = 0; i < kinds.Length; i++)
+        {
+            _uniqueOwners.TryGetValue(kinds[i], out var owner);
+            bool mine = owner != null && owner == myId;
+            bool taken = owner != null && !mine;
+            string sub = mine ? "내 선택" : taken ? (_knownNames.TryGetValue(owner, out var n) ? n : "대원") : "선택 가능";
+            _uniqueLabels[i].text = $"<b>{UniqueItems.DisplayName(kinds[i])}</b>\n<size=15><color=#{(mine ? "FFFFFF" : taken ? "8A949E" : "7FD6F0")}>{sub}</color></size>";
+            _uniqueButtons[i].image.color = mine ? LobbyStyle.Accent : taken ? new Color(0.11f, 0.12f, 0.14f) : LobbyStyle.ButtonDark;
+            _uniqueButtons[i].interactable = !locked && !taken;
+        }
+    }
+
+    async Task PickUniqueAsync(UniqueItemKind kind)
+    {
+        if (_session == null || _busy || _savingUnique) return;
+        string myId = AuthenticationService.Instance.PlayerId;
+        var me = _session.GetPlayer(myId);
+        if (!_session.IsHost && me != null && PlayerReady(me))
+        {
+            SetStatus("준비를 취소해야 고유 아이템을 바꿀 수 있어요.", true);
+            return;
+        }
+        var current = me != null ? PlayerUnique(me) : UniqueItemKind.None;
+        var next = current == kind ? UniqueItemKind.None : kind;   // 같은 버튼을 다시 누르면 선택 취소
+        if (next != UniqueItemKind.None && _uniqueOwners.TryGetValue(next, out var owner) && owner != myId)
+        {
+            string other = _knownNames.TryGetValue(owner, out var n) ? n : "다른 대원";
+            SetStatus($"{other} 님이 이미 '{UniqueItems.DisplayName(next)}'을(를) 골랐어요.", true);
+            return;
+        }
+        await SaveUniqueAsync(next, false);
+        if (_session == null) return;
+        if (next != UniqueItemKind.None) SetStatus($"고유 아이템 '{UniqueItems.DisplayName(next)}' · {UniqueItems.Description(next)} (게임에서 3번 키)");
+        else SetStatus("고유 아이템 선택을 취소했어요.");
+    }
+
+    /// <summary>내 고유 아이템을 방 정보에 저장한다. clearReady면 준비도 함께 푼다 (선택이 지워졌을 때)</summary>
+    async Task SaveUniqueAsync(UniqueItemKind kind, bool clearReady)
+    {
+        var session = _session;
+        if (session == null) return;
+        _savingUnique = true;
+        UpdateRoomButtons();
+        try
+        {
+            session.CurrentPlayer.SetProperty(KeyUnique, new PlayerProperty(UniqueItems.Code(kind), VisibilityPropertyOptions.Member));
+            if (clearReady && !session.IsHost) session.CurrentPlayer.SetProperty(KeyReady, new PlayerProperty("0", VisibilityPropertyOptions.Member));
+            await session.SaveCurrentPlayerDataAsync();
+            UniqueItems.LocalChoice = kind;
+        }
+        catch (Exception e)
+        {
+            SetStatus(FriendlyError(e), true);
+        }
+        finally
+        {
+            _savingUnique = false;
+            if (_session == session) RefreshRoom();
+        }
     }
 
     async Task ToggleReadyAsync()
@@ -635,6 +870,11 @@ public class LobbyManager : MonoBehaviour
         if (_session == null || _session.IsHost || _busy) return;
         var me = _session.GetPlayer(AuthenticationService.Instance.PlayerId);
         bool next = !(me != null && PlayerReady(me));
+        if (next && (me == null || PlayerUnique(me) == UniqueItemKind.None))
+        {
+            SetStatus("먼저 고유 아이템을 하나 골라 주세요.", true);
+            return;
+        }
         readyButton.interactable = false;
         try
         {
@@ -681,11 +921,19 @@ public class LobbyManager : MonoBehaviour
             SetStatus($"'{gameSceneName}' 씬이 빌드 설정에 없어요.", true);
             return;
         }
+        if (_savingUnique || !AllPickedUniqueItems(out _))
+        {
+            SetStatus("모든 대원이 서로 다른 고유 아이템을 골라야 시작할 수 있어요.", true);
+            return;
+        }
+        var hostPlayer = _session.GetPlayer(AuthenticationService.Instance.PlayerId);
+        if (hostPlayer != null) UniqueItems.LocalChoice = PlayerUnique(hostPlayer);
 
         await RunBusy("게임을 시작하는 중...", async () =>
         {
             _gameStarting = true;
-            LoadingScreen.Show();   // 방장은 누르자마자 로딩 화면 (참가자는 씬 불러오기가 시작될 때 자동으로 뜸)
+            LoadingScreen.Show();   // 방장은 누르자마자 로딩 화면
+            if (chat != null) chat.AnnounceGameStart(true);   // 참가자도 바로 로딩 화면 (씬 불러오기 신호는 방장 로딩이 끝나야 옴)
             try
             {
                 var host = _session.AsHost();
@@ -708,6 +956,7 @@ public class LobbyManager : MonoBehaviour
             {
                 _gameStarting = false;
                 LoadingScreen.Cancel();
+                if (chat != null) chat.AnnounceGameStart(false);
                 throw;
             }
         });
@@ -816,6 +1065,23 @@ public class LobbyManager : MonoBehaviour
     {
         if (system) AddSystemLine(text);
         else AddLine($"<color=#E0443A><b>{Escape(sender)}</b></color>  {Escape(text)}");
+    }
+
+    /// <summary>참가자: 방장이 게임 시작을 누르면 바로 로딩 화면을 띄운다 (실패하면 닫는다)</summary>
+    void OnGameStartChanged(bool starting)
+    {
+        if (_session == null || _session.IsHost) return;   // 방장은 StartGameAsync에서 직접 처리
+        if (starting)
+        {
+            _gameStarting = true;
+            LoadingScreen.Show();
+        }
+        else
+        {
+            _gameStarting = false;
+            LoadingScreen.Cancel();
+            SetStatus("방장이 게임을 시작하지 못했어요. 잠시 후 다시 시도해요.", true);
+        }
     }
 
     void AddSystemLine(string text) => AddLine($"<color=#7FA7B8>{text}</color>");

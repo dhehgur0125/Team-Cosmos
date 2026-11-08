@@ -139,7 +139,7 @@ private void Update()
     public bool TryUseScanner()
     {
         if (!isActiveAndEnabled || !IsReady) return false;
-        if (inventory != null && (!inventory.IsAlive || !inventory.HasItem(FarmingItemKind.Scanner))) return false;
+        if (inventory != null && (!inventory.IsAlive || !(inventory.HasItem(FarmingItemKind.Scanner) || FpsUniqueItem.For(gameObject).Has(UniqueItemKind.Scanner)))) return false;
         Scan(scannerCooldown, scannerRadius);
         return true;
     }

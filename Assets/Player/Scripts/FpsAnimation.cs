@@ -48,7 +48,7 @@ namespace VoidLast.Player
             animator.SetBool("CrouchBackward", backward);
             bool attacking = animator.GetCurrentAnimatorStateInfo(1).IsTag("Melee") ||
                 (animator.IsInTransition(1) && animator.GetNextAnimatorStateInfo(1).IsTag("Melee"));
-            bool holdingItem = inventory != null && inventory.ItemAt(inventory.SelectedIndex) != FarmingItemKind.None;
+            bool holdingItem = inventory != null && inventory.ItemAt(inventory.SelectedIndex) != FarmingItemKind.None || FpsUniqueItem.HoldsHandItem(inventory);
             float targetWeight = !motor.IsDead && (equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol || holdingItem || backward || attacking) ? 1 : 0;
             upperWeight = Mathf.MoveTowards(upperWeight, targetWeight, Time.deltaTime * 8);
             animator.SetLayerWeight(1, upperWeight);

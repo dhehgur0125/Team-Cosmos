@@ -68,6 +68,8 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     readonly NetworkVariable<float> _health = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     readonly NetworkVariable<FixedString64Bytes> _nickname = new NetworkVariable<FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     readonly NetworkVariable<FixedString64Bytes> _authId = new NetworkVariable<FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    /// <summary>대기실에서 고른 고유 아이템 (UniqueItemKind 번호). 다른 대원 화면에서도 3번 칸에 같은 아이템이 보이도록</summary>
+    readonly NetworkVariable<byte> _uniqueItem = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
     public static FpsNetworkPlayer Local { get; private set; }
     public static readonly List<FpsNetworkPlayer> All = new List<FpsNetworkPlayer>();
@@ -79,6 +81,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     public FpsHealth Health => _healthComp;
     public FpsInventory Inventory => _inventory;
     public FpsInput PlayerInput => _input;
+    public FpsUniqueItem UniqueItem => _unique;
     public Camera ViewCamera => viewCamera;
 
     FpsMotor _motor;
@@ -89,6 +92,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     FpsInput _input;
     FpsRadioView _radio;
     FpsWeaponFlashlight _flashlight;
+    FpsUniqueItem _unique;
     bool _radioTalking;
     float _nextWrite;
 
@@ -105,6 +109,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _input = GetComponent<FpsInput>();
         _radio = GetComponent<FpsRadioView>();
         _flashlight = GetComponent<FpsWeaponFlashlight>();
+        _unique = FpsUniqueItem.For(gameObject);
         if (cameraPivot == null) cameraPivot = transform.Find("CameraPivot");
         if (viewCamera == null) viewCamera = GetComponentInChildren<Camera>(true);
     }
@@ -128,6 +133,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         ScanNoise.Emitted -= OnLocalScan;
         GunNoise.Emitted -= OnLocalGunNoise;
         _health.OnValueChanged -= OnHealthChanged;
+        _uniqueItem.OnValueChanged -= OnUniqueItemChanged;
     }
 
     void SetupOwner()
@@ -142,6 +148,14 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         catch (Exception) { }
         _authId.Value = new FixedString64Bytes(Truncate(auth, 60));
         _health.Value = _healthComp.Current;
+
+        // 고유 아이템: 대기실에서 고른 것을 3번 칸에 넣고 다른 대원에게 알린다
+        var unique = UniqueItems.LocalChoice;
+        _uniqueItem.Value = (byte)unique;
+        _unique.Assign(unique);
+        // 무전을 고르면 4번 칸에 동료에게 줄 무전기 하나를 더 들고 시작한다 (게임 첫 층에서만. 아래층에는 핫바가 그대로 이어짐)
+        if (unique == UniqueItemKind.Radio && !FloorCarryOver.HasPlayerState)
+            _inventory.GiveStartingItem(0, FarmingItemKind.Radio);
 
         _healthComp.Changed += PushHealth;
         _pistol.Shot += OnLocalShot;
@@ -166,8 +180,12 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _healthComp.NetworkHealRedirect = amount => { HealRpc(amount); return true; };
         _health.OnValueChanged += OnHealthChanged;
         _healthComp.ApplyNetworkHealth(_health.Value);
+        _uniqueItem.OnValueChanged += OnUniqueItemChanged;
+        _unique.Assign((UniqueItemKind)_uniqueItem.Value);
         ApplyState(_state.Value);
     }
+
+    void OnUniqueItemChanged(byte previous, byte current) => _unique.Assign((UniqueItemKind)current);
 
     static string Truncate(string s, int max) => string.IsNullOrEmpty(s) ? "" : s.Length > max ? s.Substring(0, max) : s;
 

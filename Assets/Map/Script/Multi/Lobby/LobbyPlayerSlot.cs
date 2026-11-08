@@ -44,6 +44,17 @@ public class LobbyPlayerSlot : MonoBehaviour
         kickButton.gameObject.SetActive(canKick);
     }
 
+    /// <summary>고른 고유 아이템 표시 (역할 글자 옆). 빈 글자면 아직 안 고름</summary>
+    public void SetUniqueItem(string itemName)
+    {
+        if (roleText == null) return;
+        string role = roleText.text;
+        int cut = role.IndexOf("  ·  ", StringComparison.Ordinal);
+        if (cut >= 0) role = role.Substring(0, cut);
+        roleText.text = role + "  ·  " + (string.IsNullOrEmpty(itemName) ? "<color=#8A949E>아이템 고르는 중</color>" : "<color=#7FD6F0>" + itemName + "</color>");
+        roleText.richText = true;
+    }
+
     /// <summary>음성 채팅 상태 표시</summary>
     public void SetVoice(bool connected, bool speaking, bool muted)
     {

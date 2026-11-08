@@ -109,6 +109,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4874269986630254310, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1530549595181415037}
+    - targetCorrespondingSourceObject: {fileID: 4874269986630254310, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 453942958819227647}
   m_SourcePrefab: {fileID: 100100000, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
 --- !u!4 &189474309189043150 stripped
 Transform:
@@ -282,6 +285,9 @@ MonoBehaviour:
     m_Bits: 0
   activateKey: 122
   cooldown: 1.5
+  requireScannerItem: 1
+  scannerCooldown: 15
+  scannerRadius: 20
   waveSpeed: 12
   noiseRadius: 20
   showWave: 1
@@ -360,4 +366,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b376c9dea5fb7d34a8ee0b36c6e697e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsMedicalKitNetwork
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &453942958819227647
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8720472763344413594}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84c76a38470b69a4e88efe3f1bab39a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsFlashEmitterNetwork
   ShowTopMostFoldoutHeaderGroup: 1

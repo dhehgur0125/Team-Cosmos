@@ -187,6 +187,11 @@ public sealed class FloorTransition : NetworkBehaviour
             var status = NetworkManager.SceneManager.LoadScene(nextSceneName, LoadSceneMode.Single);
             Debug.Log($"[Floor] {floor}층 → {nextSceneName} (계단 {side}) : {status}");
         }
+        else
+        {
+            // 참가자: 네트워크 씬 불러오기 신호는 방장이 다음 층을 다 불러온 뒤에 오므로, 그동안 검은 화면 대신 로딩 화면을 보여 준다
+            LoadingScreen.Show();
+        }
     }
 
     // ------------------------------------------------------------------ 도착

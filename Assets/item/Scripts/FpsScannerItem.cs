@@ -39,6 +39,7 @@ public sealed class FpsScannerItem : MonoBehaviour
     FpsEquipment equipment;
     FpsInput input;
     ItemDetector detector;
+    FpsUniqueItem unique;
     Transform fpRoot, worldRoot;
     float equip, recoil;
     bool wasHeld;
@@ -58,6 +59,7 @@ public sealed class FpsScannerItem : MonoBehaviour
         equipment = GetComponent<FpsEquipment>();
         input = GetComponent<FpsInput>();
         detector = GetComponent<ItemDetector>();
+        unique = FpsUniqueItem.For(gameObject);
         BuildViews();
     }
 
@@ -155,7 +157,8 @@ public sealed class FpsScannerItem : MonoBehaviour
 
     void LateUpdate()
     {
-        bool held = inventory != null && inventory.IsAlive && inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.Scanner;
+        // 4~6번 칸의 스캐너 또는 3번 칸의 고유 아이템 스캔
+        bool held = inventory != null && inventory.IsAlive && (inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.Scanner || unique != null && unique.InHand(UniqueItemKind.Scanner));
         if (held != wasHeld) { wasHeld = held; equip = 0f; recoil = 0f; }
         IsHeld = held;
         if (fpRoot != null && fpRoot.gameObject.activeSelf != held) fpRoot.gameObject.SetActive(held);

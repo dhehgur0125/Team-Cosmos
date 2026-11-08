@@ -151,8 +151,10 @@ public sealed class InGameVoiceChat : MonoBehaviour
         {
             var inv = _player.Inventory;
             bool alive = inv != null && inv.IsAlive;
-            bool hasRadio = inv != null && inv.HasItem(FarmingItemKind.Radio);
-            bool radioInHand = alive && inv.ItemAt(inv.SelectedIndex) == FarmingItemKind.Radio;
+            // 무전기: 4~6번 칸에 주웠거나 받은 무전기, 또는 3번 칸의 고유 아이템 무전
+            var unique = _player.UniqueItem;
+            bool hasRadio = inv != null && (inv.HasItem(FarmingItemKind.Radio) || unique != null && unique.Has(UniqueItemKind.Radio));
+            bool radioInHand = alive && (inv.ItemAt(inv.SelectedIndex) == FarmingItemKind.Radio || unique != null && unique.InHand(UniqueItemKind.Radio));
 
             UpdateRadioChannel(hasRadio);
 
@@ -447,7 +449,8 @@ public sealed class InGameVoiceChat : MonoBehaviour
 
         _mic.text = _voice.MicMuted ? "<color=#F87171>MIC OFF</color>" : "MIC ON";
         var inv = _player != null ? _player.Inventory : null;
-        bool hasRadio = inv != null && inv.HasItem(FarmingItemKind.Radio);
+        var unique = _player != null ? _player.UniqueItem : null;
+        bool hasRadio = inv != null && (inv.HasItem(FarmingItemKind.Radio) || unique != null && unique.Has(UniqueItemKind.Radio));
 
         if (_dead)
         {
@@ -469,7 +472,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
         else if (hasRadio)
             SetHud("근거리 대화", _radioJoined ? "무전기 보유 · V를 누르는 동안 무전 (무전기를 가진 대원 + 바로 옆 대원에게 들림)" : "무전 채널에 연결하는 중...", new Color(0.43f, 0.91f, 0.72f));
         else
-            SetHud("근거리 대화", "가까이 있는 대원에게만 들려요 · 무전기를 주우면 멀리서도 대화", new Color(0.43f, 0.91f, 0.72f));
+            SetHud("근거리 대화", "가까이 있는 대원에게만 들려요 · 무전기를 받으면 멀리서도 대화", new Color(0.43f, 0.91f, 0.72f));
 
         // 말하는 사람 표시
         var parts = new List<string>();

@@ -37,6 +37,7 @@ public sealed class LoadingScreen : MonoBehaviour
 
     Stage _stage;
     bool _showing, _closing, _offline;
+    bool _guest;   // 참가자: 방장이 씬을 다 불러올 때까지 '시작 준비' 단계에서 기다린다
     string _targetScene;
     float _shown, _creep, _stageStart, _doneAt, _tipAt;
     int _tip;
@@ -93,6 +94,7 @@ public sealed class LoadingScreen : MonoBehaviour
 
     void OnDestroy()
     {
+        if (_showing) Application.backgroundLoadingPriority = ThreadPriority.Normal;
         if (_hooked != null) _hooked.OnSceneEvent -= OnSceneEvent;
         _hooked = null;
         if (Instance == this) Instance = null;
@@ -141,6 +143,9 @@ public sealed class LoadingScreen : MonoBehaviour
             _showing = true;
             _closing = false;
             _shown = 0f; _creep = 0f; _op = null; _stage = Stage.Hidden;
+            var nm = NetworkManager.Singleton;
+            _guest = nm != null && nm.IsListening && !nm.IsServer;
+            Application.backgroundLoadingPriority = ThreadPriority.High;   // 로딩 화면이 덮는 동안은 불러오기를 최대한 빠르게
             if (transform.parent != null) transform.SetParent(null, true);
             DontDestroyOnLoad(gameObject);   // 로비 씬이 내려가도 화면 유지
             if (_canvasGo == null) Build();
@@ -159,6 +164,7 @@ public sealed class LoadingScreen : MonoBehaviour
         if (!_showing) return;
         _showing = false;
         _stage = Stage.Hidden;
+        Application.backgroundLoadingPriority = ThreadPriority.Normal;
         if (_canvasGo != null) { _canvasGo.SetActive(false); _group.blocksRaycasts = false; }
         // 아직 로비라면 로비 씬으로 되돌려 둔다 (다음 시작 때 다시 사용)
         if (SceneManager.GetActiveScene().IsValid()) SceneManager.MoveGameObjectToScene(gameObject, SceneManager.GetActiveScene());
@@ -170,7 +176,7 @@ public sealed class LoadingScreen : MonoBehaviour
         _stageStart = Time.unscaledTime;
         _creep = Mathf.Max(_creep, StageFloor(s));
         if (s == Stage.Done) _doneAt = Time.unscaledTime;
-        if (_status != null) _status.text = StageText(s);
+        if (_status != null) _status.text = s == Stage.Starting && _guest ? "방장이 우주선 구역을 불러오는 중" : StageText(s);
     }
 
     static float StageFloor(Stage s)
@@ -224,7 +230,8 @@ public sealed class LoadingScreen : MonoBehaviour
         switch (_stage)
         {
             case Stage.Starting:
-                if (stageAge > 20f) { Abort(); return; }   // 시작 요청이 끝내 진행되지 않음
+                // 방장: 시작 요청이 끝내 진행되지 않음. 참가자: 방장 컴퓨터가 느리면 오래 걸릴 수 있으므로 더 기다리고, 연결이 끊기면 닫는다
+                if (stageAge > (_guest ? 120f : 20f) || _guest && (nm == null || !nm.IsListening)) { Abort(); return; }
                 break;
             case Stage.Loading:
                 if (!_offline && (nm == null || !nm.IsListening)) { SetStage(Stage.Done); break; }
@@ -238,8 +245,9 @@ public sealed class LoadingScreen : MonoBehaviour
         }
 
         // 게이지: 단계 안에서는 천천히 차오르며(멈춘 것처럼 보이지 않게) 단계의 상한을 넘지 않는다
-        float cap = StageCap(_stage);
-        _creep = Mathf.Min(cap, _creep + dt * 0.035f);
+        // 참가자가 방장을 기다리는 동안에는 30%까지 천천히 차오른다 (방장 로딩 시간을 알 수 없으므로)
+        float cap = _stage == Stage.Starting && _guest ? 0.3f : StageCap(_stage);
+        _creep = Mathf.Min(cap, _creep + dt * (_stage == Stage.Starting && _guest ? 0.012f : 0.035f));
         float target = _stage == Stage.Done ? 1f : _creep;
         float speed = _stage == Stage.Done ? 1.6f : 0.55f;
         _shown = Mathf.MoveTowards(_shown, target, dt * speed);
@@ -260,7 +268,7 @@ public sealed class LoadingScreen : MonoBehaviour
         {
             _group.alpha = Mathf.Clamp01(1f - (now - _doneAt) / Mathf.Max(0.05f, fadeSeconds));
             _group.blocksRaycasts = false;
-            if (_group.alpha <= 0f) { _showing = false; Destroy(gameObject); }
+            if (_group.alpha <= 0f) { _showing = false; Application.backgroundLoadingPriority = ThreadPriority.Normal; Destroy(gameObject); }
         }
         else _group.alpha = Mathf.MoveTowards(_group.alpha, 1f, dt * 8f);
     }

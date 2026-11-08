@@ -30,7 +30,10 @@ namespace VoidLast.Player
         readonly HashSet<MonsterHealth> affected = new HashSet<MonsterHealth>();
         bool Online => network != null && network.IsSpawned;
         public bool IsLocal => Online ? network.IsOwner : equipment != null && !equipment.IsNetworkProxy;
-        public bool IsSelected => isActiveAndEnabled && health != null && !health.IsDead && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Item && (medicalKit == null || !medicalKit.isActiveAndEnabled);
+        FpsUniqueItem unique;
+        FpsUniqueItem Unique => unique != null ? unique : unique = FpsUniqueItem.For(gameObject);
+        // 고유 아이템으로 스턴을 고른 대원만 3번 칸에서 꺼낸다 (혼자 시험: 구급상자가 꺼져 있으면 스턴)
+        public bool IsSelected => isActiveAndEnabled && health != null && !health.IsDead && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Item && Unique.Has(UniqueItemKind.Stun);
         public bool CanOperate => IsSelected && !FpsInput.Blocked && view != null && view.isActiveAndEnabled && view.IsEquipped;
         public bool IsCharging => Online ? network.IsCharging : charging;
         public float ChargeProgress => Online ? network.ChargeProgress : charging ? Mathf.Clamp01((Time.time - started) / Mathf.Max(0.01f, chargeDuration)) : 0;

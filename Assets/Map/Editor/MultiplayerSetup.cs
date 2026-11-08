@@ -222,6 +222,7 @@ namespace VoidLast.MapTools
             AssetDatabase.ImportAsset(RadioIconPath, ImportAssetOptions.ForceUpdate);
             var importer = (TextureImporter)AssetImporter.GetAtPath(RadioIconPath);
             importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;   // Unity 6 기본값(Multiple)이면 스프라이트가 안 생겨 핫바 아이콘이 비어 보인다
             importer.alphaIsTransparency = true;
             importer.mipmapEnabled = false;
             importer.SaveAndReimport();
@@ -495,29 +496,14 @@ namespace VoidLast.MapTools
             }
             log.Add("spawns: " + chosen.Count + " " + string.Join(" ", chosen.Select(p => p.ToString("F2"))));
 
-            // ---- radio pickups (대원 수만큼 4개, 시작 지점 근처 바닥)
+            // ---- radio pickups: 무전기는 이제 고유 아이템이라 맵에 놓지 않는다 (예전에 놓은 것은 지운다).
+            //      무전을 고른 대원이 3번 칸 무전기 + 4번 칸 동료용 무전기를 들고 시작한다 (FpsNetworkPlayer).
             var pickupsRoot = integration.transform.Find("Integration Pickups");
+            int removedRadios = 0;
             if (pickupsRoot != null)
                 foreach (Transform t in pickupsRoot.Cast<Transform>().ToList())
-                    if (t.name.StartsWith("VOID_LAST_RadioPickup")) Object.DestroyImmediate(t.gameObject);
-            var radioPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(RadioPickupPath);
-            var radioSpots = new List<Vector3>();
-            foreach (var c in Ring(PlayerStart + new Vector3(1.2f, 0, -1.4f), 0f, 2.2f, 0.45f))
-            {
-                if (radioSpots.Count >= 4) break;
-                if (radioSpots.Any(p => Flat(p - c) < 0.5f) || exclude.Any(p => Flat(p - c) < 0.45f) || chosen.Any(p => Flat(p - c) < 0.7f)) continue;
-                if (!FloorPoint(c, out var floor)) continue;
-                if (Physics.CheckBox(floor + Vector3.up * 0.12f, new Vector3(0.12f, 0.1f, 0.15f), Quaternion.identity, ~0, QueryTriggerInteraction.Ignore)) continue;
-                radioSpots.Add(floor);
-            }
-            for (int i = 0; i < radioSpots.Count; i++)
-            {
-                var r = (GameObject)PrefabUtility.InstantiatePrefab(radioPrefab, pickupsRoot != null ? pickupsRoot : integration.transform);
-                r.name = "VOID_LAST_RadioPickup " + (i + 1);
-                r.transform.SetPositionAndRotation(radioSpots[i] + Vector3.up * 0.002f, Quaternion.Euler(0, 70 + i * 23, 0));
-                if (r.GetComponent<DetectableItem>() == null) r.AddComponent<DetectableItem>();
-            }
-            log.Add("radios: " + radioSpots.Count);
+                    if (t.name.StartsWith("VOID_LAST_RadioPickup")) { Object.DestroyImmediate(t.gameObject); removedRadios++; }
+            log.Add("radios removed: " + removedRadios);
 
             // ---- multiplayer objects
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath);

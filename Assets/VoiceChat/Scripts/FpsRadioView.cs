@@ -44,6 +44,7 @@ public sealed class FpsRadioView : MonoBehaviour
 
     static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
     FpsInventory inventory;
+    FpsUniqueItem unique;
     Transform fpRoot, worldRoot;
     Renderer[] ledRenderers;
     MaterialPropertyBlock block;
@@ -52,6 +53,7 @@ public sealed class FpsRadioView : MonoBehaviour
     void Awake()
     {
         inventory = GetComponent<FpsInventory>();
+        unique = FpsUniqueItem.For(gameObject);
         block = new MaterialPropertyBlock();
         // 배터리·임무 물건도 무전기와 같은 자리에 들고 있는 모습을 보여 준다
         var carried = GetComponent<FpsCarriedItemView>();
@@ -120,7 +122,8 @@ public sealed class FpsRadioView : MonoBehaviour
 
     void LateUpdate()
     {
-        bool held = inventory != null && inventory.IsAlive && inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.Radio;
+        // 4~6번 칸의 무전기 또는 3번 칸의 고유 아이템 무전
+        bool held = inventory != null && inventory.IsAlive && (inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.Radio || unique != null && unique.InHand(UniqueItemKind.Radio));
         if (held != IsHeld) { IsHeld = held; equip = 0; }
         if (fpRoot != null && fpRoot.gameObject.activeSelf != held) fpRoot.gameObject.SetActive(held);
         if (worldRoot != null && worldRoot.gameObject.activeSelf != held) worldRoot.gameObject.SetActive(held);
