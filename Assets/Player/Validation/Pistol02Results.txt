@@ -1,0 +1,50 @@
+Pistol 02 - Character_test actual Play Mode
+2026-11-08T16:56:21.5930665Z
+PASS: Pistol 02 Clip, Scope and physical Dot are present
+PASS: Pistol uses original astronaut forearm geometry, not the short glove-only cutout
+PASS: Camera mask, near plane and original Humanoid Avatar remain valid
+PASS: Walk retains FPS arm and weapon
+PASS: Run retains FPS arm and weapon
+PASS: ADS physical sight centre aligns with screen centre within 0.1 percent
+PASS: ADS shot follows existing camera hitscan, damage and ammo rules
+PASS: Actual hit stays on camera-centre shot direction
+PASS: Gun and entire FPS arm recoil together
+PASS: Recoil returns without drift
+PASS: Reload starts once; duplicate request rejected
+PASS: One real Clip mesh drops at reload timing and original hides
+PASS: Dropped magazine has local physics only and cannot push its player
+PASS: Reload completes with unchanged ammo accounting and restores Clip
+PASS: Magazine collides with the floor and settles
+PASS: Visual dropped magazine does not intercept hitscan
+PASS: Cancellable reload begins
+PASS: Switching after drop cancels reload and restores original without duplicate drop
+PASS: Early-cancel reload begins
+PASS: Switching before detach creates no dropped magazine
+PASS: Local camera shows FPS arm only; observer shows astronaut and world gun only
+PASS: Dropped magazine expires automatically
+PASS: Local UDP host starts
+PASS: Local UDP client starts
+PASS: Two actual NGO peers connected
+PASS: Owner 0 starts network reload
+PASS: Owner 0 drops one magazine on host
+PASS: Owner 0 drops one magazine on client
+PASS: Network owner retains original ammo calculation
+PASS: Both peers restore original Clip after reload
+PASS: Both peers restore original Clip after reload
+PASS: Network cancellation reload begins
+PASS: Slot cancellation restores Clip on both peers without duplicate drop
+PASS: Slot cancellation restores Clip on both peers without duplicate drop
+PASS: Existing Shot RPC reaches other peer once without changing ammo
+PASS: Owner 1 starts network reload
+PASS: Owner 1 drops one magazine on host
+PASS: Owner 1 drops one magazine on client
+PASS: Network owner retains original ammo calculation
+PASS: Both peers restore original Clip after reload
+PASS: Both peers restore original Clip after reload
+PASS: Network cancellation reload begins
+PASS: Slot cancellation restores Clip on both peers without duplicate drop
+PASS: Slot cancellation restores Clip on both peers without duplicate drop
+PASS: Existing Shot RPC reaches other peer once without changing ammo
+PASS: All peer magazine debris remains local; no spawned network debris
+PASS: No Console errors or exceptions during completed tests
+COMPLETE. Local UDP reload/visual-shot replay tested; separate-PC Relay, Lobby and physical keyboard/mouse feel not tested. No maps or team network code saved.

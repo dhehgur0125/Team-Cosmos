@@ -71,7 +71,13 @@ namespace VoidLast.Player.Editor
             importer.textureType = TextureImporterType.Sprite; importer.spriteImportMode = SpriteImportMode.Single;
             importer.alphaIsTransparency = true; importer.mipmapEnabled = false; importer.textureCompression = TextureImporterCompression.Uncompressed; importer.maxTextureSize = 512; importer.userData = "transparent-srgb-v3"; importer.SaveAndReimport();
         }
-        static void CopyGlove(Animator animator, SkinnedMeshRenderer body)
+        public static void CreatePistolArm(GameObject player, string path)
+        {
+            var animator = player.GetComponentInChildren<Animator>();
+            var body = animator.GetComponentsInChildren<SkinnedMeshRenderer>(true).Single(r => r.name == "Astronaut_Suit_Body_Mesh");
+            CopyGlove(animator, body, path, true);
+        }
+        static void CopyGlove(Animator animator, SkinnedMeshRenderer body, string assetPath = GlovePath, bool fullArm = false)
         {
             var baked = new Mesh();
             var transforms = animator.GetComponentsInChildren<Transform>(true);
@@ -80,6 +86,7 @@ namespace VoidLast.Player.Editor
             {
                 var hand = animator.GetBoneTransform(HumanBodyBones.RightHand);
                 var forearm = animator.GetBoneTransform(HumanBodyBones.RightLowerArm);
+                var upperArm = animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
                 Vector3 towardElbow = (forearm.position - hand.position).normalized;
                 var middle = animator.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
                 Vector3 alongGrip = (animator.GetBoneTransform(HumanBodyBones.RightIndexProximal).position - animator.GetBoneTransform(HumanBodyBones.RightLittleProximal).position).normalized;
@@ -108,19 +115,21 @@ namespace VoidLast.Player.Editor
                 var keep = new bool[vertices.Length];
                 for (int i = 0; i < keep.Length; i++)
                 {
-                    var weight = weights[i]; float handWeight = 0, armWeight = 0;
+                    var weight = weights[i]; float handWeight = 0, armWeight = 0, fullArmWeight = 0;
                     foreach (var pair in new[] { (weight.boneIndex0, weight.weight0), (weight.boneIndex1, weight.weight1), (weight.boneIndex2, weight.weight2), (weight.boneIndex3, weight.weight3) })
                     {
                         if (bones[pair.Item1].IsChildOf(hand)) handWeight += pair.Item2;
                         if (bones[pair.Item1] == forearm) armWeight += pair.Item2;
+                        if (bones[pair.Item1].IsChildOf(upperArm)) fullArmWeight += pair.Item2;
                     }
                     Vector3 world = body.transform.TransformPoint(vertices[i]);
-                    keep[i] = handWeight > 0.25f || armWeight > 0.3f && Vector3.Dot(world - hand.position, towardElbow) < 0.16f;
+                    keep[i] = fullArm ? fullArmWeight > 0.05f && Vector3.Dot(world - hand.position, towardElbow) < 0.42f
+                        : handWeight > 0.25f || armWeight > 0.3f && Vector3.Dot(world - hand.position, towardElbow) < 0.16f;
                 }
                 var map = new Dictionary<int, int>(); var outputVertices = new List<Vector3>(); var outputUvs = new List<Vector2>(); var outputNormals = new List<Vector3>();
                 var uvs = baked.uv; var normals = baked.normals;
-                var existing = AssetDatabase.LoadAssetAtPath<Mesh>(GlovePath);
-                var result = existing != null ? existing : new Mesh(); result.Clear(); result.name = "FPS_RightGlove"; result.subMeshCount = baked.subMeshCount;
+                var existing = AssetDatabase.LoadAssetAtPath<Mesh>(assetPath);
+                var result = existing != null ? existing : new Mesh(); result.Clear(); result.name = fullArm ? "FPS Pistol Right Arm" : "FPS_RightGlove"; result.subMeshCount = baked.subMeshCount;
                 var submeshes = new List<int[]>();
                 for (int sub = 0; sub < baked.subMeshCount; sub++)
                 {
@@ -146,9 +155,9 @@ namespace VoidLast.Player.Editor
                 for (int sub = 0; sub < submeshes.Count; sub++) result.SetTriangles(submeshes[sub], sub);
                 result.RecalculateBounds(); result.RecalculateTangents();
                 Debug.Log("Copied existing right glove/sleeve: " + result.vertexCount + " vertices; original body unchanged.");
-                if (existing == null) AssetDatabase.CreateAsset(result, GlovePath);
+                if (existing == null) AssetDatabase.CreateAsset(result, assetPath);
                 else { EditorUtility.SetDirty(result); AssetDatabase.SaveAssetIfDirty(result); }
-                var importer = AssetImporter.GetAtPath(GlovePath); importer.userData = "source-joints-grip-v1"; importer.SaveAndReimport();
+                var importer = AssetImporter.GetAtPath(assetPath); importer.userData = fullArm ? "source-pistol-forearm-v1" : "source-joints-grip-v1"; importer.SaveAndReimport();
             }
             finally
             {

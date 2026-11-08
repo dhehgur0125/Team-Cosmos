@@ -24,6 +24,86 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: worldRenderers.Array.size
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[36]'
+      value: 
+      objectReference: {fileID: 6769221628367008128}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[37]'
+      value: 
+      objectReference: {fileID: 4469917635128579667}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[38]'
+      value: 
+      objectReference: {fileID: 289270525949875400}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[39]'
+      value: 
+      objectReference: {fileID: 5053619976940453231}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[40]'
+      value: 
+      objectReference: {fileID: 106370031065963473}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[41]'
+      value: 
+      objectReference: {fileID: 2776698765151306665}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[42]'
+      value: 
+      objectReference: {fileID: 2842033160162742614}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[43]'
+      value: 
+      objectReference: {fileID: 5126913738924716972}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'worldRenderers.Array.data[44]'
+      value: 
+      objectReference: {fileID: 4289893730140563809}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: firstPersonRenderers.Array.size
+      value: 26
+      objectReference: {fileID: 0}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[17]'
+      value: 
+      objectReference: {fileID: 5239272911134731762}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[18]'
+      value: 
+      objectReference: {fileID: 3120132150857304609}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[19]'
+      value: 
+      objectReference: {fileID: 1244976751286438074}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[20]'
+      value: 
+      objectReference: {fileID: 6009676952127775005}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[21]'
+      value: 
+      objectReference: {fileID: 1458426557677225891}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[22]'
+      value: 
+      objectReference: {fileID: 3732473709968744411}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[23]'
+      value: 
+      objectReference: {fileID: 3617612990713842980}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[24]'
+      value: 
+      objectReference: {fileID: 5936532801042690014}
+    - target: {fileID: 2956255063060754906, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      propertyPath: 'firstPersonRenderers.Array.data[25]'
+      value: 
+      objectReference: {fileID: 3372204767488242963}
     - target: {fileID: 3203973901369466343, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -112,10 +192,43 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4874269986630254310, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
       insertIndex: -1
       addedObject: {fileID: 453942958819227647}
+    - targetCorrespondingSourceObject: {fileID: 4874269986630254310, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5384911682492395067}
   m_SourcePrefab: {fileID: 100100000, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+--- !u!23 &106370031065963473 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4312288482165933741, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &189474309189043150 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4035384272216645298, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &289270525949875400 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4513178017007585716, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1244976751286438074 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 3163425513521878470, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &1458426557677225891 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 3358817008575945439, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &2776698765151306665 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 2029264899098631893, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &2842033160162742614 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 2148598990198590506, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
   m_PrefabInstance: {fileID: 4224857470183234940}
   m_PrefabAsset: {fileID: 0}
 --- !u!114 &2995587593326045295 stripped
@@ -129,9 +242,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 42102933064b1b045a103fc0c7d75fcb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsInput
+--- !u!23 &3120132150857304609 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 1291788538342102877, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &3372204767488242963 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 1472060401057179759, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
 --- !u!20 &3609345654346492137 stripped
 Camera:
   m_CorrespondingSourceObject: {fileID: 628056177216943509, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &3617612990713842980 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 618649723183239256, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &3732473709968744411 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 679441477109449383, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
   m_PrefabInstance: {fileID: 4224857470183234940}
   m_PrefabAsset: {fileID: 0}
 --- !u!114 &3814032534592180330 stripped
@@ -156,14 +289,54 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c003f765bc5dee441a668a0d15a94bbc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsHud
+--- !u!23 &4289893730140563809 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 83728782289630237, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4469917635128579667 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 336049323093166895, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &5053619976940453231 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8972197281922490387, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &5126913738924716972 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 9045411260581031632, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &5239272911134731762 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8220221092966330510, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
 --- !u!81 &5307824119238778974 stripped
 AudioListener:
   m_CorrespondingSourceObject: {fileID: 8289042885087018274, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
   m_PrefabInstance: {fileID: 4224857470183234940}
   m_PrefabAsset: {fileID: 0}
+--- !u!23 &5936532801042690014 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7549009741288567458, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &6009676952127775005 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7622091838689705057, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &6168004139636763996 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8014316519877865504, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
+  m_PrefabInstance: {fileID: 4224857470183234940}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &6769221628367008128 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7444641812135390460, guid: d301cf86c9ae4544eb090d378ac47785, type: 3}
   m_PrefabInstance: {fileID: 4224857470183234940}
   m_PrefabAsset: {fileID: 0}
 --- !u!114 &7976745030550948463 stripped
@@ -205,14 +378,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 560190834
+  GlobalObjectIdHash: 4281813287
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
-  m_InScenePlaced: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -379,4 +552,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 84c76a38470b69a4e88efe3f1bab39a1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsFlashEmitterNetwork
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &5384911682492395067
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8720472763344413594}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8f070ef1584cc247932425ad4545b06, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsReloadVisualNetwork
   ShowTopMostFoldoutHeaderGroup: 1

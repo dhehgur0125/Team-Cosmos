@@ -61,6 +61,7 @@ namespace VoidLast.Player
             float nearest = float.PositiveInfinity;
             foreach (var hit in hits)
             {
+                if (hit.collider.GetComponent<FpsDroppedMagazine>() != null) continue; // Cosmetic debris cannot intercept a gameplay shot.
                 if (hit.collider.transform.IsChildOf(transform) || hit.distance >= nearest) continue;
                 LastHit = hit; nearest = hit.distance; HasLastHit = true;
             }

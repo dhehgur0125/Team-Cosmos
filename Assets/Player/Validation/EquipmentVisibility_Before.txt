@@ -1,0 +1,12 @@
+Equipment camera visibility / BEFORE / 2026-11-08T17:06:11.3087733Z
+PASS: Healer: local and world models exist
+PASS: Healer: own camera hides world items; observer hides FPS items
+FAIL: Healer: visible image matches hidden-world reference; different pixels=11230
+PASS: Syringe: local and world models exist
+PASS: Syringe: own camera hides world items; observer hides FPS items
+FAIL: Syringe: visible image matches hidden-world reference; different pixels=8719
+PASS: Battery: local and world models exist
+PASS: Battery: own camera hides world items; observer hides FPS items
+FAIL: Battery: visible image matches hidden-world reference; different pixels=690792
+Actual Character_test Play Mode, camera pitch 65 degrees. Temporary inventory/selection only; no scene/prefab saves. Networking not exercised.
+Console errors during run=0

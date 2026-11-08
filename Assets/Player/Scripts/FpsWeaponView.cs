@@ -22,6 +22,7 @@ namespace VoidLast.Player
         [SerializeField, Range(0.2f, 0.4f)] float equipDuration = 0.3f;
         [SerializeField] Vector3 equipOffset = new Vector3(0, -0.35f, -0.08f);
         [SerializeField] Vector3 reloadOffset = new Vector3(0, -0.4f, -0.08f);
+        [SerializeField] Vector3 reloadEulerAngles;
         [SerializeField] Vector3 recoilPosition = new Vector3(0, 0.01f, -0.032f);
         [SerializeField] Vector3 recoilEuler = new Vector3(-6, 0, 0.35f);
         [Tooltip("WeaponRoot 로컬 좌표의 손목 회전 중심. 총과 장갑 전체에 함께 적용됩니다.")]
@@ -80,6 +81,7 @@ namespace VoidLast.Player
             }
             float kick = recoil * Mathf.Lerp(1, aimedRecoilMultiplier, aimBlend);
             Quaternion pose = Quaternion.Slerp(Quaternion.Euler(hipEulerAngles), Quaternion.Euler(aimEulerAngles), aimBlend);
+            pose *= Quaternion.Euler(reloadEulerAngles * reload);
             Quaternion rotation = Quaternion.Euler(recoilEuler * kick);
             Vector3 pivotOffset = (recoilPivot - rotation * recoilPivot) * modelScale;
             weaponRoot.localPosition = Vector3.Lerp(hipPosition, aimPosition, aimBlend) + equipOffset * (1 - equip.Blend) + reloadOffset * reload
