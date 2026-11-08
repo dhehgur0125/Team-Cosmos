@@ -3,10 +3,13 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using VoidLast.Monster;
+using VoidLast.Player;
 
 /// <summary>
 /// 플레이어에 붙이는 아이템 탐지기 (에코로케이션 방식).
-/// 키를 누르면 플레이어에게서 음파가 퍼져 나가며 바닥·벽 표면을 훑고,
+/// 대원(FPS)은 스캐너 아이템을 손에 들고 좌클릭할 때 스캔한다 (FpsScannerItem, 쿨타임 scannerCooldown).
+/// 인벤토리가 없는 테스트 씬(itemtest)에서는 예전처럼 activateKey(Z)로 스캔한다.
+/// 스캔하면 플레이어에게서 음파가 퍼져 나가며 바닥·벽 표면을 훑고,
 /// 파동이 닿은 DetectableItem은 메아리 링과 함께 발광하며 벽·지형 너머에서도 실루엣으로 비쳐 보인다.
 /// </summary>
 public class ItemDetector : MonoBehaviour
@@ -21,7 +24,15 @@ public class ItemDetector : MonoBehaviour
     [Tooltip("탐지기 작동 키. Q는 FpsInput의 '아이템 버리기'와 겹쳐서 Z로 변경했습니다.")]
     public KeyCode activateKey = KeyCode.Z;
 
-    [Min(0f)] public float cooldown = 1.5f; // 재사용 대기 시간(초)
+    [Min(0f)] public float cooldown = 1.5f; // 재사용 대기 시간(초). Z 키·검사 도구(ActivateDetector)용
+
+    [Header("스캐너 아이템")]
+    [Tooltip("켜면 같은 오브젝트에 FpsInventory가 있을 때(대원) Z 키를 쓰지 않고, 스캐너 아이템을 손에 들고 좌클릭할 때만 스캔합니다.")]
+    public bool requireScannerItem = true;
+    [Tooltip("스캐너 아이템으로 스캔한 뒤 다시 쓸 수 있을 때까지의 시간(초)")]
+    [Min(0f)] public float scannerCooldown = 15f;
+    [Tooltip("스캐너 아이템으로 스캔할 때의 탐지 반경(m). 파동도 이 반경까지 퍼집니다. detectRadius는 Z 키·검사 도구용입니다.")]
+    [Min(1f)] public float scannerRadius = 20f;
 
     [Header("스캔 파동")]
     [Tooltip("파동이 퍼지는 속도(m/s). 아이템은 파동이 닿는 순간 발광합니다. 0이면 반경 안의 아이템이 동시에 발광합니다.")]
@@ -53,6 +64,7 @@ public class ItemDetector : MonoBehaviour
     {
         public Vector3 origin;
         public float startTime;
+        public float maxRadius;
         public Material material;
     }
 
@@ -67,6 +79,12 @@ public class ItemDetector : MonoBehaviour
 
     private readonly List<Wave> waves = new List<Wave>();
     private float nextReadyTime;
+    private FpsInventory inventory;
+
+    /// <summary>스캐너 아이템으로만 스캔하는지 (대원). false면 Z 키로 스캔하는 테스트 씬</summary>
+    public bool UsesScannerItem => requireScannerItem && inventory != null;
+    /// <summary>마지막 스캔에 적용된 재사용 대기 시간(초). 쿨타임 표시용</summary>
+    public float LastCooldownDuration { get; private set; } = 1f;
 
     public bool IsReady => Time.time >= nextReadyTime;
     public float CooldownRemaining => Mathf.Max(0f, nextReadyTime - Time.time);
@@ -79,10 +97,14 @@ public class ItemDetector : MonoBehaviour
         pingShader = Shader.Find("Custom/EchoPing");
     }
 
-    private void Awake()
+private void Awake()
     {
         if (xrayShader != null) DetectableItem.DefaultXRayShader = xrayShader;
         if (pingShader != null) DetectableItem.DefaultPingShader = pingShader;
+
+        // 대원이면 손에 드는 스캐너(모델·좌클릭·쿨타임 표시)를 함께 붙인다. 프리팹은 건드리지 않는다
+        inventory = GetComponent<FpsInventory>();
+        if (UsesScannerItem && GetComponent<FpsScannerItem>() == null) gameObject.AddComponent<FpsScannerItem>();
     }
 
     private void OnDisable()
@@ -91,9 +113,10 @@ public class ItemDetector : MonoBehaviour
         waves.Clear();
     }
 
-    private void Update()
+private void Update()
     {
-        if (Input.GetKeyDown(activateKey))
+        // 대원은 Z를 쓰지 않는다 (스캐너 아이템 좌클릭). 인벤토리가 없는 테스트 씬만 Z로 스캔
+        if (!UsesScannerItem && Input.GetKeyDown(activateKey))
         {
             ActivateDetector();
         }
@@ -101,6 +124,7 @@ public class ItemDetector : MonoBehaviour
         DrawWaves();
     }
 
+/// <summary>Z 키·검사 도구용 스캔 (쿨타임 cooldown, 아이템 확인 없음)</summary>
     public void ActivateDetector()
     {
         if (!IsReady)
@@ -108,13 +132,28 @@ public class ItemDetector : MonoBehaviour
             Debug.Log($"<color=grey>[탐지기] 재사용 대기 중 ({CooldownRemaining:F1}초)</color>");
             return;
         }
-        nextReadyTime = Time.time + cooldown;
+        Scan(cooldown, detectRadius);
+    }
+
+    /// <summary>스캐너 아이템 좌클릭: 스캐너를 가지고 있고 쿨타임이 끝났을 때만 스캔한다 (쿨타임 scannerCooldown)</summary>
+    public bool TryUseScanner()
+    {
+        if (!isActiveAndEnabled || !IsReady) return false;
+        if (inventory != null && (!inventory.IsAlive || !inventory.HasItem(FarmingItemKind.Scanner))) return false;
+        Scan(scannerCooldown, scannerRadius);
+        return true;
+    }
+
+    private void Scan(float cooldownSeconds, float radius)
+    {
+        LastCooldownDuration = Mathf.Max(0.01f, cooldownSeconds);
+        nextReadyTime = Time.time + cooldownSeconds;
 
         Vector3 origin = transform.position;
-        float sqrRadius = detectRadius * detectRadius;
+        float sqrRadius = radius * radius;
         int found = 0;
 
-        StartWave(origin);
+        StartWave(origin, radius);
 
         // 눈 없는 몬스터에게 스캔 소리를 알린다 (파동이 닿는 시간에 맞춰 각자 반응)
         ScanNoise.Emit(origin, noiseRadius, waveSpeed);
@@ -137,12 +176,12 @@ public class ItemDetector : MonoBehaviour
             found++;
         }
 
-        Debug.Log($"<color=cyan>[탐지기 작동] 반경 {detectRadius}m 안에서 아이템 {found}개를 감지했습니다.</color>");
+        Debug.Log($"<color=cyan>[탐지기 작동] 반경 {radius}m 안에서 아이템 {found}개를 감지했습니다.</color>");
     }
 
     // ------------------------------------------------------------------ 음파(소나) 파동
 
-    private void StartWave(Vector3 origin)
+    private void StartWave(Vector3 origin, float radius)
     {
         if (!showWave || sonarShader == null) return;
 
@@ -151,13 +190,13 @@ public class ItemDetector : MonoBehaviour
         Material material = new Material(sonarShader) { name = "SonarWave (runtime)", hideFlags = HideFlags.HideAndDontSave };
         material.SetColor(ColorId, waveColor);
         material.SetVector(OriginId, origin);
-        material.SetFloat(MaxRadiusId, detectRadius);
+        material.SetFloat(MaxRadiusId, radius);
         material.SetFloat(BandWidthId, frontWidth);
         material.SetFloat(TrailLengthId, trailLength);
         material.SetFloat(RingSpacingId, ringSpacing);
         material.SetFloat(IntensityId, 1f);
 
-        waves.Add(new Wave { origin = origin, startTime = Time.time, material = material });
+        waves.Add(new Wave { origin = origin, startTime = Time.time, maxRadius = radius, material = material });
     }
 
     private void DrawWaves()
@@ -172,7 +211,7 @@ public class ItemDetector : MonoBehaviour
             Wave wave = waves[i];
             float radius = visualSpeed * (Time.time - wave.startTime);
 
-            if (radius > detectRadius + 0.5f)
+            if (radius > wave.maxRadius + 0.5f)
             {
                 DestroyWaveMaterial(wave);
                 waves.RemoveAt(i);

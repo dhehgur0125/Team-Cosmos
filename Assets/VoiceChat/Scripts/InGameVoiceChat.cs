@@ -63,6 +63,8 @@ public sealed class InGameVoiceChat : MonoBehaviour
     async void Start()
     {
         _voice = VoiceChatService.Instance;
+        // 무전으로 들리는 다른 대원 목소리에만 무전기 음질(치지직)을 입힌다 (근거리 육성은 그대로)
+        if (GetComponent<RadioVoiceEffect>() == null) gameObject.AddComponent<RadioVoiceEffect>();
         BuildHud();
         BuildSounds();
         SetHud("음성 연결 중...", "Vivox에 로그인하는 중", new Color(0.99f, 0.88f, 0.28f));

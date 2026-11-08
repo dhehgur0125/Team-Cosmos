@@ -5,7 +5,7 @@ using UnityEngine;
 namespace VoidLast.Player
 {
     // 프리팹·씬에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
-    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler }
+    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler, Scanner }
 
     [DefaultExecutionOrder(-50)]
     public sealed class FpsInventory : MonoBehaviour

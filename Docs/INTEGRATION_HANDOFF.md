@@ -177,3 +177,47 @@ Editor 메뉴의 `VOID LAST/Integration/1 - Add Stage2 Test Setup If Missing`은
 ## 9. 팀원 Codex 공통 작업 안내문
 
 > 먼저 Docs/INTEGRATION_HANDOFF.md와 현재 Git 변경 사항을 읽어라. 실제 Unity 씬·프리팹·참조를 확인하고 Stage2_Ship을 통합 기준으로 사용하라. 기존 팀원 변경, Player/Monster 원본, .meta/GUID를 보존하라. 맡은 기능에 필요한 최소 범위만 수정하고 Packages/ProjectSettings는 임의 변경하지 마라. F 획득·R 재장전·V 무전·Z 스캔을 유지하라. 존재하지 않는 무전기/스캐너 프리팹을 가정하지 마라. 변경한 기능에 필요한 검사만 실행하고 반복적인 전체 검사는 피하라. 실제 확인한 결과와 미검증 항목을 구분해 인계 문서를 갱신하라.
+
+## 10. 스캐너 아이템 · 무전 음성 효과 (2026-11-08)
+
+기준 `main` a16c7de. Packages·ProjectSettings는 변경하지 않았다. 새 파일은 Unity가 만든 .meta와 함께 추가됐다.
+
+### 10.1 변경 내용
+
+- 스캔은 이제 **스캐너 아이템**으로 한다. 4·5·6번 슬롯에 넣고 손에 든 상태에서 좌클릭하면 스캔하며, 쿨타임은 15초, 탐지 반경은 20m(`scannerRadius`, 파동도 20m까지)다. 대원(FPS)은 **Z 키 스캔을 쓰지 않는다**(사용자 결정). 인벤토리가 없는 itemtest에서만 Z가 남는다.
+- F 획득, Q 드랍, 죽을 때 떨어뜨리기, 멀티 동기화(NetworkPickupRegistry), 핫바 아이콘은 기존 카탈로그 흐름(`Resources/FarmingItems`)을 그대로 탄다.
+- 무전 채널로 들리는 다른 대원 목소리에만 무전기 음질(좁은 대역·찌그러짐·말하는 동안 치지직)을 입힌다. 근거리 육성은 그대로다.
+
+수정한 기존 파일 (Player 원본 2곳은 최소 수정):
+- `Player/Scripts/FpsInventory.cs`: `FarmingItemKind` 맨 끝에 `Scanner`(=8) 추가. 기존 번호는 그대로다.
+- `Player/Scripts/FarmingItems.cs`: Scanner를 카탈로그 아이템에 포함, HUD 이름 `SCANNER`.
+- `item/Scripts/ItemDetector.cs`: `TryUseScanner()`(스캐너 보유 확인, 쿨타임 `scannerCooldown`=15) 추가. 대원이면 Z 무시. 검사 도구가 쓰는 `ActivateDetector()`는 동작·쿨타임(1.5초)·반경(`detectRadius` 15m)을 그대로 뒀다. Awake에서 FpsScannerItem을 자동으로 붙이므로 플레이어 프리팹은 수정하지 않았다.
+- `VoiceChat/Scripts/InGameVoiceChat.cs`: Start에 RadioVoiceEffect를 붙이는 한 줄.
+- `VoiceChat/Scripts/StandaloneRadioTest.cs`: 오프라인 테스트(층 씬 바로 Play)에서도 멀티플레이와 같게 **무전기를 손에 들고 좌클릭하는 동안** 송신하도록 추가(V도 유지). 송신 중 손에 든 무전기 LED가 깜빡인다. 멀티플레이 경로(InGameVoiceChat)의 좌클릭 송신은 원래부터 있었고 바꾸지 않았다.
+- `Map/Scenes/Floors/Stage2_Ship_2f.unity`: `Integration Pickups` 아래에 `VOID_LAST_ScannerPickup` 1개 배치 (-15.2, 8.0, -28.7).
+
+새 파일:
+- `item/Scripts/FpsScannerItem.cs`: 손에 든 모습(1인칭 레이저건+장갑, 3인칭 손 소켓), 좌클릭 사용, 반동, 화면 아래 쿨타임 표시. 무전기와 같은 위치(FpsRadioView의 참조)를 쓴다.
+- `Resources/FarmingItems/Scanner.prefab`: 바닥 프리팹. FpsWorldPickup(Scanner)과 DetectableItem이 붙어 있고, 모델 자식은 `ScannerModel`(Sci-Fi Laser Gun Type B `LaserGun_B_Right` 중첩 프리팹, MeshCollider 제거)이다. FpsCarriedItemView가 `Model`이라는 자식만 복제하므로 이름을 달리해 손에 두 번 보이지 않게 했다.
+- `Resources/FarmingItems/Icons/Scanner.png`: F2MissionItemAssets와 같은 조명·방식으로 렌더링한 아이콘.
+- `VoiceChat/Scripts/RadioVoiceEffect.cs`, `RadioVoiceFilter.cs`: Vivox 16.12.1 참가자 오디오 탭(`CreateVivoxParticipantTap`, silenceInChannelAudioMix=true)으로 무전 채널의 다른 대원 음성을 받아 필터를 적용한다. 컴포넌트를 끄면 탭을 없애 원래 소리로 돌아간다.
+
+### 10.2 실제 확인함
+
+- 전체 컴파일 성공, Console 오류 0.
+- 프리팹·아이콘을 Resources에서 읽을 수 있음. 2f 씬 저장 파일에 스캐너가 들어 있고 Missing Script 0.
+- 2f 오프라인 테스트 Play에서 반경 20m 스캔 후 쿨타임 15초 적용, 파동 maxRadius 20 확인.
+- 2f 오프라인 테스트 Play(사용자가 직접 플레이): 스캐너를 F로 주워 0번 슬롯에 들어감, 손에 들림(IsHeld/IsEquipped), 좌클릭 스캔 후 쿨타임 15초가 돌고 `SCAN 12s` 표시가 보임, 주변 아이템 발광 화면 확인.
+- 스캐너가 없을 때 `TryUseScanner()`는 false를 반환한다.
+
+### 10.3 미검증
+
+- 무전 치지직 효과: 두 클라이언트로 Vivox 무전을 실제로 주고받는 테스트를 하지 않았다. 참가자 탭이 만들어지는지, 소리가 끊기지 않는지, 음질이 적당한지 모두 미확인. 문제가 있으면 RadioVoiceEffect를 끄면 원래 소리로 돌아간다. 음질은 RadioVoiceFilter의 값(대역·drive·hiss·crackle)으로 조절한다.
+- 멀티플레이에서 스캐너 줍기·드랍 동기화, 다른 대원 화면의 3인칭 모습, 층 이동 시 스캐너 유지(쿨타임은 층마다 초기화된다).
+- 장갑 위치: 권총(WeaponRoot)에서 장갑이 손잡이를 쥐는 관계를 레이저건 손잡이(메시 정점으로 측정, 모델 기준 y≈0.05·z≈-0.08)에 옮겨 `glovePosition (0, 0.065, -0.12)`, `gloveEuler (90, 180, 0)`으로 정했다. 프리뷰 씬 옆모습 렌더에서 권총과 같은 방식으로 손잡이를 감싸는 것을 확인했다. 실제 게임 화면(1인칭)에서의 모습과 레이저건 화면 위치(heldPosition)는 사용자가 직접 보고 조정해야 한다.
+- 다른 층(1·3·4·5f)에는 스캐너를 배치하지 않았다.
+
+### 10.4 주의
+
+- `Stage2IntegrationValidation`은 `ActivateDetector()`를 직접 호출하므로 영향이 없다. 단, 실제 게임에서는 스캐너 없이 스캔할 수 없다.
+- 프로젝트에서 F, R, V는 그대로다. Z는 대원에게서 제거됐다.

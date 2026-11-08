@@ -5,6 +5,7 @@ using Unity.Services.Core;
 using Unity.Services.Vivox;
 using UnityEngine;
 using UnityEngine.UIElements;
+using VoidLast.Player;
 
 [RequireComponent(typeof(UIDocument))]
 public class StandaloneRadioTest : MonoBehaviour
@@ -36,6 +37,9 @@ public class StandaloneRadioTest : MonoBehaviour
     private readonly List<VisualElement> meterSegments = new List<VisualElement>();
 
     private bool isRadioTransmitting;
+    private FpsInventory playerInventory;
+    private FpsInput playerInput;
+    private FpsRadioView playerRadioView;
     private bool isChannelJoined;
     private string currentChannel;
     private float displayedLevel;
@@ -103,9 +107,10 @@ public class StandaloneRadioTest : MonoBehaviour
             Debug.Log($"일반 말소리를 냅니다. (반경 {normalVoiceRadius}m)");
         }
 
-        // V 키: 무전기 사용 (누르는 동안만 송출). R은 FPS 재장전으로 유지한다.
-        if (Input.GetKeyDown(KeyCode.V)) StartRadio();
-        if (Input.GetKeyUp(KeyCode.V) && isRadioTransmitting) StopRadio();
+        // V 키 또는 무전기를 손에 들고 좌클릭: 누르는 동안만 송출 (멀티플레이 InGameVoiceChat과 같은 규칙). R은 FPS 재장전으로 유지한다.
+        bool pushToTalk = Input.GetKey(KeyCode.V) || (RadioInHand() && playerInput != null && playerInput.AttackHeld && UnityEngine.Cursor.lockState == CursorLockMode.Locked);
+        if (pushToTalk && !isRadioTransmitting) StartRadio();
+        else if (!pushToTalk && isRadioTransmitting) StopRadio();
     }
 
     private void OnApplicationFocus(bool hasFocus)
@@ -137,6 +142,7 @@ public class StandaloneRadioTest : MonoBehaviour
     private void StartRadio()
     {
         isRadioTransmitting = true;
+        if (playerRadioView != null) playerRadioView.Talking = true;   // 손에 든 무전기 LED
         SwitchTransmissionMode(radioChannel);
         SetHudState(HudState.Radio);
         EmitSound(true);
@@ -146,6 +152,7 @@ public class StandaloneRadioTest : MonoBehaviour
     private void StopRadio()
     {
         isRadioTransmitting = false;
+        if (playerRadioView != null) playerRadioView.Talking = false;
         SwitchTransmissionMode(proximityChannel);
         SetHudState(HudState.Proximity);
         Debug.Log("<color=white>[무전기 종료] 3D 대화 모드로 복귀했습니다.</color>");
@@ -331,5 +338,18 @@ private void UpdateMemberCount()
         {
             // 채널 정보가 바뀌는 순간의 일시적 오류는 무시
         }
+    }
+
+
+// 오프라인 테스트용: 씬에 놓인 플레이어가 무전기를 손에 들고 있는지
+    private bool RadioInHand()
+    {
+        if (playerInventory == null && dummyPlayerTransform != null)
+        {
+            playerInventory = dummyPlayerTransform.GetComponentInParent<FpsInventory>();
+            playerInput = dummyPlayerTransform.GetComponentInParent<FpsInput>();
+            playerRadioView = dummyPlayerTransform.GetComponentInParent<FpsRadioView>();
+        }
+        return playerInventory != null && playerInventory.IsAlive && playerInventory.ItemAt(playerInventory.SelectedIndex) == FarmingItemKind.Radio;
     }
 }

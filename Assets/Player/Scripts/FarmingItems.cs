@@ -17,7 +17,7 @@ namespace VoidLast.Player
             kind == FarmingItemKind.QuarantineCard || kind == FarmingItemKind.Cutter || kind == FarmingItemKind.PowerModule || kind == FarmingItemKind.FuelCoupler;
 
         /// <summary>Resources에서 읽어 오는 아이템인지 (주사기·무전기는 대원 프리팹에 직접 연결되어 있음)</summary>
-        public static bool IsCatalogItem(FarmingItemKind kind) => kind == FarmingItemKind.Battery || IsMissionItem(kind);
+        public static bool IsCatalogItem(FarmingItemKind kind) => kind == FarmingItemKind.Battery || kind == FarmingItemKind.Scanner || IsMissionItem(kind);
 
         /// <summary>스캔에 표시되는지: 배터리는 직접 찾아야 한다</summary>
         public static bool IsScannable(FarmingItemKind kind) => kind != FarmingItemKind.Battery;
@@ -33,6 +33,7 @@ namespace VoidLast.Player
                 case FarmingItemKind.Cutter: return "CUTTER";
                 case FarmingItemKind.PowerModule: return "POWER MODULE";
                 case FarmingItemKind.FuelCoupler: return "FUEL COUPLER";
+                case FarmingItemKind.Scanner: return "SCANNER";
                 default: return "ITEM";
             }
         }
