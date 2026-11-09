@@ -7,7 +7,7 @@ using UnityEngine.Rendering.Universal;
 /// 그래픽 품질 단계 설정 (메뉴 Tools/VOID LAST/Optimize/Setup Graphics Quality).
 ///  - PC(높음): 원래 설정 + GPU Resident Drawer·GPU 가림 판정(보이지 않는 물체를 GPU가 걸러 냄).
 ///  - Laptop(노트북): RAM 16GB·내장 그래픽 노트북용. 텍스처 절반 크기, 화면 80% 해상도(FSR로 키움),
-///    그림자 거리·해상도 축소, 화면 주변 그늘(SSAO) 끔, 수직 동기화(화면 주사율에 맞춤)로 발열 감소.
+///    그림자 거리·해상도 축소(손전등 그림자 저장 공간은 PC와 같은 2048 유지), 화면 주변 그늘(SSAO) 끔, 수직 동기화(화면 주사율에 맞춤)로 발열 감소.
 ///  - 두 단계 모두 로딩 중 텍스처·모델 올리기 예산을 늘려 로딩 시간을 줄인다.
 /// 게임은 시작할 때 GraphicsQuality가 컴퓨터 사양을 보고 자동으로 고르고, 대기실 버튼으로 바꿀 수 있다.
 /// 다시 실행해도 같은 결과가 나오도록 만들었다 (Laptop 에셋은 PC 에셋을 복사해 다시 만든다).
@@ -54,8 +54,11 @@ public static class GraphicsQualitySetup
         laptop.shadowDistance = 25f;
         laptop.shadowCascadeCount = 2;
         laptop.mainLightShadowmapResolution = 1024;
-        laptop.additionalLightsShadowmapResolution = 512;
-        SetBool(laptop, "m_SoftShadowsSupported", false);
+        // 손전등 그림자: 그림자 저장 공간이 512면 손전등(1024 칸)이 들어가지 못해 크게 줄어들고,
+        // 딱딱한 그림자라 움직일 때 계단 모양이 움찔거린다 → 2048(메모리 약 8MB) + 부드러운 그림자(중간 품질)
+        laptop.additionalLightsShadowmapResolution = 2048;
+        SetBool(laptop, "m_SoftShadowsSupported", true);
+        SetInt(laptop, "m_SoftShadowQuality", 2);   // 1 낮음, 2 중간, 3 높음 (PC는 높음)
         EditorUtility.SetDirty(laptop);
 
         // ---- 품질 단계: 0 = PC, 1 = Laptop
@@ -97,6 +100,14 @@ public static class GraphicsQualitySetup
         var so = new SerializedObject(target);
         var p = so.FindProperty(property);
         if (p != null) { p.boolValue = value; so.ApplyModifiedPropertiesWithoutUndo(); }
+        else Debug.LogWarning("[그래픽 품질] 설정 항목을 찾지 못함: " + property);
+    }
+
+    static void SetInt(Object target, string property, int value)
+    {
+        var so = new SerializedObject(target);
+        var p = so.FindProperty(property);
+        if (p != null) { p.intValue = value; so.ApplyModifiedPropertiesWithoutUndo(); }
         else Debug.LogWarning("[그래픽 품질] 설정 항목을 찾지 못함: " + property);
     }
 }

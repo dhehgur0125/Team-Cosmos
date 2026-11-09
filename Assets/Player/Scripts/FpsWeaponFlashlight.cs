@@ -53,6 +53,7 @@ namespace VoidLast.Player
             var visibility = GetComponent<FpsLocalVisibility>();
             if (visibility != null) visibility.AddRenderers(Concat(worldModel, worldLens), Concat(firstPersonModel, firstPersonLens));
             if (beam != null) beam.enabled = false;
+            LightCookieKeeper.Ensure(beam);   // 처음 켤 때 하늘색 화면·멈칫 방지
             ApplyLens(0f);
         }
 
