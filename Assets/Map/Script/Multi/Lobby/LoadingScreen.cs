@@ -284,7 +284,7 @@ public sealed class LoadingScreen : MonoBehaviour
     void ShowTip()
     {
         _tipAt = Time.unscaledTime;
-        if (_tipText != null) _tipText.text = tips.Length > 0 ? "<color=#E0443A>TIP</color>   " + tips[_tip] : "";
+        if (_tipText != null) _tipText.text = tips.Length > 0 ? "<color=#E0443A>TIP</color>   " + WithKeys(tips[_tip]) : "";
     }
 
     // ------------------------------------------------------------------ UI 만들기
@@ -454,4 +454,11 @@ public sealed class LoadingScreen : MonoBehaviour
         tex.SetPixels32(px); tex.Apply();
         return tex;
     }
+
+    /// <summary>팁 속 기본 키(E·F·M·V)를 설정 창에서 바꾼 키로 바꿔 보여 준다</summary>
+    static string WithKeys(string tip) => tip
+        .Replace("<b>E</b>", "<b>" + GameKeys.Label(GameAction.Flashlight) + "</b>")
+        .Replace("<b>F</b>", "<b>" + GameKeys.Label(GameAction.Interact) + "</b>")
+        .Replace("<b>M</b>", "<b>" + GameKeys.Label(GameAction.MicMute) + "</b>")
+        .Replace("<b>V</b>", "<b>" + GameKeys.Label(GameAction.Radio) + "</b>");
 }

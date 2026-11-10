@@ -134,7 +134,7 @@ public class LobbyManager : MonoBehaviour
         if (chat != null) { chat.MessageReceived += OnChatMessage; chat.GameStartChanged += OnGameStartChanged; }
         if (micButton != null) micButton.onClick.AddListener(ToggleMic);
         BuildUniquePicker();
-        BuildGraphicsButton();
+        BuildBackToStartButton();
     }
 
     async void Start()
@@ -244,6 +244,7 @@ public class LobbyManager : MonoBehaviour
 
     void Update()
     {
+        if (_backToStart != null && _backToStart.activeSelf != mainPanel.activeSelf) _backToStart.SetActive(mainPanel.activeSelf);
         if (_session == null && mainPanel.activeSelf && !_busy && Time.unscaledTime >= _nextListRefresh)
             _ = RefreshRoomListAsync(false);
 
@@ -750,44 +751,39 @@ public class LobbyManager : MonoBehaviour
         UpdateUniquePicker();
     }
 
-    // ------------------------------------------------------------------ graphics quality
-    TMP_Text _graphicsLabel;
+    // ------------------------------------------------------------------ back to start
+    /// <summary>
+    /// 첫 화면(방 목록) 오른쪽 위에 "처음 화면" 버튼을 코드로 만든다 → Start 씬으로 돌아간다.
+    /// (그래픽 품질 버튼은 Start 화면·게임 중 ESC의 설정 창으로 옮겼다)
+    /// </summary>
+    GameObject _backToStart;   // 첫 화면(mainPanel)이 보일 때만 보인다 (Update)
 
-    /// <summary>로비 화면 오른쪽 위에 그래픽 품질 버튼(높음 ↔ 노트북)을 코드로 만든다</summary>
-    void BuildGraphicsButton()
+    void BuildBackToStartButton()
     {
         var root = mainPanel != null ? mainPanel.transform.parent as RectTransform : null;
         if (root == null || readyButton == null) return;
-        var go = new GameObject("GraphicsQualityButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        var go = new GameObject("BackToStartButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         go.transform.SetParent(root, false);
+        _backToStart = go;
         var r = (RectTransform)go.transform;
         r.anchorMin = r.anchorMax = new Vector2(1, 1); r.pivot = new Vector2(1, 1);
-        r.anchoredPosition = new Vector2(-80, -44); r.sizeDelta = new Vector2(300, 56);
+        r.anchoredPosition = new Vector2(-80, -44); r.sizeDelta = new Vector2(220, 56);
         var image = go.GetComponent<Image>();
         image.sprite = readyButton.image.sprite; image.type = readyButton.image.type; image.color = LobbyStyle.ButtonDark;
         var button = go.GetComponent<Button>();
         button.colors = readyButton.colors; button.targetGraphic = image;
         button.onClick.AddListener(() =>
         {
-            GraphicsQuality.Toggle();
-            RefreshGraphicsButton();
-            SetStatus(GraphicsQuality.IsLaptop
-                ? "그래픽: 노트북 · 텍스처 절반, 화면 80% 해상도, 그림자·화면 효과를 줄여 가볍게 돌아가요."
-                : "그래픽: 높음 · 원래 화질로 그려요.");
+            if (_busy) return;
+            SceneManager.LoadScene(StartMenu.SceneName);
         });
         var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer));
         labelGo.transform.SetParent(go.transform, false);
-        _graphicsLabel = labelGo.AddComponent<TextMeshProUGUI>();
-        if (startHintText != null) _graphicsLabel.font = startHintText.font;
-        _graphicsLabel.fontSize = 22; _graphicsLabel.alignment = TextAlignmentOptions.Center; _graphicsLabel.richText = true; _graphicsLabel.raycastTarget = false;
-        var lr = _graphicsLabel.rectTransform; lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.offsetMin = lr.offsetMax = Vector2.zero;
-        RefreshGraphicsButton();
-    }
-
-    void RefreshGraphicsButton()
-    {
-        if (_graphicsLabel != null)
-            _graphicsLabel.text = "그래픽: <b>" + GraphicsQuality.DisplayName + "</b>" + (GraphicsQuality.IsAuto ? " <size=16><color=#8A949E>(자동)</color></size>" : "");
+        var label = labelGo.AddComponent<TextMeshProUGUI>();
+        if (startHintText != null) label.font = startHintText.font;
+        label.text = "← 처음 화면";
+        label.fontSize = 22; label.alignment = TextAlignmentOptions.Center; label.raycastTarget = false;
+        var lr = label.rectTransform; lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.offsetMin = lr.offsetMax = Vector2.zero;
     }
 
     static void ResizeBottom(Button button, float y, float height)

@@ -5,8 +5,8 @@ using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// 그래픽 품질 단계 설정 (메뉴 Tools/VOID LAST/Optimize/Setup Graphics Quality).
-///  - PC(높음): 원래 설정 + GPU Resident Drawer·GPU 가림 판정(보이지 않는 물체를 GPU가 걸러 냄).
-///  - Laptop(노트북): RAM 16GB·내장 그래픽 노트북용. 텍스처 절반 크기, 화면 80% 해상도(FSR로 키움),
+///  - High(높음): 원래 설정 + GPU Resident Drawer·GPU 가림 판정(보이지 않는 물체를 GPU가 걸러 냄).
+///  - Low(낮음, 예전 이름 노트북): RAM 16GB·내장 그래픽 노트북용. 텍스처 절반 크기, 화면 80% 해상도(FSR로 키움),
 ///    그림자 거리·해상도 축소(손전등 그림자 저장 공간은 PC와 같은 2048 유지), 화면 주변 그늘(SSAO) 끔, 수직 동기화(화면 주사율에 맞춤)로 발열 감소.
 ///  - 두 단계 모두 로딩 중 텍스처·모델 올리기 예산을 늘려 로딩 시간을 줄인다.
 /// 게임은 시작할 때 GraphicsQuality가 컴퓨터 사양을 보고 자동으로 고르고, 대기실 버튼으로 바꿀 수 있다.
@@ -61,16 +61,16 @@ public static class GraphicsQualitySetup
         SetInt(laptop, "m_SoftShadowQuality", 2);   // 1 낮음, 2 중간, 3 높음 (PC는 높음)
         EditorUtility.SetDirty(laptop);
 
-        // ---- 품질 단계: 0 = PC, 1 = Laptop
+        // ---- 품질 단계: 0 = High(높음), 1 = Low(낮음)
         var qs = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset")[0]);
         var levels = qs.FindProperty("m_QualitySettings");
         while (levels.arraySize > 1) levels.DeleteArrayElementAtIndex(levels.arraySize - 1);
         var high = levels.GetArrayElementAtIndex(0);
-        high.FindPropertyRelative("name").stringValue = "PC";
+        high.FindPropertyRelative("name").stringValue = "High";
         UploadBudget(high);
         levels.InsertArrayElementAtIndex(0);   // 0번을 복사해 1번에 넣는다
         var low = levels.GetArrayElementAtIndex(1);
-        low.FindPropertyRelative("name").stringValue = "Laptop";
+        low.FindPropertyRelative("name").stringValue = "Low";
         low.FindPropertyRelative("customRenderPipeline").objectReferenceValue = laptop;
         low.FindPropertyRelative("globalTextureMipmapLimit").intValue = 1;   // 텍스처 절반 크기 (메모리 약 1/4)
         low.FindPropertyRelative("vSyncCount").intValue = 1;

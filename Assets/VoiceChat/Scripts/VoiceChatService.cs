@@ -140,6 +140,7 @@ public sealed class VoiceChatService : MonoBehaviour
             });
         }
         if (MicMuted) VivoxService.Instance.MuteInputDevice(); else VivoxService.Instance.UnmuteInputDevice();
+        GameAudio.ApplyVoice();   // 설정의 음성 채팅·마이크 크기
         Debug.Log("[Voice] Vivox 로그인 완료");
         SetState(Status.Ready);
     }

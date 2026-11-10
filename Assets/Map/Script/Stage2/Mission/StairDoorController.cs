@@ -93,6 +93,7 @@ public sealed class StairDoorController : NetworkBehaviour
             if (d.blocker != null) _byCollider[d.blocker] = i;
             d.audio = d.root.gameObject.AddComponent<AudioSource>();
             d.audio.playOnAwake = false; d.audio.spatialBlend = 1f; d.audio.minDistance = 2f; d.audio.maxDistance = 25f; d.audio.volume = 0.8f;
+            GameAudio.Route(d.audio);
         }
         BuildPrompt();
     }
@@ -146,7 +147,7 @@ public sealed class StairDoorController : NetworkBehaviour
 #if ENABLE_INPUT_SYSTEM
         return Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame;
 #else
-        return Input.GetKeyDown(KeyCode.F);
+        return GameKeys.Down(GameAction.Interact);
 #endif
     }
 
@@ -178,7 +179,7 @@ public sealed class StairDoorController : NetworkBehaviour
             if (!floor.HasNextFloor) _prompt.text = "<color=#94A3B8>위층으로는 다시 올라갈 수 없어요</color>";
             else if (floor.IsDescending) _prompt.text = "";
             else if (!allowed) _prompt.text = "<color=#FCA5A5>잠김</color> · 이 계단은 막혀 있어요. 다른 계단으로 가세요";
-            else if (floor.CanDescend) _prompt.text = "[F] 문 열고 " + FloorTransition.FloorName(floor.floor - 1).Split(' ')[0] + "으로 내려가기";
+            else if (floor.CanDescend) _prompt.text = "[" + GameKeys.Label(GameAction.Interact) + "] 문 열고 " + FloorTransition.FloorName(floor.floor - 1).Split(' ')[0] + "으로 내려가기";
             else _prompt.text = "<color=#FCA5A5>잠김</color> · 이 층의 임무를 먼저 완료하세요";
             if (InteractPressed() && floor.CanDescend && allowed) Request(target, me);
             return;
@@ -186,7 +187,7 @@ public sealed class StairDoorController : NetworkBehaviour
 
         bool open = IsOpen(target);
         if (Time.unscaledTime < _denyUntil) _prompt.text = "<color=#FCA5A5>문 사이에 누가 있어서 닫을 수 없어요</color>";
-        else _prompt.text = open ? "[F] 문 닫기" : "[F] 문 열기";
+        else _prompt.text = "[" + GameKeys.Label(GameAction.Interact) + (open ? "] 문 닫기" : "] 문 열기");
 
         if (InteractPressed())
         {

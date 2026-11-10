@@ -183,7 +183,7 @@ namespace VoidLast.Monster
             ScreamCount++;
             Change(Mode.Scream);
             screamEnds = Time.time + screamDuration;
-            if (screamClip != null) AudioSource.PlayClipAtPoint(screamClip, transform.position, screamVolume);
+            if (screamClip != null) GameAudio.PlayAt(screamClip, transform.position, screamVolume);
             TriggerAnimator("Scream");
             AlertAllies();
             Screamed?.Invoke(this);
@@ -192,7 +192,7 @@ namespace VoidLast.Monster
         /// <summary>복제본 전용: 서버에서 비명을 질렀을 때 소리와 애니메이션만 재생한다.</summary>
         public void PlayNetworkScream()
         {
-            if (screamClip != null) AudioSource.PlayClipAtPoint(screamClip, transform.position, screamVolume);
+            if (screamClip != null) GameAudio.PlayAt(screamClip, transform.position, screamVolume);
             TriggerAnimator("Scream");
         }
 

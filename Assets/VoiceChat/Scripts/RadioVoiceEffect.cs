@@ -73,6 +73,7 @@ public sealed class RadioVoiceEffect : MonoBehaviour
                 source.spatialBlend = 0f;   // 무전은 거리와 상관없이 귀에 대고 듣는 소리
                 source.volume = volume;
                 source.bypassEffects = false;
+                GameAudio.Route(source, AudioCategory.Voice);   // 음성 채팅 크기로 조절
             }
             // 탭 컴포넌트 뒤에 붙여야 탭이 넣어 준 음성에 필터가 적용된다
             if (go.GetComponent<RadioVoiceFilter>() == null) go.AddComponent<RadioVoiceFilter>();

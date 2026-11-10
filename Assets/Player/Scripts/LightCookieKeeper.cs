@@ -43,11 +43,13 @@ namespace VoidLast.Player
             RenderPipelineManager.beginCameraRendering += Follow;
         }
 
-        /// <summary>그리는 카메라마다 그 자리로 옮겨, 앞쪽 바닥을 향하게 한다 (그 카메라에서 "보이는 그림자 빛"이 되도록)</summary>
+        /// <summary>주 카메라 자리로 옮겨 앞쪽 바닥을 향하게 한다 (그 카메라에서 "보이는 그림자 빛"이 되도록)</summary>
         static void Follow(ScriptableRenderContext context, Camera cam)
         {
             if (keeper == null) { RenderPipelineManager.beginCameraRendering -= Follow; return; }
-            if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
+            // 게임의 주 카메라만 따라간다. 한 프레임에 여러 카메라(에디터 씬 뷰 등) 사이를 오가면
+            // GPU 가림 판정(GPU Resident Drawer)이 그림자 빛의 정보를 잘못 재사용해 오류를 낸다.
+            if (cam.cameraType != CameraType.Game || cam != Camera.main) return;
             var t = cam.transform;
             Vector3 flat = Vector3.ProjectOnPlane(t.forward, Vector3.up);
             if (flat.sqrMagnitude < 0.01f) flat = Vector3.ProjectOnPlane(t.up, Vector3.up);

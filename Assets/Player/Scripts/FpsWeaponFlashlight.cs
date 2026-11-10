@@ -195,6 +195,7 @@ namespace VoidLast.Player
             {
                 sfx = gameObject.AddComponent<AudioSource>();
                 sfx.playOnAwake = false; sfx.spatialBlend = 0f; sfx.volume = 0.5f;
+                GameAudio.Route(sfx);
                 clickOn = Click("FlashlightOn", 2400f, 0.035f);
                 clickOff = Click("FlashlightOff", 1700f, 0.03f);
             }

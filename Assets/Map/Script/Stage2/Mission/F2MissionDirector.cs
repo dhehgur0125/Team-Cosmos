@@ -456,7 +456,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
 #if ENABLE_INPUT_SYSTEM
         return Keyboard.current != null && Keyboard.current.fKey.isPressed;
 #else
-        return Input.GetKey(KeyCode.F);
+        return GameKeys.Held(GameAction.Interact);
 #endif
     }
 
@@ -537,7 +537,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
                 }
                 else _hold = 0f;
                 progress = _hold / _target.holdSeconds;
-                prompt = "[F] 길게 눌러 " + _target.actionLabel;
+                prompt = "[" + GameKeys.Label(GameAction.Interact) + "] 길게 눌러 " + _target.actionLabel;
             }
             else { _hold = 0f; prompt = reason ?? ""; }
         }
@@ -629,7 +629,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
 
     void PlayAt(MissionInteractable device, AudioClip clip)
     {
-        if (device != null && clip != null) AudioSource.PlayClipAtPoint(clip, device.transform.position, 1f);
+        if (device != null && clip != null) GameAudio.PlayAt(clip, device.transform.position, 1f);
     }
 
     /// <summary>우리 팀 누군가 이 물건을 들고 있는지 (진행 목록 표시용)</summary>

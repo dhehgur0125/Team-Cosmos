@@ -36,31 +36,32 @@ namespace VoidLast.Player
         void Update()
         {
             Clear();
-            if (Blocked) return;
+            if (Blocked || PauseMenu.IsOpen) return;   // 연출 중이거나 ESC 메뉴가 열려 있으면 조작 없음
 #if ENABLE_INPUT_SYSTEM
             var keyboard = Keyboard.current;
             var mouse = Mouse.current;
-            ReleaseCursor = keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
+            ReleaseCursor = keyboard != null && keyboard.escapeKey.wasPressedThisFrame && PauseMenu.EscUsedFrame != Time.frameCount;
             CaptureCursor = mouse != null && mouse.leftButton.wasPressedThisFrame;
             if (Cursor.lockState != CursorLockMode.Locked || !Application.isFocused) return;
             if (keyboard != null)
             {
+                // 키는 설정 창(Key 탭)에서 바꿀 수 있다 (GameKeys)
                 Move = Vector2.ClampMagnitude(new Vector2(
-                    (keyboard.dKey.isPressed ? 1 : 0) - (keyboard.aKey.isPressed ? 1 : 0),
-                    (keyboard.wKey.isPressed ? 1 : 0) - (keyboard.sKey.isPressed ? 1 : 0)), 1);
-                Sprint = keyboard.leftShiftKey.isPressed;
-                Crouch = keyboard.leftCtrlKey.isPressed;
-                Jump = keyboard.spaceKey.wasPressedThisFrame;
-                Interact = keyboard.fKey.wasPressedThisFrame;
-                Drop = keyboard.qKey.wasPressedThisFrame;
-                Reload = keyboard.rKey.wasPressedThisFrame;
+                    (GameKeys.Held(GameAction.MoveRight) ? 1 : 0) - (GameKeys.Held(GameAction.MoveLeft) ? 1 : 0),
+                    (GameKeys.Held(GameAction.MoveForward) ? 1 : 0) - (GameKeys.Held(GameAction.MoveBack) ? 1 : 0)), 1);
+                Sprint = GameKeys.Held(GameAction.Sprint);
+                Crouch = GameKeys.Held(GameAction.Crouch);
+                Jump = GameKeys.Down(GameAction.Jump);
+                Interact = GameKeys.Down(GameAction.Interact);
+                Drop = GameKeys.Down(GameAction.Drop);
+                Reload = GameKeys.Down(GameAction.Reload);
                 HalveHealth = keyboard.hKey.wasPressedThisFrame;
-                Flashlight = keyboard.eKey.wasPressedThisFrame;
+                Flashlight = GameKeys.Down(GameAction.Flashlight);
                 Slot = (keyboard.digit1Key.wasPressedThisFrame || keyboard.numpad1Key.wasPressedThisFrame) ? 1 : (keyboard.digit2Key.wasPressedThisFrame || keyboard.numpad2Key.wasPressedThisFrame) ? 2 : (keyboard.digit3Key.wasPressedThisFrame || keyboard.numpad3Key.wasPressedThisFrame) ? 3 : (keyboard.digit4Key.wasPressedThisFrame || keyboard.numpad4Key.wasPressedThisFrame) ? 4 : (keyboard.digit5Key.wasPressedThisFrame || keyboard.numpad5Key.wasPressedThisFrame) ? 5 : (keyboard.digit6Key.wasPressedThisFrame || keyboard.numpad6Key.wasPressedThisFrame) ? 6 : 0;
             }
             if (mouse != null)
             {
-                Look = mouse.delta.ReadValue();
+                Look = mouse.delta.ReadValue() * GameSettings.MouseSensitivity;   // 설정의 마우스 감도
                 Aim = mouse.rightButton.isPressed;
                 Attack = mouse.leftButton.wasPressedThisFrame;
                 AttackHeld = mouse.leftButton.isPressed;
@@ -71,7 +72,7 @@ namespace VoidLast.Player
             CaptureCursor = Input.GetMouseButtonDown(0);
             if (Cursor.lockState != CursorLockMode.Locked || !Application.isFocused) return;
             Move = Vector2.ClampMagnitude(new Vector2((Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.A) ? 1 : 0), (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0)), 1);
-            Look = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 10f;
+            Look = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 10f * GameSettings.MouseSensitivity;
             Sprint = Input.GetKey(KeyCode.LeftShift);
             Crouch = Input.GetKey(KeyCode.LeftControl);
             Aim = Input.GetMouseButton(1);

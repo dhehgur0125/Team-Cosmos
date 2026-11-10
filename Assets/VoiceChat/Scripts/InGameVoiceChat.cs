@@ -276,27 +276,10 @@ public sealed class InGameVoiceChat : MonoBehaviour
     }
 
     // ------------------------------------------------------------------ input helpers
+    // 키는 설정 창(Key 탭)에서 바꿀 수 있다: 무전 = GameAction.Radio(기본 V), 마이크 = GameAction.MicMute(기본 M)
     const int KeyV = 0, KeyM = 1;
-    static bool KeyHeld(int key)
-    {
-#if ENABLE_INPUT_SYSTEM
-        var kb = Keyboard.current;
-        if (kb == null) return false;
-        return key == KeyV ? kb.vKey.isPressed : kb.mKey.isPressed;
-#else
-        return Input.GetKey(key == KeyV ? KeyCode.V : KeyCode.M);
-#endif
-    }
-    static bool KeyDown(int key)
-    {
-#if ENABLE_INPUT_SYSTEM
-        var kb = Keyboard.current;
-        if (kb == null) return false;
-        return key == KeyV ? kb.vKey.wasPressedThisFrame : kb.mKey.wasPressedThisFrame;
-#else
-        return Input.GetKeyDown(key == KeyV ? KeyCode.V : KeyCode.M);
-#endif
-    }
+    static bool KeyHeld(int key) => GameKeys.Held(key == KeyV ? GameAction.Radio : GameAction.MicMute);
+    static bool KeyDown(int key) => GameKeys.Down(key == KeyV ? GameAction.Radio : GameAction.MicMute);
     static bool CursorLocked() => Cursor.lockState == CursorLockMode.Locked && Application.isFocused;
 
     // ------------------------------------------------------------------ sounds
@@ -304,6 +287,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
     {
         _sfx = gameObject.AddComponent<AudioSource>();
         _sfx.playOnAwake = false; _sfx.spatialBlend = 0; _sfx.volume = radioClickVolume;
+        GameAudio.Route(_sfx);
         _clickOn = Tone("RadioOn", new[] { 1250f, 1650f }, 0.07f);
         _clickOff = Tone("RadioOff", new[] { 1650f, 1100f }, 0.08f);
         _squelch = Noise("RadioSquelch", 0.16f);
@@ -460,7 +444,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
             _voice.GetSpeakers(_voice.DeadChannel, _speakers);
             foreach (var id in _speakers) dead.Add(NameOf(id));
             _speakingText.text = dead.Count > 0 ? "말하는 중: " + string.Join(", ", dead) : "";
-            _hint.text = "[M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
+            _hint.text = "[" + GameKeys.Label(GameAction.MicMute) + "] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
             return;
         }
         if (_voice.State == VoiceChatService.Status.Error && !_voice.IsInChannel(_voice.NearChannel))
@@ -484,7 +468,8 @@ public sealed class InGameVoiceChat : MonoBehaviour
             foreach (var id in _speakers) parts.Add(NameOf(id) + " <color=#FCA5A5>(무전)</color>");
         }
         _speakingText.text = parts.Count > 0 ? "말하는 중: " + string.Join(", ", parts) : "";
-        _hint.text = hasRadio ? "[V] 무전   [M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기") : "[M] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
+        string mic = "[" + GameKeys.Label(GameAction.MicMute) + "] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
+        _hint.text = hasRadio ? "[" + GameKeys.Label(GameAction.Radio) + "] 무전   " + mic : mic;
     }
 
     static string NameOf(string playerId)
