@@ -87,6 +87,7 @@ namespace VoidLast.MapTools
             return cold;
         }
 
+        const string BakedDir = "Assets/Map/Stage2_Ship/Interior/Baked";
         const string BioSeamless = "Assets/BefourStudios/BioHorrorSciFiEnvironment/Art/Materials/M_BioHorror_Seamless.mat";
         const float BioTile = 3f;   // 바이오매스 무늬 한 장이 덮는 길이(m)
 
@@ -107,6 +108,168 @@ namespace VoidLast.MapTools
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(BioSeamless);
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        /// <summary>울퉁불퉁한 얼룩 여러 장을 메시 하나로 모은다.</summary>
+        sealed class SplatMesh
+        {
+            readonly List<Vector3> v = new List<Vector3>();
+            readonly List<Vector2> uv = new List<Vector2>();
+            readonly List<int> t = new List<int>();
+            public int Count;
+
+            public void Add(Vector3 center, Vector3 normal, float radius, System.Random rng)
+            {
+                Vector3 tan = Mathf.Abs(normal.y) > 0.9f ? Vector3.right : Vector3.Cross(Vector3.up, normal).normalized;
+                Vector3 bit = Vector3.Cross(normal, tan);
+                float spin = (float)rng.NextDouble() * Mathf.PI * 2f, stretch = 0.7f + (float)rng.NextDouble() * 0.8f;
+                Vector3 c = center + normal * (0.03f + (float)rng.NextDouble() * 0.02f);   // 겹친 얼룩끼리 깜빡이지 않게 높이를 조금씩 다르게
+                Vector2 uvOff = new Vector2((float)rng.NextDouble(), (float)rng.NextDouble());
+                int i0 = v.Count;
+                const int seg = 14;
+                // 꼭짓점마다 따로 난수를 쓰면 별 모양으로 뾰족해진다. 느린 물결 몇 개를 더해 번진 얼룩 모양을 만든다.
+                float p1 = (float)rng.NextDouble() * 6.28f, p2 = (float)rng.NextDouble() * 6.28f, p3 = (float)rng.NextDouble() * 6.28f;
+                v.Add(c); uv.Add(uvOff);
+                for (int i = 0; i < seg; i++)
+                {
+                    float ang = spin + i * Mathf.PI * 2f / seg;
+                    float r = radius * (0.72f + 0.16f * Mathf.Sin(2f * ang + p1) + 0.11f * Mathf.Sin(3f * ang + p2) + 0.07f * Mathf.Sin(5f * ang + p3));
+                    float px = Mathf.Cos(ang) * r * stretch, py = Mathf.Sin(ang) * r;
+                    v.Add(c + tan * px + bit * py);
+                    uv.Add(uvOff + new Vector2(px, py) / BioTile);
+                }
+                for (int i = 0; i < seg; i++)
+                {
+                    int p = i0 + 1 + i, q = i0 + 1 + (i + 1) % seg;
+                    t.Add(i0); t.Add(p); t.Add(q);
+                    t.Add(i0); t.Add(q); t.Add(p);   // 양면
+                }
+                Count++;
+            }
+
+            public void Build(Transform parent, string name, string assetPath = null)
+            {
+                if (Count == 0) return;
+                var mesh = new Mesh { name = name };
+                if (v.Count > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                mesh.SetVertices(v); mesh.SetUVs(0, uv); mesh.SetTriangles(t, 0);
+                mesh.RecalculateNormals(); mesh.RecalculateTangents(); mesh.RecalculateBounds();
+                // 씬에 넣으면 원본 씬과 층 씬에 두 번 저장돼 파일이 커진다. 따로 에셋으로 둔다.
+                if (assetPath != null) AssetDatabase.CreateAsset(mesh, assetPath);
+                var go = new GameObject(name);
+                go.transform.SetParent(parent, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(BioSeamless);
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+        }
+
+        static readonly string[] SprayGrowths = { "SM_BioMassSet_01_03", "SM_BioMassSet_02_01", "SM_BioMassSet_04_03", "SM_BioMassSet_01_01", "SM_ShroomSet_1", "SM_ShroomSet_2", "SM_ShroomSet_3", "SM_ShroomSet_4" };
+
+        /// <summary>
+        /// 구역 안에서 아래·옆으로 광선을 쏴서 맞은 표면(우주선 구조물·소품·앞서 놓은 인테리어)에 얼룩을 붙인다.
+        /// 일부 자리에는 작은 덩어리도 붙인다 (충돌을 꺼서 장식으로만).
+        /// </summary>
+        static int Spray(string assetPath, Transform grp, Transform floorRoot, Dictionary<string, string> dict, List<Vector3> keepClear, float floorY,
+            float x0, float z0, float x1, float z1, int count, int seed, float ylo, float yhi)
+        {
+            var rng = new System.Random(seed);
+            var splats = new SplatMesh();
+            var ship = floorRoot.parent;
+            int growths = 0;
+            for (int i = 0; i < count; i++)
+            {
+                float x = Mathf.Lerp(x0, x1, (float)rng.NextDouble()), z = Mathf.Lerp(z0, z1, (float)rng.NextDouble());
+                bool down = rng.NextDouble() < 0.55;
+                Vector3 origin, dir; float max;
+                if (down) { origin = new Vector3(x, floorY + yhi, z); dir = Vector3.down; max = yhi - ylo + 0.3f; }
+                else
+                {
+                    float ang = (float)rng.NextDouble() * Mathf.PI * 2f;
+                    origin = new Vector3(x, floorY + Mathf.Lerp(ylo + 0.3f, yhi - 0.3f, (float)rng.NextDouble()), z);
+                    dir = new Vector3(Mathf.Cos(ang), 0, Mathf.Sin(ang)); max = 7f;
+                }
+                RaycastHit hit;
+                if (!Physics.Raycast(origin, dir, out hit, max, ~0, QueryTriggerInteraction.Ignore)) continue;
+                if (!hit.collider.transform.IsChildOf(ship)) continue;   // 임무 장치·몬스터·대원에는 붙이지 않는다
+                bool near = false;
+                foreach (var k in keepClear) if (Mathf.Abs(k.y - hit.point.y) < 3f && (new Vector2(k.x - hit.point.x, k.z - hit.point.z)).sqrMagnitude < 1.3f * 1.3f) { near = true; break; }
+                if (near) continue;
+                bool onFloor = hit.normal.y > 0.7f && hit.point.y < floorY + 0.3f;
+                // 바닥이 아닌 곳(소품 윗면·벽)은 가장자리 밖으로 삐져나오면 떠 보이므로 작게
+                float radius = onFloor ? Mathf.Lerp(0.6f, 1.9f, (float)rng.NextDouble()) : Mathf.Lerp(0.2f, 0.55f, (float)rng.NextDouble());
+                splats.Add(hit.point, hit.normal, radius, rng);
+                // 큰 얼룩 둘레에 작은 얼룩을 겹쳐 덩어리진 윤곽을 만든다
+                Vector3 st = Mathf.Abs(hit.normal.y) > 0.9f ? Vector3.right : Vector3.Cross(Vector3.up, hit.normal).normalized, sbt = Vector3.Cross(hit.normal, st);
+                int sat = onFloor ? 3 : 2;
+                for (int s = 0; s < sat; s++)
+                {
+                    float sa = (float)rng.NextDouble() * Mathf.PI * 2f, sd = radius * Mathf.Lerp(0.5f, 0.9f, (float)rng.NextDouble());
+                    splats.Add(hit.point + (st * Mathf.Cos(sa) + sbt * Mathf.Sin(sa)) * sd, hit.normal, radius * Mathf.Lerp(0.35f, 0.7f, (float)rng.NextDouble()), rng);
+                }
+
+                if (rng.NextDouble() < 0.15)
+                {
+                    string name = SprayGrowths[rng.Next(SprayGrowths.Length)];
+                    if (!dict.ContainsKey(name)) continue;
+                    var go = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(dict[name]));
+                    go.transform.SetParent(grp, true);
+                    go.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal) * Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
+                    go.transform.localScale *= Mathf.Lerp(0.4f, 0.9f, (float)rng.NextDouble());
+                    foreach (var col in go.GetComponentsInChildren<Collider>()) col.enabled = false;
+                    var rs = go.GetComponentsInChildren<Renderer>();
+                    if (rs.Length > 0)
+                    {
+                        var b = rs[0].bounds;
+                        foreach (var r in rs) b.Encapsulate(r.bounds);
+                        Vector3 n = hit.normal;
+                        float half = Mathf.Abs(n.x) * b.extents.x + Mathf.Abs(n.y) * b.extents.y + Mathf.Abs(n.z) * b.extents.z;
+                        go.transform.position += hit.point + n * half * 0.7f - b.center;   // 표면에 살짝 박히게
+                    }
+                    growths++;
+                }
+            }
+            splats.Build(grp, "BioSplats", assetPath);
+            return splats.Count + growths;
+        }
+
+        /// <summary>배치표 그룹 이름(#Blockers / #Burst / #Hazard)에 따라 반응하는 바이오매스로 만든다.</summary>
+        static void AttachGrowth(GameObject go, string group, Bounds b, int id)
+        {
+            BioGrowthKind kind;
+            if (group.StartsWith("Blockers")) kind = BioGrowthKind.Blocker;
+            else if (group.StartsWith("Burst")) kind = BioGrowthKind.Burst;
+            else if (group.StartsWith("Hazard")) kind = BioGrowthKind.Hazard;
+            else return;
+            var g = go.AddComponent<BioGrowth>();
+            g.id = id; g.kind = kind;
+            if (kind == BioGrowthKind.Hazard) g.radius = Mathf.Max(b.extents.x, b.extents.z) + 1f;
+            if (kind != BioGrowthKind.Blocker) return;
+            // 부서지면 몬스터 길도 열려야 하므로 길찾기 굽기에서는 빼고, 살아 있는 동안만 길을 깎는 장애물을 붙인다
+            go.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
+            var block = new GameObject("NavBlock");
+            block.transform.SetParent(go.transform, false);
+            block.transform.position = b.center;
+            block.transform.rotation = Quaternion.identity;   // 부모가 돌아가 있어도 상자는 세계 축에 맞춘다
+            Vector3 ls = block.transform.lossyScale;
+            var ob = block.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+            ob.shape = UnityEngine.AI.NavMeshObstacleShape.Box;
+            ob.size = new Vector3(b.size.x / ls.x, b.size.y / ls.y, b.size.z / ls.z);
+            ob.carving = true;
+        }
+
+        /// <summary>원본 씬의 멀티플레이 루트에 BioGrowthSystem이 없으면 만든다 (층 씬으로 나눌 때 같이 복사된다).</summary>
+        static void EnsureGrowthSystem(UnityEngine.SceneManagement.Scene sc)
+        {
+            foreach (var r in sc.GetRootGameObjects())
+            {
+                if (r.name != MultiplayerSetup.MultiRootName || r.transform.Find("Bio Growth System") != null) continue;
+                var go = new GameObject("Bio Growth System");
+                go.transform.SetParent(r.transform, false);
+                go.AddComponent<Unity.Netcode.NetworkObject>();
+                go.AddComponent<BioGrowthSystem>();
+            }
         }
 
         const string InfestedDir = "Assets/Map/Stage2_Ship/Interior/Materials/Infested";
@@ -195,6 +358,19 @@ namespace VoidLast.MapTools
             interior.SetParent(fl, false);
 
             float floorY = (floor - 1) * 8f;
+            // 임무 장치·줍는 물건 자리에는 얼룩을 뿌리지 않는다 (알아보기 어려워지므로)
+            var keepClear = new List<Vector3>();
+            foreach (var r in sc.GetRootGameObjects())
+            {
+                var m = r.name == "VOID_LAST_Multiplayer" ? r.transform.Find("F" + floor + " Mission") : null;
+                if (m != null) foreach (Transform c in m) keepClear.Add(c.position);
+                var pk = r.name == "VOID_LAST_Integration_Test" ? r.transform.Find("Integration Pickups") : null;
+                if (pk != null) foreach (Transform c in pk) keepClear.Add(c.position);
+            }
+            // 이 층의 예전 얼룩 메시 에셋을 지우고 새로 만든다
+            if (!AssetDatabase.IsValidFolder(BakedDir)) AssetDatabase.CreateFolder("Assets/Map/Stage2_Ship/Interior", "Baked");
+            foreach (var g in AssetDatabase.FindAssets("F" + floor + "_Splats_", new[] { BakedDir })) AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(g));
+            int splatIndex = 0, growthIndex = 0;
             var ci = CultureInfo.InvariantCulture;
             Transform grp = interior;
             int placed = 0;
@@ -208,6 +384,26 @@ namespace VoidLast.MapTools
                 // 바닥·벽에 바르는 바이오매스 면 (충돌 없음 → 길찾기에 영향 없음)
                 //   @BioFloor|x0|z0|x1|z1          바닥 사각형
                 //   @BioWall|x0|z0|x1|z1[|높이]    벽을 따라가는 선분 (벽면에서 살짝 띄운 좌표로 적는다)
+                //   @BioSplat|x|z|반지름[|seed]                       바닥에 울퉁불퉁한 얼룩 하나
+                //   @BioSpray|x0|z0|x1|z1|개수|seed[|y아래|y위]      구역 안 표면(바닥·벽·소품·컨테이너·계단)에 얼룩을 흩뿌림. y는 바닥 기준
+                if (a[0] == "@BioSplat")
+                {
+                    var sb1 = new SplatMesh();
+                    var rng1 = new System.Random(a.Length > 4 ? int.Parse(a[4]) : placed);
+                    sb1.Add(new Vector3(float.Parse(a[1], ci), floorY, float.Parse(a[2], ci)), Vector3.up, float.Parse(a[3], ci), rng1);
+                    sb1.Build(grp, "BioSplat");
+                    placed++;
+                    continue;
+                }
+                if (a[0] == "@BioSpray")
+                {
+                    Physics.SyncTransforms();   // 앞에서 놓은 물체에도 묻도록
+                    float ylo = a.Length > 7 ? float.Parse(a[7], ci) : 0f, yhi = a.Length > 8 ? float.Parse(a[8], ci) : RoomHeight - 0.1f;
+                    placed += Spray(BakedDir + "/F" + floor + "_Splats_" + (splatIndex++) + ".asset", grp, fl, dict, keepClear, floorY,
+                        float.Parse(a[1], ci), float.Parse(a[2], ci), float.Parse(a[3], ci), float.Parse(a[4], ci),
+                        int.Parse(a[5]), int.Parse(a[6]), ylo, yhi);
+                    continue;
+                }
                 if (a[0] == "@BioFloor" || a[0] == "@BioWall")
                 {
                     float px0 = float.Parse(a[1], ci), pz0 = float.Parse(a[2], ci), px1 = float.Parse(a[3], ci), pz1 = float.Parse(a[4], ci);
@@ -240,10 +436,14 @@ namespace VoidLast.MapTools
                 var b = rs[0].bounds;
                 foreach (var r in rs) b.Encapsulate(r.bounds);
                 float dy = top ? floorY + RoomHeight - 0.05f - b.max.y : floorY + yoff - b.min.y;
-                go.transform.position += new Vector3(x - b.center.x, dy, z - b.center.z);
+                Vector3 shift = new Vector3(x - b.center.x, dy, z - b.center.z);
+                go.transform.position += shift;
                 placed++;
+                b.center += shift;
+                AttachGrowth(go, grp.name, b, floor * 10000 + (growthIndex++));
             }
             Physics.SyncTransforms();
+            EnsureGrowthSystem(sc);
 
             string nav = "";
             if (bakeNav)
