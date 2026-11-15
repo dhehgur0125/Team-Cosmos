@@ -15,7 +15,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1650591764022817884
 Transform:
   m_ObjectHideFlags: 0
@@ -321,6 +321,7 @@ GameObject:
   - component: {fileID: 969808502696513547}
   - component: {fileID: 3309929463965930747}
   - component: {fileID: 3745603334001580270}
+  - component: {fileID: 2893416607251930442}
   m_Layer: 0
   m_Name: VOID_LAST_EyedLargeMonster
   m_TagString: Untagged
@@ -342,6 +343,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1650591764022817884}
+  - {fileID: 4718203955620001773}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!195 &8006093767883283201
@@ -432,15 +434,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c50ba16bf522dd41a7428df0684c7a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Monster.MonsterMelee
-  damage: 30
-  attackDistance: 2.5
-  windup: 0.3
+  attackDamage: 30
+  attackStartDistance: 2.7
+  minimumSeparation: 2.3
+  separationSpeed: 4
+  attackWindupTime: 0.3
   directionLockLead: 0.12
-  lungeDistance: 1.5
+  lungeDistance: 0
   lungeDuration: 0.2
-  recoveryDuration: 0.8
+  attackRecoveryTime: 0.8
   hitStartDelay: 0.08
-  hitReach: 2
+  hitRange: 3
+  hitCheckRadius: 0.6
+  attackAngle: 90
   hitWidth: 1
   hitHeight: 1.9
   hitCenterHeight: 1.1
@@ -471,6 +477,8 @@ MonoBehaviour:
   searchDuration: 10
   searchRadius: 9
   senseInterval: 0.15
+  patrolHopDistance: 20
+  patrolRandomness: 0.25
 --- !u!114 &3745603334001580270
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -485,6 +493,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Monster.MonsterHitFeedback
   bloodPrefab: {fileID: 5623868940776082628, guid: 21cfd5724f131cd418b97def6d8b028e, type: 3}
   effectScale: 0.48
+--- !u!114 &2893416607251930442
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7130495796012770897}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed7e3f0c76b54029b2af5e8be76b03e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Monster.EyedMonsterAnimation
+  animator: {fileID: 4718203955610738287}
+  attackClip: {fileID: 7400000, guid: 07b47e638d302654ca7c96ef8b8421f0, type: 3}
 --- !u!1 &7819591963768065285
 GameObject:
   m_ObjectHideFlags: 0
@@ -575,3 +597,90 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1001 &4718203955620147713
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 9152939087912042357}
+    m_Modifications:
+    - target: {fileID: 118994, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_Name
+      value: Model
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 9546862, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: 9ce09ca768984a529e78ae395c8680f0, type: 2}
+    - target: {fileID: 9546862, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+--- !u!95 &4718203955610738287 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 9546862, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+  m_PrefabInstance: {fileID: 4718203955620147713}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4718203955620001773 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 411116, guid: 86c737425152f734bb70ab7fc3179d8b, type: 3}
+  m_PrefabInstance: {fileID: 4718203955620147713}
+  m_PrefabAsset: {fileID: 0}

@@ -98,7 +98,10 @@ namespace creepycat.scifikitvol4
             if (Input.GetMouseButtonDown(0))
             {
                 // Get the gameobject clicked
-                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                // No main camera (e.g. the player died and its camera is disabled): skip the click.
+                Camera cam = Camera.main;
+                if (cam == null) return;
+                Ray ray = cam.ScreenPointToRay(Input.mousePosition);
                 RaycastHit hit;
 
                 // If something clicked

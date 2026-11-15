@@ -1,4 +1,5 @@
-/* [ 코드 설명 ] NavMesh 경로로 지정 지점 순찰·시각 추격·마지막 목격 위치 조사·시간 제한 수색·복귀를 수행합니다. 보이는 기존 대상을 우선하며 숨은 플레이어의 현재 위치나 소리는 읽지 않습니다. */
+/* [ 코드 설명 ] NavMesh 경로로 지정 지점 순찰(서로 가까운 지점끼리만 이어 걸으며 가까운 미방문 지점 우선, 모두 방문하면 새로 한 바퀴)·시각 추격·마지막 목격 위치 조사·시간 제한 수색·복귀를 수행합니다. 보이는 기존 대상을 우선하며 숨은 플레이어의 현재 위치나 소리는 읽지 않습니다. */
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using VoidLast.Player;
@@ -19,6 +20,8 @@ namespace VoidLast.Monster
         [SerializeField, Min(0.1f)] float searchDuration = 10;
         [SerializeField, Min(1)] float searchRadius = 9;
         [SerializeField, Min(0.05f)] float senseInterval = 0.15f;
+        [SerializeField, Min(1), Tooltip("순찰 중 한 번에 이동하는 최대 경로 길이. 이 안의 지점끼리만 이어 걸어 방을 가로지르는 먼 이동을 막는다.")] float patrolHopDistance = 20;
+        [SerializeField, Range(0, 1), Tooltip("가장 가까운 미방문 지점 대신 두 번째로 가까운 미방문 지점을 목표로 삼을 확률.")] float patrolRandomness = 0.25f;
         NavMeshAgent agent;
         MonsterHealth health;
         MonsterVision vision;
@@ -28,6 +31,8 @@ namespace VoidLast.Monster
         bool targetVisible, knowsLocation, hasGoal;
         float nextSense, nextPath, waitUntil, searchEnds, deathBlend;
         int previousPatrol = -1;
+        bool[] patrolVisited; // 이번 바퀴에 들른 지점
+        int[][] patrolLinks; float[][] patrolLinkLengths; // patrolHopDistance 이내로 이어진 이웃 지점과 경로 길이
         public Mode State { get; private set; }
         /// <summary>멀티플레이: 방장(서버)이 아닌 화면의 복제본이면 AI를 돌리지 않고 서버가 보낸 상태로 연출만 한다.</summary>
         public bool NetworkProxy { get; set; }
@@ -125,16 +130,89 @@ namespace VoidLast.Monster
         void PickPatrol(bool nearest)
         {
             if (patrolPoints == null || patrolPoints.Length == 0) { waitUntil = Time.time + 1; return; }
-            int start = Random.Range(0, patrolPoints.Length), chosen = -1; float best = float.PositiveInfinity;
+            if (patrolVisited == null || patrolVisited.Length != patrolPoints.Length) { patrolVisited = new bool[patrolPoints.Length]; BuildPatrolLinks(); }
+            int chosen = nearest || previousPatrol < 0 ? NearestPatrol() : NextPatrol();
+            if (chosen >= 0 && MoveTo(patrolPoints[chosen].position, patrolSpeed, 0.2f)) { previousPatrol = chosen; patrolVisited[chosen] = true; PatrolDestinations++; }
+            else waitUntil = Time.time + 1;
+        }
+        int NearestPatrol()
+        {
+            int chosen = -1; float best = float.PositiveInfinity;
             for (int i = 0; i < patrolPoints.Length; i++)
             {
-                int index = (start + i) % patrolPoints.Length; var point = patrolPoints[index];
-                if (point == null || !nearest && patrolPoints.Length > 1 && index == previousPatrol || !Reachable(point.position, out _)) continue;
+                var point = patrolPoints[i];
+                if (point == null || !Reachable(point.position, out _)) continue;
                 float distance = (point.position - transform.position).sqrMagnitude;
-                if (!nearest || distance < best) { chosen = index; best = distance; if (!nearest) break; }
+                if (distance < best) { chosen = i; best = distance; }
             }
-            if (chosen >= 0 && MoveTo(patrolPoints[chosen].position, patrolSpeed, 0.2f)) { previousPatrol = chosen; PatrolDestinations++; }
-            else waitUntil = Time.time + 1;
+            return chosen;
+        }
+        /// <summary>경로 길이가 patrolHopDistance 이내인 지점끼리 이웃으로 묶는다. 순찰은 이웃 사이로만 이동하므로 먼 지점으로 방을 가로질러 가지 않는다.</summary>
+        void BuildPatrolLinks()
+        {
+            int n = patrolPoints.Length; var path = new NavMeshPath();
+            var links = new List<int>[n]; var lengths = new List<float>[n];
+            for (int i = 0; i < n; i++) { links[i] = new List<int>(); lengths[i] = new List<float>(); }
+            for (int i = 0; i < n; i++)
+                for (int j = i + 1; j < n; j++)
+                {
+                    if (patrolPoints[i] == null || patrolPoints[j] == null || Vector3.Distance(patrolPoints[i].position, patrolPoints[j].position) > patrolHopDistance) continue;
+                    if (!NavMesh.SamplePosition(patrolPoints[i].position, out var a, 0.8f, agent.areaMask) || !NavMesh.SamplePosition(patrolPoints[j].position, out var b, 0.8f, agent.areaMask)) continue;
+                    if (!NavMesh.CalculatePath(a.position, b.position, agent.areaMask, path) || path.status != NavMeshPathStatus.PathComplete) continue;
+                    float length = 0;
+                    for (int c = 1; c < path.corners.Length; c++) length += Vector3.Distance(path.corners[c - 1], path.corners[c]);
+                    if (length > patrolHopDistance) continue;
+                    links[i].Add(j); lengths[i].Add(length); links[j].Add(i); lengths[j].Add(length);
+                }
+            patrolLinks = new int[n][]; patrolLinkLengths = new float[n][];
+            for (int i = 0; i < n; i++) { patrolLinks[i] = links[i].ToArray(); patrolLinkLengths[i] = lengths[i].ToArray(); }
+        }
+        /// <summary>이웃 지점을 따라 가장 가까운 미방문 지점 쪽으로 한 칸 이동할 지점을 고른다. 모두 들렀으면 새 바퀴를 시작한다.</summary>
+        int NextPatrol()
+        {
+            int n = patrolPoints.Length, current = previousPatrol;
+            if (n == 1) return 0;
+            if (patrolPoints[current] == null || Vector3.ProjectOnPlane(patrolPoints[current].position - transform.position, Vector3.up).sqrMagnitude > 4) return NearestPatrol();
+            var distance = new float[n]; var parent = new int[n]; var done = new bool[n];
+            for (int i = 0; i < n; i++) { distance[i] = float.PositiveInfinity; parent[i] = -1; }
+            distance[current] = 0;
+            for (int step = 0; step < n; step++)
+            {
+                int u = -1;
+                for (int i = 0; i < n; i++) if (!done[i] && (u < 0 || distance[i] < distance[u])) u = i;
+                if (u < 0 || float.IsPositiveInfinity(distance[u])) break;
+                done[u] = true;
+                for (int k = 0; k < patrolLinks[u].Length; k++)
+                {
+                    int v = patrolLinks[u][k]; float through = distance[u] + patrolLinkLengths[u][k];
+                    if (through < distance[v]) { distance[v] = through; parent[v] = u; }
+                }
+            }
+            for (int lap = 0; lap < 2; lap++)
+            {
+                int best = -1, second = -1; float bestScore = float.PositiveInfinity, secondScore = float.PositiveInfinity;
+                for (int i = 0; i < n; i++)
+                {
+                    if (i == current || patrolVisited[i] || patrolPoints[i] == null) continue;
+                    float score = distance[i];
+                    if (float.IsPositiveInfinity(score))
+                    {
+                        // 이웃으로 이어지지 않은 지점(지점이 드문 맵)은 기존처럼 직접 이동한다.
+                        if (!Reachable(patrolPoints[i].position, out _)) continue;
+                        score = 100000 + Vector3.Distance(patrolPoints[i].position, transform.position);
+                    }
+                    if (score < bestScore) { second = best; secondScore = bestScore; best = i; bestScore = score; }
+                    else if (score < secondScore) { second = i; secondScore = score; }
+                }
+                if (best >= 0)
+                {
+                    int goal = second >= 0 && Random.value < patrolRandomness ? second : best;
+                    while (parent[goal] >= 0 && parent[goal] != current) goal = parent[goal];
+                    return goal;
+                }
+                System.Array.Clear(patrolVisited, 0, n); patrolVisited[current] = true; // 한 바퀴를 다 돌았다.
+            }
+            return -1;
         }
         void BeginSearch() { Change(Mode.Search); searchEnds = Time.time + searchDuration; }
         void PickSearch()
