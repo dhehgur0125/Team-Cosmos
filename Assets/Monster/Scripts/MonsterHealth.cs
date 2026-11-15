@@ -13,6 +13,7 @@ namespace VoidLast.Monster
         public bool IsDead => Current <= 0;
         public event Action<GameObject, Vector3> Damaged;
         public event Action Died;
+        public event Action<Vector3, Vector3> HitConfirmed;
         /// <summary>멀티플레이: 복제본에 맞은 피해는 직접 깎지 않고 서버로 보낸다.</summary>
         public Action<float, GameObject, Vector3> NetworkHitRedirect;
         void Awake() => Current = maximumHealth;
@@ -21,6 +22,8 @@ namespace VoidLast.Monster
             if (IsDead || damage <= 0 || float.IsNaN(damage)) return;
             if (NetworkHitRedirect != null) { NetworkHitRedirect(damage, attacker, hitPoint); return; }
             Current = Mathf.Max(0, Current - damage);
+            Vector3 outward = attacker != null ? (attacker.transform.position + Vector3.up - hitPoint).normalized : -transform.forward;
+            HitConfirmed?.Invoke(hitPoint, outward);
             if (IsDead) Died?.Invoke();
             else Damaged?.Invoke(attacker, attacker != null ? attacker.transform.position : hitPoint);
         }

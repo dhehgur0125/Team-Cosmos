@@ -15,6 +15,7 @@ namespace VoidLast.Player
         public bool CanHeal => !IsDead && Current < maximumHealth;
         public event Action Changed;
         public event Action Died;
+        public event Action<float> DamageTaken;
         /// <summary>멀티플레이: 다른 대원의 복제본이면 피해·회복을 직접 바꾸지 않고 주인 클라이언트에 전달한다.</summary>
         public Action<float> NetworkDamageRedirect;
         public Func<float, bool> NetworkHealRedirect;
@@ -30,7 +31,9 @@ namespace VoidLast.Player
         {
             if (IsDead || amount <= 0 || float.IsNaN(amount) || DamageBlocked) return;
             if (NetworkDamageRedirect != null) { NetworkDamageRedirect(amount); return; }
+            float previous = Current;
             Current = Mathf.Clamp(Current - amount, 0, maximumHealth);
+            DamageTaken?.Invoke(previous - Current);
             Changed?.Invoke();
             if (IsDead) HandleDeath();
         }

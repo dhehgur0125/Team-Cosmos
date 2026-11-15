@@ -16146,6 +16146,7 @@ GameObject:
   - component: {fileID: 3196104957287798149}
   - component: {fileID: 2923014361838188340}
   - component: {fileID: 6566836041672594428}
+  - component: {fileID: 4248413513336558078}
   m_Layer: 0
   m_Name: VOID_LAST_FPS
   m_TagString: Untagged
@@ -16731,6 +16732,20 @@ MonoBehaviour:
   worldClip: {fileID: 2202381092588126000}
   dropAtProgress: 0.22
   lifetime: 5
+--- !u!114 &4248413513336558078
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4874269986630254310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6faa7c5e852226a4e87e5a85b37198b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsDamageFeedback
+  bloodOverlayPrefab: {fileID: 6410434145153182886, guid: a1630b3c0bfc06b40a20da35fac99ec2, type: 3}
+  fadeSeconds: 1.25
 --- !u!1 &4998313752617456583
 GameObject:
   m_ObjectHideFlags: 0

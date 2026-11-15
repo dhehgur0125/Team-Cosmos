@@ -40,6 +40,7 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
         {
             _health.Value = _hp != null ? _hp.Current : 0;
             if (_small != null) _small.Screamed += OnServerScream;
+            if (_hp != null) _hp.HitConfirmed += OnServerHit;
             return;
         }
 
@@ -56,6 +57,7 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         if (_small != null) _small.Screamed -= OnServerScream;
+        if (_hp != null) _hp.HitConfirmed -= OnServerHit;
         _health.OnValueChanged -= OnHealth;
         _mode.OnValueChanged -= OnMode;
         if (_hp != null) _hp.NetworkHitRedirect = null;
@@ -116,6 +118,14 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
         if (attackerObjectId != ulong.MaxValue && NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(attackerObjectId, out var no))
             attacker = no.gameObject;
         _hp.TakeHit(damage, attacker, hitPoint);
+    }
+
+    void OnServerHit(Vector3 point, Vector3 outward) => BloodHitRpc(point, outward);
+
+    [Rpc(SendTo.NotServer)]
+    void BloodHitRpc(Vector3 point, Vector3 outward)
+    {
+        GetComponent<MonsterHitFeedback>()?.PlayBlood(point, outward);
     }
 
     // ------------------------------------------------------------------ 비명 소리

@@ -104,6 +104,10 @@ public class LobbyManager : MonoBehaviour
     TMP_Text[] _uniqueLabels;
     readonly Dictionary<UniqueItemKind, string> _uniqueOwners = new Dictionary<UniqueItemKind, string>();
     bool _savingUnique;
+    UniqueItemKind _pendingUnique;
+    int _uniqueRevision;
+    bool _pendingClearReady;
+    ISession _uniqueSaveSession;
 
     // ------------------------------------------------------------------ lifecycle
     void Awake()
@@ -477,6 +481,9 @@ public class LobbyManager : MonoBehaviour
     void EnterRoom(ISession session)
     {
         _session = session;
+        _uniqueSaveSession = null;
+        _savingUnique = false;
+        _pendingClearReady = false;
         _leaving = false;
         _gameStarting = false;
         _knownNames.Clear();
@@ -615,7 +622,7 @@ public class LobbyManager : MonoBehaviour
                 _knownNames[p.Id] = PlayerName(p);
                 slots[i].SetPlayer(PlayerName(p), isHost, isHost || PlayerReady(p), isMe,
                     _session.IsHost && !isMe, () => _ = KickAsync(pid));
-                var kind = PlayerUnique(p);
+                var kind = isMe && _savingUnique ? _pendingUnique : PlayerUnique(p);
                 slots[i].SetUniqueItem(kind != UniqueItemKind.None ? UniqueItems.DisplayName(kind) : null);
             }
             else if (i < _session.MaxPlayers) slots[i].SetOpen();
@@ -656,6 +663,13 @@ public class LobbyManager : MonoBehaviour
         UpdateUniquePicker();
         var myPlayer = _session.GetPlayer(AuthenticationService.Instance.PlayerId);
         bool picked = myPlayer != null && PlayerUnique(myPlayer) != UniqueItemKind.None;
+        if (_savingUnique)
+        {
+            readyButton.interactable = false;
+            startButton.interactable = false;
+            startHintText.text = "선택을 저장하는 중… 다른 아이템으로 바꿀 수 있어요.";
+            return;
+        }
 
         if (!host)
         {
@@ -798,14 +812,14 @@ public class LobbyManager : MonoBehaviour
         if (_uniqueButtons == null) return;
         string myId = _session != null && AuthenticationService.Instance.IsSignedIn ? AuthenticationService.Instance.PlayerId : null;
         var me = _session != null && myId != null ? _session.GetPlayer(myId) : null;
-        bool locked = _session == null || _busy || _savingUnique || (!_session.IsHost && me != null && PlayerReady(me));   // 준비한 대원은 준비를 취소해야 바꿀 수 있다
+        bool locked = _session == null || _busy || (!_session.IsHost && me != null && PlayerReady(me));   // 준비한 대원은 준비를 취소해야 바꿀 수 있다
         var kinds = UniqueItems.Selectable;
         for (int i = 0; i < kinds.Length; i++)
         {
             _uniqueOwners.TryGetValue(kinds[i], out var owner);
-            bool mine = owner != null && owner == myId;
-            bool taken = owner != null && !mine;
-            string sub = mine ? "내 선택" : taken ? (_knownNames.TryGetValue(owner, out var n) ? n : "대원") : "선택 가능";
+            bool mine = _savingUnique ? kinds[i] == _pendingUnique : owner != null && owner == myId;
+            bool taken = owner != null && owner != myId;
+            string sub = mine ? (_savingUnique ? "저장 중…" : "내 선택") : taken ? (_knownNames.TryGetValue(owner, out var n) ? n : "대원") : "선택 가능";
             _uniqueLabels[i].text = $"<b>{UniqueItems.DisplayName(kinds[i])}</b>\n<size=15><color=#{(mine ? "FFFFFF" : taken ? "8A949E" : "7FD6F0")}>{sub}</color></size>";
             _uniqueButtons[i].image.color = mine ? LobbyStyle.Accent : taken ? new Color(0.11f, 0.12f, 0.14f) : LobbyStyle.ButtonDark;
             _uniqueButtons[i].interactable = !locked && !taken;
@@ -814,7 +828,7 @@ public class LobbyManager : MonoBehaviour
 
     async Task PickUniqueAsync(UniqueItemKind kind)
     {
-        if (_session == null || _busy || _savingUnique) return;
+        if (_session == null || _busy) return;
         string myId = AuthenticationService.Instance.PlayerId;
         var me = _session.GetPlayer(myId);
         if (!_session.IsHost && me != null && PlayerReady(me))
@@ -822,7 +836,7 @@ public class LobbyManager : MonoBehaviour
             SetStatus("준비를 취소해야 고유 아이템을 바꿀 수 있어요.", true);
             return;
         }
-        var current = me != null ? PlayerUnique(me) : UniqueItemKind.None;
+        var current = _savingUnique ? _pendingUnique : me != null ? PlayerUnique(me) : UniqueItemKind.None;
         var next = current == kind ? UniqueItemKind.None : kind;   // 같은 버튼을 다시 누르면 선택 취소
         if (next != UniqueItemKind.None && _uniqueOwners.TryGetValue(next, out var owner) && owner != myId)
         {
@@ -830,10 +844,9 @@ public class LobbyManager : MonoBehaviour
             SetStatus($"{other} 님이 이미 '{UniqueItems.DisplayName(next)}'을(를) 골랐어요.", true);
             return;
         }
-        await SaveUniqueAsync(next, false);
-        if (_session == null) return;
         if (next != UniqueItemKind.None) SetStatus($"고유 아이템 '{UniqueItems.DisplayName(next)}' · {UniqueItems.Description(next)} (게임에서 3번 키)");
         else SetStatus("고유 아이템 선택을 취소했어요.");
+        await SaveUniqueAsync(next, false);
     }
 
     /// <summary>내 고유 아이템을 방 정보에 저장한다. clearReady면 준비도 함께 푼다 (선택이 지워졌을 때)</summary>
@@ -841,29 +854,65 @@ public class LobbyManager : MonoBehaviour
     {
         var session = _session;
         if (session == null) return;
+        _pendingUnique = kind;
+        _pendingClearReady |= clearReady;
+        _uniqueRevision++;
+        if (_savingUnique && _uniqueSaveSession == session)
+        {
+            UpdateRoomButtons();
+            return; // The in-flight writer will send the most recent choice next.
+        }
+        var confirmed = UniqueItems.LocalChoice;
+        _uniqueSaveSession = session;
         _savingUnique = true;
         UpdateRoomButtons();
         try
         {
-            session.CurrentPlayer.SetProperty(KeyUnique, new PlayerProperty(UniqueItems.Code(kind), VisibilityPropertyOptions.Member));
-            if (clearReady && !session.IsHost) session.CurrentPlayer.SetProperty(KeyReady, new PlayerProperty("0", VisibilityPropertyOptions.Member));
-            await session.SaveCurrentPlayerDataAsync();
-            UniqueItems.LocalChoice = kind;
-        }
-        catch (Exception e)
-        {
-            SetStatus(FriendlyError(e), true);
+            while (_session == session && _uniqueSaveSession == session)
+            {
+                int revision = _uniqueRevision;
+                var choice = _pendingUnique;
+                bool resetReady = _pendingClearReady;
+                _pendingClearReady = false;
+                try
+                {
+                    session.CurrentPlayer.SetProperty(KeyUnique, new PlayerProperty(UniqueItems.Code(choice), VisibilityPropertyOptions.Member));
+                    if (resetReady && !session.IsHost)
+                        session.CurrentPlayer.SetProperty(KeyReady, new PlayerProperty("0", VisibilityPropertyOptions.Member));
+                    await session.SaveCurrentPlayerDataAsync();
+                    if (this == null || _session != session || _uniqueSaveSession != session) return;
+                    confirmed = choice;
+                    UniqueItems.LocalChoice = choice;
+                }
+                catch (Exception e)
+                {
+                    if (this == null || _session != session || _uniqueSaveSession != session) return;
+                    if (revision == _uniqueRevision)
+                    {
+                        // SetProperty changes the local SDK object before the request succeeds.
+                        session.CurrentPlayer.SetProperty(KeyUnique, new PlayerProperty(UniqueItems.Code(confirmed), VisibilityPropertyOptions.Member));
+                        SetStatus(FriendlyError(e), true);
+                        break;
+                    }
+                    _pendingClearReady |= resetReady;
+                }
+                if (revision == _uniqueRevision) break;
+            }
         }
         finally
         {
-            _savingUnique = false;
-            if (_session == session) RefreshRoom();
+            if (this != null && _session == session && _uniqueSaveSession == session)
+            {
+                _savingUnique = false;
+                _uniqueSaveSession = null;
+                RefreshRoom();
+            }
         }
     }
 
     async Task ToggleReadyAsync()
     {
-        if (_session == null || _session.IsHost || _busy) return;
+        if (_session == null || _session.IsHost || _busy || _savingUnique) return;
         var me = _session.GetPlayer(AuthenticationService.Instance.PlayerId);
         bool next = !(me != null && PlayerReady(me));
         if (next && (me == null || PlayerUnique(me) == UniqueItemKind.None))

@@ -221,3 +221,97 @@ Editor 메뉴의 `VOID LAST/Integration/1 - Add Stage2 Test Setup If Missing`은
 
 - `Stage2IntegrationValidation`은 `ActivateDetector()`를 직접 호출하므로 영향이 없다. 단, 실제 게임에서는 스캐너 없이 스캔할 수 없다.
 - 프로젝트에서 F, R, V는 그대로다. Z는 대원에게서 제거됐다.
+
+## Monster asset integration — 2026-11-15
+- User-confirmed scene: Assets/Map/Scenes/Floors/Stage2_Ship_2f.unity.
+- Blind: Skorpmare, scale 0.3190647, idle height 1.6 m, width 1.546 m, depth 1.950 m. Small: Muscomorph, scale 0.6189891, height 1 m, width 0.857 m, depth 0.962 m. Ground aligned from baked idle vertices; animation extents vary.
+- Existing prefab GUIDs preserved; Visual disabled, Model added. AI, collision, NavMesh, player, network scripts and purchased assets unchanged. Collider/agent radius-height remain Small 0.3/1.0 m; Blind 0.5/1.6 m. Decorative limbs extend beyond colliders.
+- Added Assets/Monster/Scripts/MonsterAssetAnimation.cs, Assets/Monster/Animations/VOID_LAST_SmallMonster.controller, VOID_LAST_BlindMonster.controller, and copied clips under Animations/Muscomorph and Animations/Skorpmare. Copied action clips are non-looping. Root motion disabled.
+- Bridge subscribes to existing StateChanged events and supports MonsterNetworkSync proxy state, using transform displacement for client locomotion. No network protocol changes.
+- Small: Search/Chase/Investigate/Hunt -> Speed blend IdleBreathe/CrawlForward (faster crawl substitutes run); Scream -> Roar fitted to 1.1 s; Attack -> BiteAttack fitted to 1.3 s; Dead -> Death; Stunned -> GetHit1.
+- Blind: Wander/Approach -> IdleBreathe/Walk/Run; Grope -> looping TentaclesComboAttack at 0.65 speed (substitute); Strike -> SimpleTentaclesAttack fitted to 1.45 s; Dead -> Death; Stunned -> GetHitFront.
+- Verified Play Mode 2f: both on NavMesh and moving; small Search velocity 2.4 m/s with CrawlForward; blind naturally entered Grope, moved 0.9 m/s with TentaclesComboAttack. Explicit proxy-state playback exercised scream, attack, grope, stunned, death and locomotion. URP models visually inspected with temporary inspection light, removed afterward. Console errors zero.
+- Not verified: complete scan-to-approach sequence, attack contact-frame alignment, all doorways/animation envelopes, itemtest, two-client networking.
+- Shared prefab changes affect scenes referencing these assets. Existing dirty 2f scene not saved; prefabs saved. Editor returned to Edit Mode.
+- Git status/diff repeatedly failed with 'this operation must be run in a work tree' despite rev-parse identifying this project. No commit/push/reset.
+- Inspection images: Assets/Screenshots/screenshot-20261115-165223.png, screenshot-20261115-165433.png, screenshot-20261115-165452.png. Lit inspection images exported to Codex outputs.
+
+### Source clips: seconds / original looping
+- Muscomorph/BiteAttack: 0.667 s / True
+- Muscomorph/BiteAttack_RM: 0.667 s / True
+- Muscomorph/CrawlBackwards: 0.5 s / True
+- Muscomorph/CrawlBackwards_RM: 0.5 s / True
+- Muscomorph/CrawlForward: 0.5 s / True
+- Muscomorph/CrawlForward_RM: 0.5 s / True
+- Muscomorph/CrawlLeft: 0.5 s / True
+- Muscomorph/CrawlLeft_RM: 0.5 s / True
+- Muscomorph/CrawlRight: 0.5 s / True
+- Muscomorph/CrawlRight_RM: 0.5 s / True
+- Muscomorph/Death: 1.267 s / False
+- Muscomorph/DeathHitTheGround: 0.533 s / False
+- Muscomorph/Falling: 1 s / True
+- Muscomorph/Fly: 1.333 s / True
+- Muscomorph/FlyingBiteAttack: 0.667 s / True
+- Muscomorph/FlyingGetHit: 0.667 s / True
+- Muscomorph/FlyingGetHitToFalling: 1 s / True
+- Muscomorph/FlyingRoar: 1.333 s / True
+- Muscomorph/GetHit1: 0.667 s / True
+- Muscomorph/GetHit2: 0.667 s / True
+- Muscomorph/IdleBreathe: 2 s / True
+- Muscomorph/Landing: 0.833 s / True
+- Muscomorph/Roar: 2.333 s / True
+- Muscomorph/Spit: 0.667 s / True
+- Muscomorph/StingerAttack: 0.667 s / True
+- Muscomorph/TakeOff: 0.833 s / True
+- Muscomorph/Take 001: 0.033 s / False
+- Skorpmare/Take 001: 0.033 s / False
+- Skorpmare/BiteAttack: 1 s / True
+- Skorpmare/BiteAttack_RM: 1 s / True
+- Skorpmare/Death: 2.967 s / False
+- Skorpmare/GetHitBack: 1 s / True
+- Skorpmare/GetHitFront: 1 s / True
+- Skorpmare/IdleBreathe: 2 s / True
+- Skorpmare/Roar: 3.5 s / True
+- Skorpmare/Run: 0.6 s / True
+- Skorpmare/Run_RM: 0.6 s / True
+- Skorpmare/SimpleTentaclesAttack: 1.333 s / True
+- Skorpmare/SpitAcidAttack: 1.333 s / False
+- Skorpmare/TentaclesComboAttack: 3.5 s / True
+- Skorpmare/Turn90Left: 1 s / True
+- Skorpmare/Turn90Left_RM: 1 s / True
+- Skorpmare/Turn90Right: 1 s / True
+- Skorpmare/Turn90Right_RM: 1 s / True
+- Skorpmare/Walk: 1 s / True
+- Skorpmare/Walk_RM: 1 s / True
+
+### Monster size adjustment — 2026-11-15
+- User requested smaller Muscomorph and 2 m Skorpmare. Model scale: Small 0.5261407 (idle height 0.85 m; 15% smaller), Blind 0.3988309 (idle height 2 m). Floor offsets adjusted proportionally. Prefabs saved; AI, animation and collider settings unchanged.
+
+## Lobby unique selection responsiveness — 2026-11-15
+- User clarified that every selection temporarily disables buttons, rather than freezing rendering. LobbyManager gated the picker on SaveCurrentPlayerDataAsync. This required network write cannot be preloaded.
+- Modified Assets/Map/Script/Multi/Lobby/LobbyManager.cs: pending selection shown immediately, picker stays usable while saving, one serialized writer coalesces rapid clicks to the latest choice. Ready/start remain blocked until confirmation. Errors restore last confirmed local property; old-session responses are ignored after room changes. Existing ownership conflict resolution preserved.
+- Validation: C# harness using the actual save method with delayed/failing fake sessions passed rapid-selection coalescing, final-choice persistence, rollback, and session-change isolation. Unity compilation/console errors zero. Live Unity Services multiplayer latency and simultaneous ownership conflict were not tested.
+
+## Combat feedback and monster readability — 2026-11-15
+- User request: blood on monster hits, local player damage screen, and readable monster surfaces in darkness without attached lights.
+- Source assets: RVFX/BloodEffectsPack/0_BuiltIn/Blood/Splash/Blood_Splash_02.prefab and UIEffect/Prefab/BloodScreen_01.prefab. Purchased sources unchanged.
+- Added MonsterHitFeedback.cs and Monster/Effects/VOID_LAST_MonsterBloodHit.prefab with two copied URP particle materials. Vendor BloodModifier removed only from the copy. Three pre-created effects per monster; no Instantiate on hits; each stops after 1.5 s. Original blood textures and particle animation reused.
+- MonsterHealth.HitConfirmed reports actual impact point/direction, including fatal hits, separate from existing AI Damaged event. MonsterNetworkSync forwards accepted server hits via BloodHitRpc to non-server clients; no client prediction/duplicate server burst.
+- Added Player/Scripts/FpsDamageFeedback.cs, Player/Prefabs/Effects/VOID_LAST_DamageOverlay.prefab and VOID_LAST_DamageScreen.mat. FpsHealth.DamageTaken is raised only by actual damage. Local active camera/ownership gate; healing and carry-over do not trigger a hit flash. Screen-edge blood fades, mild residual below 25% HP; no camera shake or input blocking. Loading hides UI.
+- Attached feedback to Small/Blind/EyedLarge monster prefabs and FPS/FPS_Network player prefabs. Existing GUIDs, health values, model sizes and AI preserved.
+- Readable material copies under Assets/Monster/Materials/*_Readable.mat: albedo-textured low emission (0.12,0.13,0.15), standard URP Lit depth/shadows. BakedEmissive flag is required by URP to retain its emission keyword; these moving non-static renderers do not add real-time scene lights. No lights, bloom setup or through-wall overlay added; no bake performed.
+- Verified: Unity compilation and console errors zero; runtime normal hit one burst, fatal hit one burst, corpse hit ignored, 16 active particles in two sampled bursts; player HP loss activates overlay (~0.65), heal does not retrigger. Rendered and visually inspected copied blood effect, UI, and monster with no added lights.
+- Not verified: two-client RPC delivery/latency, full session owner-switch/death/spectator lifecycle, every corridor and post-processing configuration. Existing asset animations/AI unchanged.
+- Preview files in Codex outputs: MonsterDarkVisibility.png, MonsterBloodPreview.png, PlayerDamagePreview.png. Temporary test objects and preview scenes removed. No scene save or commit/push.
+
+## 팀 인수인계 및 시작점 테스트 몬스터 — 2026-11-15
+- 최신 한국어 요약: [WORK_SUMMARY_2026-11-15.md](WORK_SUMMARY_2026-11-15.md)
+- 다음 몬스터 담당자용: [MONSTER_HANDOFF.md](MONSTER_HANDOFF.md)
+- Stage2_Ship_2f에 TEST_SmallMonster_NearStart 1개 추가. 위치 (-12, 8.067, -28.5), Y 270도, 시작점 약 6m 앞, 개별 roamRadius=4. 기존 개체 유지. NavMesh 경로/공간 검사 및 저장 후 1개 존재 확인. 실제 신규 배치 전투 플레이는 미검증.
+- 최신 외형 높이: Small 약 0.85m, Blind 약 2m. 초기 설정 기록보다 이 값을 우선한다.
+
+## 혈흔 가시성 보강 — 2026-11-15
+- 모든 몬스터 피격 effectScale 0.28 → 0.48(약 1.7배), 파티클 수명 0.5 → 0.7초.
+- URP 혈흔 BaseColor를 (1.6, 0.85, 0.85, 1)로 올려 붉은색 대비/불투명도를 강화. 가산 블렌딩이나 광원은 추가하지 않음.
+- 실제 피격점에서 outward 방향으로 0.08m 이동해 외형에 가려지는 현상을 줄임. 풀 3개/정리 1.5초 유지.
+- 프리팹 수정으로 시작점 테스트 개체에도 상속됨. 컴파일/콘솔 오류 0. 어두운 배경 렌더로 혈흔 가시성 확인.
