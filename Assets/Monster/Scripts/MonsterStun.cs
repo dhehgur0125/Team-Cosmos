@@ -1,6 +1,6 @@
 /*
 [ 코드 설명 ]
-1. 기존 세 몬스터 AI가 공유하는 스턴 종료 시간만 관리합니다.
+1. 몬스터 AI 5종이 공유하는 스턴 종료 시간만 관리합니다.
 2. 피해 없이 현재 공격을 취소하고 AI의 스턴 상태로 진입합니다. 중복 적용은 종료 시간만 연장하며 사망한 몬스터는 회복시키지 않습니다.
 */
 using UnityEngine;
@@ -26,6 +26,8 @@ namespace VoidLast.Monster
             GetComponent<EyedMonsterAI>()?.BeginStun(this);
             GetComponent<SmallMonsterAI>()?.BeginStun(this);
             GetComponent<BlindMonsterAI>()?.BeginStun(this);
+            GetComponent<BlindLargeMonsterAI>()?.BeginStun(this);
+            GetComponent<FrogMonsterAI>()?.BeginStun(this);
             return true;
         }
     }

@@ -53,8 +53,8 @@ namespace VoidLast.Monster
             agent = GetComponent<NavMeshAgent>(); health = GetComponent<MonsterHealth>();
             vision = GetComponent<MonsterVision>(); melee = GetComponent<MonsterMelee>(); colors = new MaterialPropertyBlock();
         }
-        void OnEnable() { health.Damaged += OnHit; health.Died += Die; }
-        void OnDisable() { health.Damaged -= OnHit; health.Died -= Die; if (NavigationReady) agent.isStopped = true; }
+        void OnEnable() { health.Damaged += OnHit; health.Died += Die; health.Revived += GetUp; }
+        void OnDisable() { health.Damaged -= OnHit; health.Died -= Die; health.Revived -= GetUp; if (NavigationReady) agent.isStopped = true; }
         void Start() { if (!NetworkProxy && !NavigationReady) Debug.LogError("Monster requires a baked NavMesh at its spawn position.", this); }
         void Update()
         {
@@ -253,7 +253,19 @@ namespace VoidLast.Monster
         {
             Change(Mode.Dead); melee.Cancel(); Target = null; targetVisible = false;
             if (agent.enabled) agent.enabled = false;
-            foreach (var collider in GetComponentsInChildren<Collider>()) collider.enabled = false;
+            downColliders.Clear();
+            foreach (var collider in GetComponentsInChildren<Collider>()) if (collider.enabled) { collider.enabled = false; downColliders.Add(collider); }
+        }
+        readonly List<Collider> downColliders = new List<Collider>(); // 쓰러질 때 끈 충돌체 (다시 일어날 때 켠다)
+        /// <summary>그로기가 끝나 다시 일어난다: 충돌체와 길 찾기를 되살리고 순찰로 돌아간다.</summary>
+        void GetUp()
+        {
+            foreach (var collider in downColliders) if (collider != null) collider.enabled = true;
+            downColliders.Clear();
+            if (NetworkProxy) return;   // 복제본의 상태는 서버가 보내 준다
+            agent.enabled = true;
+            Target = null; targetVisible = knowsLocation = false; nextSense = 0;
+            Change(Mode.Return);
         }
         void LateUpdate()
         {

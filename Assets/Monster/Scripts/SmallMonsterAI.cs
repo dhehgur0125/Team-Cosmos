@@ -34,6 +34,8 @@ namespace VoidLast.Monster
         [SerializeField, Min(0.1f)] float screamDuration = 1.1f;
         [Tooltip("비명이 들려서 동료 쪼꼬미들이 몰려오는 반경(m)")]
         [SerializeField, Min(1)] float screamAlertRadius = 25;
+        [Tooltip("비명이 눈 없는 몬스터(촉수형·눈 없는 대형)에게 들리는 반경(m)")]
+        [SerializeField, Min(1)] float screamNoiseRadius = 35;
         [SerializeField] AudioClip screamClip;
         [SerializeField, Range(0, 1)] float screamVolume = 1;
 
@@ -88,16 +90,20 @@ namespace VoidLast.Monster
         {
             All.Add(this);
             GunNoise.Emitted += OnGunHeard;
+            MoveNoise.Emitted += OnGunHeard;   // 발소리(걷기 4m·달리기 9m)도 총소리처럼 그 위치를 조사하러 간다
             health.Damaged += OnHit;
             health.Died += Die;
+            health.Revived += GetUp;
         }
 
         void OnDisable()
         {
             All.Remove(this);
             GunNoise.Emitted -= OnGunHeard;
+            MoveNoise.Emitted -= OnGunHeard;
             health.Damaged -= OnHit;
             health.Died -= Die;
+            health.Revived -= GetUp;
             if (NavigationReady) agent.isStopped = true;
         }
 
@@ -186,6 +192,7 @@ namespace VoidLast.Monster
             if (screamClip != null) GameAudio.PlayAt(screamClip, transform.position, screamVolume);
             TriggerAnimator("Scream");
             AlertAllies();
+            ScreamNoise.Emit(transform.position, screamNoiseRadius);   // 눈 없는 몬스터에게도 들린다
             Screamed?.Invoke(this);
         }
 
@@ -405,7 +412,19 @@ namespace VoidLast.Monster
             melee.Cancel();
             Target = null; targetVisible = false; aggro = false;
             if (agent.enabled) agent.enabled = false;
-            foreach (var collider in GetComponentsInChildren<Collider>()) collider.enabled = false;
+            downColliders.Clear();
+            foreach (var collider in GetComponentsInChildren<Collider>()) if (collider.enabled) { collider.enabled = false; downColliders.Add(collider); }
+        }
+        readonly List<Collider> downColliders = new List<Collider>(); // 쓰러질 때 끈 충돌체 (다시 일어날 때 켠다)
+        /// <summary>그로기가 끝나 다시 일어난다: 충돌체와 길 찾기를 되살리고 수색으로 돌아간다.</summary>
+        void GetUp()
+        {
+            foreach (var collider in downColliders) if (collider != null) collider.enabled = true;
+            downColliders.Clear();
+            if (NetworkProxy) return;   // 복제본의 상태는 서버가 보내 준다
+            agent.enabled = true;
+            Target = null; targetVisible = knowsLocation = aggro = false; nextSense = 0;
+            Change(Mode.Search);
         }
 
         // ------------------------------------------------------------------ 연출 (상태 색상 / 비명 떨림 / 쓰러짐)

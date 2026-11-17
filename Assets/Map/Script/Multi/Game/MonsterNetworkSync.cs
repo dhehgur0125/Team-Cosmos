@@ -23,6 +23,8 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
     EyedMonsterAI _eyed;
     SmallMonsterAI _small;
     BlindMonsterAI _blind;
+    BlindLargeMonsterAI _blindLarge;
+    FrogMonsterAI _frog;
 
     void Awake()
     {
@@ -32,6 +34,8 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
         _eyed = GetComponent<EyedMonsterAI>();
         _small = GetComponent<SmallMonsterAI>();
         _blind = GetComponent<BlindMonsterAI>();
+        _blindLarge = GetComponent<BlindLargeMonsterAI>();
+        _frog = GetComponent<FrogMonsterAI>();
     }
 
     public override void OnNetworkSpawn()
@@ -68,6 +72,8 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
         if (_eyed != null) _eyed.NetworkProxy = proxy;
         if (_small != null) _small.NetworkProxy = proxy;
         if (_blind != null) _blind.NetworkProxy = proxy;
+        if (_blindLarge != null) _blindLarge.NetworkProxy = proxy;
+        if (_frog != null) _frog.NetworkProxy = proxy;
         if (_melee != null && proxy) _melee.enabled = false;
     }
 
@@ -76,7 +82,8 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
         if (!IsSpawned) return;
         if (IsServer)
         {
-            byte mode = (byte)(_eyed != null ? (int)_eyed.State : _small != null ? (int)_small.State : _blind != null ? (int)_blind.State : 0);
+            byte mode = (byte)(_eyed != null ? (int)_eyed.State : _small != null ? (int)_small.State : _blind != null ? (int)_blind.State
+                : _blindLarge != null ? (int)_blindLarge.State : _frog != null ? (int)_frog.State : 0);
             if (_mode.Value != mode) _mode.Value = mode;
             float lean = _melee != null ? Mathf.Round(_melee.Lean * 2f) / 2f : 0;
             if (!Mathf.Approximately(_lean.Value, lean)) _lean.Value = lean;
@@ -94,6 +101,8 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
         if (_eyed != null) _eyed.ApplyNetworkState(current);
         if (_small != null) _small.ApplyNetworkState(current);
         if (_blind != null) _blind.ApplyNetworkState(current);
+        if (_blindLarge != null) _blindLarge.ApplyNetworkState(current);
+        if (_frog != null) _frog.ApplyNetworkState(current);
     }
 
     void OnHealth(float previous, float current)

@@ -102,16 +102,22 @@ namespace VoidLast.Monster
         {
             health.Damaged += OnHit;
             health.Died += Die;
+            health.Revived += GetUp;
             ScanNoise.Emitted += OnScanHeard; // 탐지기 스캔 소리는 눈 없는 몬스터만 듣는다
             GunNoise.Emitted += OnGunHeard;
+            MoveNoise.Emitted += OnMoveHeard;
+            ScreamNoise.Emitted += OnGunHeard; // 쪼꼬미 비명이 난 위치로 간다
         }
 
         void OnDisable()
         {
             health.Damaged -= OnHit;
             health.Died -= Die;
+            health.Revived -= GetUp;
             ScanNoise.Emitted -= OnScanHeard;
             GunNoise.Emitted -= OnGunHeard;
+            MoveNoise.Emitted -= OnMoveHeard;
+            ScreamNoise.Emitted -= OnGunHeard;
             if (NavigationReady) agent.isStopped = true;
         }
 
@@ -184,6 +190,13 @@ namespace VoidLast.Monster
         {
             if (Mathf.Abs(transform.position.y - origin.y) > 3.5f) return;
             OnScanHeard(origin, radius, 0f);
+        }
+
+        // 발소리: 더듬는 중에는 촉수 감각이 우선이라 무시한다 (가까운 대원은 더듬기가 직접 찾는다)
+        void OnMoveHeard(Vector3 origin, float radius)
+        {
+            if (State == Mode.Grope) return;
+            OnGunHeard(origin, radius);
         }
 
         // 소리가 난 위치(또는 맞은 방향)로 달려간다
@@ -449,7 +462,19 @@ namespace VoidLast.Monster
             Change(Mode.Dead);
             pendingScan = false; strikeVictim = null;
             if (agent.enabled) agent.enabled = false;
-            foreach (var collider in GetComponentsInChildren<Collider>()) collider.enabled = false;
+            downColliders.Clear();
+            foreach (var collider in GetComponentsInChildren<Collider>()) if (collider.enabled) { collider.enabled = false; downColliders.Add(collider); }
+        }
+        readonly List<Collider> downColliders = new List<Collider>(); // 쓰러질 때 끈 충돌체 (다시 일어날 때 켠다)
+        /// <summary>그로기가 끝나 다시 일어난다: 충돌체와 길 찾기를 되살리고 배회로 돌아간다.</summary>
+        void GetUp()
+        {
+            foreach (var collider in downColliders) if (collider != null) collider.enabled = true;
+            downColliders.Clear();
+            if (NetworkProxy) return;   // 복제본의 상태는 서버가 보내 준다
+            agent.enabled = true;
+            pendingScan = false; nextProximity = nextSense = 0;
+            Change(Mode.Wander);
         }
 
         // ------------------------------------------------------------------ 연출 (상태 색상 / 촉수 움직임)
