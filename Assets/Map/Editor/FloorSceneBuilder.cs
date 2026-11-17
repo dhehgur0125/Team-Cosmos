@@ -134,6 +134,13 @@ namespace VoidLast.MapTools
             ft.nextSceneName = floor > 1 ? SceneName(floor - 1) : "";
             ft.descentSides = floor == 2 ? "A" : "AB";   // 2층은 기획상 A 계단으로만 내려간다
 
+            // 6b) 3층 임무·몬스터 (원본 씬에는 없고 3층 씬에만 만든다. B 계단으로만 내려가게 바뀜)
+            if (floor == 3) log.Add(F3MissionSetup.BuildInOpenScene());
+            // 6c) 1층 임무·몬스터·탈출 (1층 씬에만 만든다)
+            if (floor == 1) log.Add(F1MissionSetup.BuildInOpenScene());
+            // 6d) 4층 임무·몬스터 (4층 씬에만 만든다. A 계단으로만 내려가게 바뀜)
+            if (floor == 4) log.Add(F4MissionSetup.BuildInOpenScene());
+
             // 7) 고치 (그 층에서 걸어갈 수 있는 자리를 골라 저장)
             log.Add(CocoonSetup.BuildInOpenScene(floor));
             ft.font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MultiplayerSetup.FontAssetPath);

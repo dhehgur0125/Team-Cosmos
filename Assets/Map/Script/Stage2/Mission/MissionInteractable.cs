@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 임무용 상호작용 장치 (F를 길게 눌러 작동). 실제 판정·진행은 F2MissionDirector가 맡고,
+/// 임무용 상호작용 장치 (F를 길게 눌러 작동). 실제 판정·진행은 그 층의 임무 진행자(F2MissionDirector, F3MissionDirector)가 맡고,
 /// 여기에는 어떤 장치인지, 안내 문구, 누르는 시간, 상태 표시등만 둔다.
 /// 레이캐스트용 콜라이더는 Trigger로 두어 이동을 막지 않는다.
 /// </summary>
@@ -9,9 +9,21 @@ using UnityEngine;
 public sealed class MissionInteractable : MonoBehaviour
 {
     // 씬에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
-    public enum Kind { PowerModule = 1, FuelPump = 2, IntrusionLog = 3, QuarantineConsole = 4, CargoLift = 5, FuelValve = 6, LockdownDoor = 7 }
+    public enum Kind
+    {
+        // 2층
+        PowerModule = 1, FuelPump = 2, IntrusionLog = 3, QuarantineConsole = 4, CargoLift = 5, FuelValve = 6, LockdownDoor = 7,
+        // 3층
+        ServerRack = 8, SecurityDoor = 9, BridgeDoor = 10, BridgeStatus = 11, RouteDownload = 12, MonsterMonitor = 13, HangarUplink = 14,
+        // 1층
+        ModuleSocket = 15, FuelLine = 16, HoldClamp = 17, HangarConsole = 18, HangarDoor = 19, IgnitionConsole = 20,
+        // 4층
+        Generator = 21, GeneratorStart = 22, CoolantValve = 23, PowerSwitch = 24,
+    }
 
     public Kind kind = Kind.PowerModule;
+    [Tooltip("같은 종류가 여러 개일 때의 번호 (서버 1·2·3, 문 1·2). 0부터")]
+    public int index;
     [Tooltip("화면 아래 안내 (예: 전력 모듈 꺼내기)")]
     public string actionLabel = "작동";
     [Min(0.1f)] public float holdSeconds = 2f;

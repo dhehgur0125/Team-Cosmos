@@ -34,7 +34,6 @@ public sealed class FloorTransition : NetworkBehaviour
     /// <summary>층 이동 연출 중 (입력 금지)</summary>
     public static bool InCutscene { get; private set; }
 
-    F2MissionDirector _director;
     bool _descending, _arrivalPending, _arrivalRunning, _applied;
     float _arrivalWait;
 
@@ -46,9 +45,8 @@ public sealed class FloorTransition : NetworkBehaviour
         get
         {
             if (!HasNextFloor || _descending) return false;
-            if (_director == null) return true;
-            var p = (F2MissionDirector.Phase)_director.State.phase;
-            return p == F2MissionDirector.Phase.Rally || p == F2MissionDirector.Phase.Cleared;
+            var mission = FloorMission.Current;
+            return mission == null || mission.ExitUnlocked;
         }
     }
     public bool IsDescending => _descending;
@@ -82,7 +80,6 @@ public sealed class FloorTransition : NetworkBehaviour
     void Awake()
     {
         Instance = this;
-        _director = FindFirstObjectByType<F2MissionDirector>();
         var ship = GameObject.Find("VOID_LAST_Ship");
         if (ship != null)
             foreach (Transform c in ship.transform)

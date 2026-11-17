@@ -31,6 +31,8 @@ public sealed class GameOverScreen : MonoBehaviour
     float _stepStart, _allDeadSince = -1f, _lobbySince = -1f;
     FpsHealth _offlineHealth;
     readonly List<string> _crew = new List<string>();
+    readonly List<string> _left = new List<string>();
+    bool _escape;   // true면 게임 오버 대신 탈출 성공 화면
 
     CanvasGroup _group;
     TMP_Text _title, _status;
@@ -117,10 +119,24 @@ public sealed class GameOverScreen : MonoBehaviour
     }
 
     // ------------------------------------------------------------------ 진행
+    /// <summary>1층에서 탈출에 성공했을 때: 같은 화면을 '탈출 성공'으로 띄우고 대기실로 돌아간다</summary>
+    public void ShowEscape(IList<string> escaped, IList<string> left)
+    {
+        if (_step != Step.Watching) return;
+        _escape = true;
+        _crew.Clear(); _left.Clear();
+        if (escaped != null) _crew.AddRange(escaped);
+        if (left != null) _left.AddRange(left);
+        Show();
+    }
+
     void Show()
     {
-        _crew.Clear();
-        foreach (var p in FpsNetworkPlayer.All) if (p != null) _crew.Add(string.IsNullOrEmpty(p.Nickname) ? "대원" : p.Nickname);
+        if (!_escape)
+        {
+            _crew.Clear();
+            foreach (var p in FpsNetworkPlayer.All) if (p != null) _crew.Add(string.IsNullOrEmpty(p.Nickname) ? "대원" : p.Nickname);
+        }
 
         // 씬이 바뀌어도 화면 유지
         transform.SetParent(null, true);
@@ -130,7 +146,7 @@ public sealed class GameOverScreen : MonoBehaviour
         _group.alpha = 0f;
         _status.text = "";
         SetStep(Step.FadingIn);
-        Debug.Log("[GameOver] 모든 대원이 사망 → 게임 오버");
+        Debug.Log(_escape ? "[GameOver] 탈출 성공" : "[GameOver] 모든 대원이 사망 → 게임 오버");
     }
 
     void MoveToLobby()
@@ -183,7 +199,8 @@ public sealed class GameOverScreen : MonoBehaviour
         var glow = new GameObject("Glow", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
         glow.transform.SetParent(root, false);
         var gi = glow.GetComponent<RawImage>();
-        gi.texture = GlowTexture(); gi.color = new Color(LobbyStyle.Accent.r, LobbyStyle.Accent.g, LobbyStyle.Accent.b, 0.16f); gi.raycastTarget = false;
+        var glowColor = _escape ? new Color(0.35f, 1f, 0.6f) : LobbyStyle.Accent;   // 탈출 성공은 초록빛
+        gi.texture = GlowTexture(); gi.color = new Color(glowColor.r, glowColor.g, glowColor.b, 0.16f); gi.raycastTarget = false;
         Place(gi.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(1500, 900));
 
         // 머리글 (로비와 같은 자리)
@@ -198,15 +215,18 @@ public sealed class GameOverScreen : MonoBehaviour
         Place(line.rectTransform, new Vector2(0.5f, 1), new Vector2(0, -140), new Vector2(1760, 2));
 
         // 가운데
-        _title = Txt(root, "GameOver", "<mspace=0.78em>GAME OVER</mspace>", 132, LobbyStyle.Accent, TextAlignmentOptions.Center, FontStyles.Bold);
+        var titleColor = _escape ? new Color(0.35f, 1f, 0.6f) : LobbyStyle.Accent;
+        _title = Txt(root, "GameOver", _escape ? "<mspace=0.78em>ESCAPED</mspace>" : "<mspace=0.78em>GAME OVER</mspace>", 132, titleColor, TextAlignmentOptions.Center, FontStyles.Bold);
         _title.characterSpacing = 60f;
         Place(_title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0, 110), new Vector2(1600, 170));
-        var tl = Img(root, "TitleLine", LobbyStyle.Accent);
+        var tl = Img(root, "TitleLine", titleColor);
         _titleLine = tl.rectTransform;
         Place(_titleLine, new Vector2(0.5f, 0.5f), new Vector2(0, 14), new Vector2(0, 3));
-        var msg = Txt(root, "Message", "모든 대원이 사망했어요", 38, LobbyStyle.Text, TextAlignmentOptions.Center, FontStyles.Normal);
+        var msg = Txt(root, "Message", _escape ? "탈출선이 출발했어요" : "모든 대원이 사망했어요", 38, LobbyStyle.Text, TextAlignmentOptions.Center, FontStyles.Normal);
         Place(msg.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0, -40), new Vector2(1200, 56));
-        var crew = Txt(root, "Crew", _crew.Count > 0 ? "대원  " + string.Join("  ·  ", _crew) : "", 24, LobbyStyle.TextDim, TextAlignmentOptions.Center, FontStyles.Normal);
+        string crewText = _crew.Count > 0 ? (_escape ? "탈출한 대원  " : "대원  ") + string.Join("  ·  ", _crew) : "";
+        if (_escape && _left.Count > 0) crewText += "      <color=#E0443A>남겨진 대원  " + string.Join("  ·  ", _left) + "</color>";
+        var crew = Txt(root, "Crew", crewText, 24, LobbyStyle.TextDim, TextAlignmentOptions.Center, FontStyles.Normal);
         Place(crew.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0, -92), new Vector2(1400, 40));
 
         // 아래

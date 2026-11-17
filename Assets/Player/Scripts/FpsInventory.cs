@@ -5,7 +5,8 @@ using UnityEngine;
 namespace VoidLast.Player
 {
     // 프리팹·씬에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
-    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler, Scanner }
+    // 씬·프리팹에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
+    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler, Scanner, AdminCard, ToolKit, PowerCell }
 
     [DefaultExecutionOrder(-50)]
     public sealed class FpsInventory : MonoBehaviour
@@ -92,11 +93,17 @@ namespace VoidLast.Player
         {
             if (IsNetworkProxy) return false;
             if (!IsAlive || item == FarmingItemKind.None) return false;
+            if (FarmingItems.IsHeavy(item) && HasHeavyItem) return false;   // 무거운 물건은 한 번에 하나만
             int empty = Array.IndexOf(items, FarmingItemKind.None);
             if (empty < 0) return false;
             items[empty] = item;
             Changed?.Invoke(); ShowHotbar();
             return true;
+        }
+        /// <summary>무거운 물건(전력 셀)을 들고 있는지. 들고 있는 동안 달리기·사격을 할 수 없다 (FpsInput)</summary>
+        public bool HasHeavyItem
+        {
+            get { foreach (var item in items) if (FarmingItems.IsHeavy(item)) return true; return false; }
         }
         /// <summary>멀티플레이: 같은 아이템을 다른 대원이 먼저 주웠다고 서버가 알려 오면 하나를 다시 뺀다.</summary>
         public bool RemoveOneByNetwork(FarmingItemKind kind)

@@ -75,7 +75,75 @@ namespace VoidLast.MapTools
                 Part(m, "Cap", PrimitiveType.Cylinder, new Vector3(0, 0.205f, 0), new Vector3(0.05f, 0.012f, 0.05f), metal);
                 Part(m, "Base", PrimitiveType.Cylinder, new Vector3(0, 0.005f, 0), new Vector3(0.115f, 0.005f, 0.115f), metal);
             });
+            BuildAdminCard();
+            BuildToolKit();
+            BuildPowerCell();
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>4층 임무 물건(전력 셀)만 만든다. 이미 있는 다른 물건은 건드리지 않는다 (F4MissionSetup에서 사용)</summary>
+        public static void BuildPowerCell()
+        {
+            EnsureFolder("Assets", "Resources");
+            EnsureFolder("Assets/Resources", "FarmingItems");
+            EnsureFolder(Dir, "Materials");
+            EnsureFolder(Dir, "Icons");
+            var dark = Mat("M_Item_Dark", new Color(0.09f, 0.1f, 0.11f), 0.6f, 0.45f);
+            var metal = Mat("M_Item_Metal", new Color(0.62f, 0.64f, 0.67f), 0.95f, 0.6f);
+            var yellow = Mat("M_Item_Yellow", new Color(0.95f, 0.75f, 0.1f), 0.05f, 0.55f);
+            var cyan = Mat("M_Item_CyanGlow", new Color(0.05f, 0.4f, 0.5f), 0f, 0.5f, new Color(0.2f, 1.8f, 2.6f));
+            Item(FarmingItemKind.PowerCell, new Vector3(0.3f, 0.5f, 0.3f), 12f, m =>
+            {
+                Part(m, "Core", PrimitiveType.Cylinder, new Vector3(0, 0.24f, 0), new Vector3(0.22f, 0.2f, 0.22f), cyan);
+                Part(m, "Cap Top", PrimitiveType.Cylinder, new Vector3(0, 0.43f, 0), new Vector3(0.28f, 0.04f, 0.28f), dark);
+                Part(m, "Cap Bottom", PrimitiveType.Cylinder, new Vector3(0, 0.04f, 0), new Vector3(0.28f, 0.04f, 0.28f), dark);
+                Part(m, "Band", PrimitiveType.Cylinder, new Vector3(0, 0.24f, 0), new Vector3(0.24f, 0.02f, 0.24f), yellow);
+                Part(m, "Rod A", PrimitiveType.Cube, new Vector3(0.12f, 0.24f, 0), new Vector3(0.02f, 0.36f, 0.02f), metal);
+                Part(m, "Rod B", PrimitiveType.Cube, new Vector3(-0.12f, 0.24f, 0), new Vector3(0.02f, 0.36f, 0.02f), metal);
+                Part(m, "Handle", PrimitiveType.Cube, new Vector3(0, 0.49f, 0), new Vector3(0.16f, 0.025f, 0.03f), metal);
+            });
+        }
+
+        /// <summary>1층 임무 물건(공구)만 만든다. 이미 있는 다른 물건은 건드리지 않는다 (F1MissionSetup에서 사용)</summary>
+        public static void BuildToolKit()
+        {
+            EnsureFolder("Assets", "Resources");
+            EnsureFolder("Assets/Resources", "FarmingItems");
+            EnsureFolder(Dir, "Materials");
+            EnsureFolder(Dir, "Icons");
+            var dark = Mat("M_Item_Dark", new Color(0.09f, 0.1f, 0.11f), 0.6f, 0.45f);
+            var metal = Mat("M_Item_Metal", new Color(0.62f, 0.64f, 0.67f), 0.95f, 0.6f);
+            var red = Mat("M_Item_ToolRed", new Color(0.7f, 0.1f, 0.08f), 0.2f, 0.5f);
+            Item(FarmingItemKind.ToolKit, new Vector3(0.42f, 0.24f, 0.2f), 4f, m =>
+            {
+                Part(m, "Box", PrimitiveType.Cube, new Vector3(0, 0.08f, 0), new Vector3(0.4f, 0.16f, 0.18f), red);
+                Part(m, "Lid", PrimitiveType.Cube, new Vector3(0, 0.17f, 0), new Vector3(0.41f, 0.03f, 0.19f), dark);
+                Part(m, "Latch L", PrimitiveType.Cube, new Vector3(-0.12f, 0.13f, 0.092f), new Vector3(0.04f, 0.05f, 0.01f), metal);
+                Part(m, "Latch R", PrimitiveType.Cube, new Vector3(0.12f, 0.13f, 0.092f), new Vector3(0.04f, 0.05f, 0.01f), metal);
+                Part(m, "Handle", PrimitiveType.Cube, new Vector3(0, 0.215f, 0), new Vector3(0.2f, 0.025f, 0.03f), metal);
+                Part(m, "Post L", PrimitiveType.Cube, new Vector3(-0.09f, 0.2f, 0), new Vector3(0.02f, 0.04f, 0.03f), metal);
+                Part(m, "Post R", PrimitiveType.Cube, new Vector3(0.09f, 0.2f, 0), new Vector3(0.02f, 0.04f, 0.03f), metal);
+            });
+        }
+
+        /// <summary>3층 임무 물건(관리자 카드)만 만든다. 이미 있는 다른 물건은 건드리지 않는다 (F3MissionSetup에서 사용)</summary>
+        public static void BuildAdminCard()
+        {
+            EnsureFolder("Assets", "Resources");
+            EnsureFolder("Assets/Resources", "FarmingItems");
+            EnsureFolder(Dir, "Materials");
+            EnsureFolder(Dir, "Icons");
+            var dark = Mat("M_Item_Dark", new Color(0.09f, 0.1f, 0.11f), 0.6f, 0.45f);
+            var navy = Mat("M_Item_Navy", new Color(0.08f, 0.16f, 0.36f), 0.1f, 0.55f);
+            var metal = Mat("M_Item_Metal", new Color(0.62f, 0.64f, 0.67f), 0.95f, 0.6f);
+            var cyan = Mat("M_Item_CyanGlow", new Color(0.05f, 0.4f, 0.5f), 0f, 0.5f, new Color(0.2f, 1.8f, 2.6f));
+            Item(FarmingItemKind.AdminCard, new Vector3(0.2f, 0.03f, 0.13f), 0.3f, m =>
+            {
+                Part(m, "Card", PrimitiveType.Cube, new Vector3(0, 0.006f, 0), new Vector3(0.18f, 0.012f, 0.115f), navy);
+                Part(m, "Stripe", PrimitiveType.Cube, new Vector3(0, 0.0125f, 0.038f), new Vector3(0.18f, 0.002f, 0.03f), metal);
+                Part(m, "Chip", PrimitiveType.Cube, new Vector3(-0.05f, 0.0125f, -0.018f), new Vector3(0.04f, 0.002f, 0.03f), dark);
+                Part(m, "LED", PrimitiveType.Cube, new Vector3(0.062f, 0.0135f, -0.03f), new Vector3(0.03f, 0.003f, 0.018f), cyan);
+            });
         }
 
         public static FpsWorldPickup Load(FarmingItemKind kind) => AssetDatabase.LoadAssetAtPath<FpsWorldPickup>(Dir + "/" + kind + ".prefab");

@@ -122,11 +122,11 @@ public sealed class CocoonSystem : NetworkBehaviour
     Vector3 PickSpot(Vector3 fallback)
     {
         var usable = new List<Vector3>();
-        var director = F2MissionDirector.Instance;
+        var mission = FloorMission.Current;
         if (spawnSpots != null)
             foreach (var spot in spawnSpots)
             {
-                if (director != null && director.IsInLockedArea(spot + Vector3.up)) continue;
+                if (mission != null && mission.IsInLockedArea(spot + Vector3.up)) continue;
                 bool taken = false;
                 for (int i = 0; i < _entries.Count; i++)
                     if (Vector3.Distance(_entries[i].position, spot) < minSpacing) { taken = true; break; }

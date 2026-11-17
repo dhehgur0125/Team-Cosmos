@@ -32,7 +32,7 @@ using UnityEngine.InputSystem;
 /// 오프라인(씬을 바로 실행): 같은 규칙을 이 컴퓨터에서 그대로 진행한다.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class F2MissionDirector : NetworkBehaviour
+public sealed class F2MissionDirector : NetworkBehaviour, IFloorMission
 {
     public enum Phase : byte { Objectives = 0, Rally = 1, Cleared = 2, Failed = 3 }
 
@@ -166,6 +166,8 @@ public sealed class F2MissionDirector : NetworkBehaviour
     bool HasAuthority => !IsSpawned || IsServer;
     /// <summary>아직 봉쇄되어 들어갈 수 없는 곳인지</summary>
     public bool IsInLockedArea(Vector3 point) => !State.lockdownLifted && lockedArea.Contains(point);
+    /// <summary>탈출 준비가 끝나 계단으로 내려갈 수 있는지</summary>
+    public bool ExitUnlocked => State.phase == (byte)Phase.Rally || State.phase == (byte)Phase.Cleared;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { Instance = null; FloorCleared = null; }
@@ -173,6 +175,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
     void Awake()
     {
         Instance = this;
+        FloorMission.Register(this);
         if (lockdownDoors != null)
             foreach (var d in lockdownDoors) if (d != null && d.leaf != null) d.closedPos = d.leaf.position;
         if (liftPlatform != null) _liftTop = liftPlatform.position;
@@ -181,7 +184,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
         _liftClip = MakeLiftHum();
     }
 
-    void OnDestroy() { if (Instance == this) Instance = null; }
+    void OnDestroy() { if (Instance == this) Instance = null; FloorMission.Unregister(this); }
 
     void Start()
     {
@@ -838,7 +841,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
 
     // ================================================================== 소리 (코드로 만든 효과음)
     /// <summary>금속음: 짧고 높은 쇳소리 몇 개가 겹친 소리</summary>
-    static AudioClip MakeClank()
+    public static AudioClip MakeClank()
     {
         const int rate = 44100; const float seconds = 0.9f;
         int n = (int)(rate * seconds);
@@ -857,7 +860,7 @@ public sealed class F2MissionDirector : NetworkBehaviour
     }
 
     /// <summary>경보음: 두 음이 번갈아 울리는 소리</summary>
-    static AudioClip MakeAlarm()
+    public static AudioClip MakeAlarm()
     {
         const int rate = 44100; const float seconds = 2.4f;
         int n = (int)(rate * seconds);

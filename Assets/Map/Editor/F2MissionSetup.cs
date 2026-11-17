@@ -198,7 +198,7 @@ namespace VoidLast.MapTools
         }
 
         /// <summary>검역 봉쇄 문: 복도 폭을 재서 그 크기에 맞춘다. widthAlongX면 x축 방향으로 넓은 문.</summary>
-        static F2MissionDirector.LockdownDoor LockdownDoor(Transform parent, string name, Vector3 at, bool widthAlongX)
+        internal static F2MissionDirector.LockdownDoor LockdownDoor(Transform parent, string name, Vector3 at, bool widthAlongX)
         {
             Vector3 side = widthAlongX ? Vector3.right : Vector3.forward;
             Vector3 probe = at + Vector3.up * 1.5f;
@@ -314,7 +314,7 @@ namespace VoidLast.MapTools
             return platform;
         }
 
-        static GameObject Kit(string name)
+        internal static GameObject Kit(string name)
         {
             foreach (var g in AssetDatabase.FindAssets(name + " t:Prefab", new[] { KitDir }))
             {
@@ -376,7 +376,7 @@ namespace VoidLast.MapTools
             return d;
         }
 
-        static Material LampMaterial()
+        internal static Material LampMaterial()
         {
             var mat = AssetDatabase.LoadAssetAtPath<Material>(LampMatPath);
             if (mat == null)

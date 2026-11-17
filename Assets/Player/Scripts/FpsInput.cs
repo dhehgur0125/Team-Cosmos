@@ -33,9 +33,25 @@ namespace VoidLast.Player
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics() { Blocked = false; }
 
+        FpsInventory _inventory;
+
+        /// <summary>무거운 물건(전력 셀)을 들고 있으면 달리기·사격 입력을 지운다</summary>
+        void ApplyHeavyLoad()
+        {
+            if (_inventory == null) _inventory = GetComponent<FpsInventory>();
+            if (_inventory == null || !_inventory.HasHeavyItem) return;
+            Sprint = false; Attack = false; AttackHeld = false;
+        }
+
         void Update()
         {
             Clear();
+            ReadInput();
+            ApplyHeavyLoad();
+        }
+
+        void ReadInput()
+        {
             if (Blocked || PauseMenu.IsOpen) return;   // 연출 중이거나 ESC 메뉴가 열려 있으면 조작 없음
 #if ENABLE_INPUT_SYSTEM
             var keyboard = Keyboard.current;

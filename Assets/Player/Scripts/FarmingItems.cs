@@ -14,7 +14,11 @@ namespace VoidLast.Player
 
         /// <summary>임무 물건: 그 층에서만 쓰고 아래층으로 가져가지 않는다</summary>
         public static bool IsMissionItem(FarmingItemKind kind) =>
-            kind == FarmingItemKind.QuarantineCard || kind == FarmingItemKind.Cutter || kind == FarmingItemKind.PowerModule || kind == FarmingItemKind.FuelCoupler;
+            kind == FarmingItemKind.QuarantineCard || kind == FarmingItemKind.Cutter || kind == FarmingItemKind.PowerModule || kind == FarmingItemKind.FuelCoupler ||
+            kind == FarmingItemKind.AdminCard || kind == FarmingItemKind.ToolKit || kind == FarmingItemKind.PowerCell;
+
+        /// <summary>무거운 물건: 한 대원이 하나만 들 수 있고, 들고 있는 동안 달리기·사격을 할 수 없다</summary>
+        public static bool IsHeavy(FarmingItemKind kind) => kind == FarmingItemKind.PowerCell;
 
         /// <summary>Resources에서 읽어 오는 아이템인지 (주사기·무전기는 대원 프리팹에 직접 연결되어 있음)</summary>
         public static bool IsCatalogItem(FarmingItemKind kind) => kind == FarmingItemKind.Battery || kind == FarmingItemKind.Scanner || IsMissionItem(kind);
@@ -34,6 +38,9 @@ namespace VoidLast.Player
                 case FarmingItemKind.PowerModule: return "POWER MODULE";
                 case FarmingItemKind.FuelCoupler: return "FUEL COUPLER";
                 case FarmingItemKind.Scanner: return "SCANNER";
+                case FarmingItemKind.AdminCard: return "ADMIN CARD";
+                case FarmingItemKind.ToolKit: return "TOOL KIT";
+                case FarmingItemKind.PowerCell: return "POWER CELL";
                 default: return "ITEM";
             }
         }
