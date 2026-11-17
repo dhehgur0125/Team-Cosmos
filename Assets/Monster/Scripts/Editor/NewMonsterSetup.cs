@@ -15,6 +15,7 @@ namespace VoidLast.Monster.EditorTools
     /// 새 몬스터 2종(눈 없는 대형·개구리) 프리팹과 애니메이션을 만들고, 눈 있는 대형의 모델을 바꾼다.
     ///  - 메뉴 Tools/VOID LAST/Monster/1 Setup New Monsters: 프리팹·애니메이션 컨트롤러 생성 (다시 실행해도 같은 결과. 프리팹에서 직접 바꾼 수치는 덮어쓴다)
     ///      눈 없는 대형 = Telluropod, 개구리 = Deinodonte, 눈 있는 대형 = Arthromahre (Monsters Pack Vol 2)
+    ///  - 메뉴 Tools/VOID LAST/Monster/3 Add Monster Glow: 어둠 속에서도 어렴풋이 보이도록 몬스터 전용 조명과 발광을 붙인다 (1번이 끝에 함께 실행)
     ///  - 메뉴 Tools/VOID LAST/Monster/2 Place New Monsters In 2F (Test): 2층 씬에 시험용으로 한 마리씩 놓고 멀티플레이 동기화를 붙인다
     ///      (층 씬을 메뉴 9로 다시 만들면 사라지므로 그때 다시 실행)
     /// </summary>
@@ -55,6 +56,7 @@ namespace VoidLast.Monster.EditorTools
             log.Add(SwapEyedModel());
             log.Add(BuildBlindLarge());
             log.Add(BuildFrog());
+            log.Add(AddGlow());   // 새로 만든 프리팹에도 어둠 속 조명을 다시 붙인다
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -247,6 +249,77 @@ namespace VoidLast.Monster.EditorTools
                 return "frog: Deinodonte x" + FrogScale;
             }
             finally { Object.DestroyImmediate(root); }
+        }
+
+        // ================================================================== 3. 어둠 속에서도 어렴풋이 보이게 (몬스터 전용 조명 + 발광 무늬)
+        /// <summary>
+        /// 몬스터 프리팹에 MonsterGlow와 "Monster Self Light"(몬스터 몸만 비추는 조명)를 붙인다. 다시 실행하면 아래 표의 수치로 되돌린다.
+        /// 눈 있는 대형에 있던 예전 조명(Monster Glow Light, 주변도 밝힘)은 지우고 같은 방식으로 맞춘다.
+        /// </summary>
+        [MenuItem("Tools/VOID LAST/Monster/3 Add Monster Glow")]
+        public static string AddGlow()
+        {
+            NameRenderingLayer();
+            var color = new Color(0.72f, 0.82f, 1f);   // 붉은 조명이 많은 선내에서 윤곽이 구분되는 옅은 푸른빛
+            // (프리팹, 조명을 붙일 자식, 조명 위치, 밝기, 범위, 발광 무늬 배율) — 밝기는 2층의 어두운 곳에서 화면으로 보고 고른 값
+            var rows = new (string prefab, string parent, Vector3 position, float intensity, float range, float emission)[]
+            {
+                (PrefabDir + "VOID_LAST_SmallMonster.prefab", "", new Vector3(0, 0.9f, 0.4f), 0.2f, 2.5f, 1.5f),
+                (PrefabDir + "VOID_LAST_BlindMonster.prefab", "", new Vector3(0, 1.6f, 0.8f), 0.25f, 4f, 1.5f),
+                (BlindLargePrefab, "", new Vector3(0, 2.2f, 0.8f), 0.5f, 6f, 1.5f),   // 통로를 막고 있는 게 보이도록 조금 더 밝게
+                (EyedPrefab, "", new Vector3(0, 2.4f, 1.2f), 0.35f, 5f, 1.5f),
+                (FrogPrefab, "Pivot", new Vector3(0, 1.3f, 0.8f), 0.08f, 3f, 2.5f),   // 가장 약하게: 눈만 희미하게 보여 매복이 유지된다
+            };
+            foreach (var row in rows)
+            {
+                var root = PrefabUtility.LoadPrefabContents(row.prefab);
+                try
+                {
+                    // 예전 방식 조명(주변 벽·바닥까지 밝히던 Monster Glow Light)은 지운다 → 모든 몬스터가 같은 방식
+                    var legacy = root.transform.Find("Monster Glow Light");
+                    if (legacy != null) Object.DestroyImmediate(legacy.gameObject);
+                    var parent = string.IsNullOrEmpty(row.parent) ? root.transform : root.transform.Find(row.parent);
+                    var lightTransform = parent.Find("Monster Self Light");
+                    if (lightTransform == null)
+                    {
+                        lightTransform = new GameObject("Monster Self Light").transform;
+                        lightTransform.SetParent(parent, false);
+                    }
+                    lightTransform.localPosition = row.position;
+                    var light = lightTransform.GetComponent<Light>();
+                    if (light == null) light = lightTransform.gameObject.AddComponent<Light>();   // ?? 는 Unity 오브젝트의 '없음'을 못 걸러서 == 로 확인
+                    light.type = LightType.Point; light.color = color; light.intensity = row.intensity; light.range = row.range;
+                    light.shadows = LightShadows.None; light.renderMode = LightRenderMode.Auto;
+                    var data = lightTransform.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>();
+                    if (data == null) data = lightTransform.gameObject.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>();
+                    data.renderingLayers = MonsterGlow.MonsterLayerBit;   // 몬스터 렌더러만 비춘다
+                    var glow = root.GetComponent<MonsterGlow>();
+                    if (glow == null) glow = root.AddComponent<MonsterGlow>();
+                    Set(glow, ("selfLight", light), ("emissionBoost", row.emission));
+                    // 프리팹을 열어 볼 때도 같은 모습이 나오도록 렌더러의 레이어를 미리 넣어 둔다 (실행 중에는 MonsterGlow가 다시 넣는다)
+                    foreach (var renderer in root.GetComponentsInChildren<SkinnedMeshRenderer>(true)) renderer.renderingLayerMask |= MonsterGlow.MonsterLayerBit;
+                    PrefabUtility.SaveAsPrefabAsset(root, row.prefab);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(root); }
+            }
+            return "glow: " + rows.Length + " prefabs";
+        }
+
+        /// <summary>렌더링 레이어 7번 이름을 Monster로 바꾼다 (Project Settings > Tags and Layers > Rendering Layers)</summary>
+        static void NameRenderingLayer()
+        {
+            var tags = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+            var layers = tags.FindProperty("m_RenderingLayers");
+            if (layers == null) return;
+            while (layers.arraySize <= MonsterGlow.MonsterLayerIndex)
+            {
+                layers.InsertArrayElementAtIndex(layers.arraySize);
+                layers.GetArrayElementAtIndex(layers.arraySize - 1).stringValue = "Light Layer " + (layers.arraySize - 1);
+            }
+            var name = layers.GetArrayElementAtIndex(MonsterGlow.MonsterLayerIndex);
+            if (name.stringValue == "Monster") return;
+            name.stringValue = "Monster";
+            tags.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ================================================================== 2. 2층에 시험 배치
