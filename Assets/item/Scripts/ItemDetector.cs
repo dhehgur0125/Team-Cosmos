@@ -15,7 +15,7 @@ using VoidLast.Player;
 public class ItemDetector : MonoBehaviour
 {
     [Header("탐지기 설정")]
-    public float detectRadius = 15f; // 감지 반경 (15m)
+    public float detectRadius = 30f; // 감지 반경 (30m)
     public float glowDuration = 3f;  // 발광 유지 시간
 
     [Tooltip("비워두면(Nothing) 모든 DetectableItem을 감지합니다. 지정하면 해당 레이어의 아이템만 감지합니다.")]
@@ -32,7 +32,7 @@ public class ItemDetector : MonoBehaviour
     [Tooltip("스캐너 아이템으로 스캔한 뒤 다시 쓸 수 있을 때까지의 시간(초)")]
     [Min(0f)] public float scannerCooldown = 15f;
     [Tooltip("스캐너 아이템으로 스캔할 때의 탐지 반경(m). 파동도 이 반경까지 퍼집니다. detectRadius는 Z 키·검사 도구용입니다.")]
-    [Min(1f)] public float scannerRadius = 20f;
+    [Min(1f)] public float scannerRadius = 30f;
 
     [Header("스캔 파동")]
     [Tooltip("파동이 퍼지는 속도(m/s). 아이템은 파동이 닿는 순간 발광합니다. 0이면 반경 안의 아이템이 동시에 발광합니다.")]
@@ -59,6 +59,69 @@ public class ItemDetector : MonoBehaviour
     [Header("벽 투과 발광")]
     [Tooltip("Custom/ItemXRayGlow 셰이더. 빌드에 포함되도록 반드시 연결되어 있어야 합니다.")]
     public Shader xrayShader;
+
+
+    [Header("임무 아이템 탐색")]
+    [Min(1f)] public float missionScanRadius = 30f;
+    [Tooltip("다른 층의 목표가 섞이지 않도록 플레이어와의 높이 차이를 제한합니다.")]
+    [Min(0f)] public float missionHeightTolerance = 4f;
+    [Min(1f)] public float missionGlowDuration = 8f;
+
+    private sealed class MissionMarker
+    {
+        public FpsWorldPickup pickup;
+        public float startsAt, expiresAt;
+    }
+    private readonly List<MissionMarker> missionMarkers = new List<MissionMarker>();
+    private Camera markerCamera;
+    private GUIStyle markerStyle;
+
+    // Only scan live objectives. Never activate pickups gated by mission progression.
+    private void RegisterMissionItems()
+    {
+        foreach (var pickup in FindObjectsByType<FpsWorldPickup>(FindObjectsSortMode.None))
+        {
+            if (!pickup.isActiveAndEnabled || pickup.IsClaimed || !FarmingItems.IsMissionItem(pickup.Item)) continue;
+            if (pickup.gameObject.scene != gameObject.scene) continue;
+            if (pickup.GetComponentInChildren<DetectableItem>() == null)
+                pickup.gameObject.AddComponent<DetectableItem>();
+        }
+    }
+
+    private void OnGUI()
+    {
+        if (missionMarkers.Count == 0) return;
+        if (markerCamera == null) markerCamera = GetComponentInChildren<Camera>();
+        if (markerCamera == null || !markerCamera.isActiveAndEnabled) return;
+        if (markerStyle == null)
+        {
+            markerStyle = new GUIStyle(GUI.skin.box);
+            markerStyle.alignment = TextAnchor.MiddleCenter;
+            markerStyle.fontStyle = FontStyle.Bold;
+            markerStyle.normal.textColor = new Color(0.35f, 1f, 1f);
+        }
+        markerStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(Screen.height / 60f), 14, 24);
+        for (int i = missionMarkers.Count - 1; i >= 0; i--)
+        {
+            var marker = missionMarkers[i];
+            var pickup = marker.pickup;
+            if (pickup == null || !pickup.isActiveAndEnabled || pickup.IsClaimed || Time.time > marker.expiresAt)
+            {
+                missionMarkers.RemoveAt(i);
+                continue;
+            }
+            if (Time.time < marker.startsAt) continue;
+            Vector3 point = markerCamera.WorldToViewportPoint(pickup.transform.position);
+            // Markers appear when looking toward an objective, including through walls.
+            if (point.z <= 0f) continue;
+            string label = FarmingItems.HudLabel(pickup.Item) + "\n" +
+                Mathf.RoundToInt(Vector3.Distance(transform.position, pickup.transform.position)) + " m";
+            float width = 220f, height = markerStyle.fontSize * 2f + 16f;
+            float x = Mathf.Clamp(point.x * Screen.width - width * 0.5f, 8f, Mathf.Max(8f, Screen.width - width - 8f));
+            float y = Mathf.Clamp((1f - point.y) * Screen.height - height - 12f, 8f, Mathf.Max(8f, Screen.height - height - 8f));
+            GUI.Label(new Rect(x, y, width, height), label, markerStyle);
+        }
+    }
 
     private sealed class Wave
     {
@@ -111,6 +174,7 @@ private void Awake()
     {
         foreach (Wave wave in waves) DestroyWaveMaterial(wave);
         waves.Clear();
+        missionMarkers.Clear();
     }
 
 private void Update()
@@ -150,7 +214,8 @@ private void Update()
         nextReadyTime = Time.time + cooldownSeconds;
 
         Vector3 origin = transform.position;
-        float sqrRadius = radius * radius;
+        RegisterMissionItems();
+        missionMarkers.Clear();
         int found = 0;
 
         StartWave(origin, radius);
@@ -164,19 +229,28 @@ private void Update()
             DetectableItem item = items[i];
             if (item == null || !item.isActiveAndEnabled) continue;
 
-            // 레이어 지정이 있을 때만 레이어로 거름
-            if (itemLayer.value != 0 && (itemLayer.value & (1 << item.gameObject.layer)) == 0) continue;
-
-            float sqrDist = (item.WorldCenter - origin).sqrMagnitude;
-            if (sqrDist > sqrRadius) continue;
-
-            // 눈에 보이는 파동이 아이템에 닿는 순간(거리 / 속도)에 맞춰 발광 시작
+            if (item.gameObject.scene != gameObject.scene) continue;
+            var pickup = item.GetComponentInParent<FpsWorldPickup>();
+            if (pickup != null && (pickup.IsClaimed || !pickup.isActiveAndEnabled)) continue;
+            bool mission = pickup != null && FarmingItems.IsMissionItem(pickup.Item);
+            // Mission objectives must remain detectable regardless of ordinary loot layer filters.
+            if (!mission && itemLayer.value != 0 && (itemLayer.value & (1 << item.gameObject.layer)) == 0) continue;
+            Vector3 offset = item.WorldCenter - origin;
+            float sqrDist = offset.sqrMagnitude;
+            float range = mission ? Mathf.Max(radius, missionScanRadius) : radius;
+            if (sqrDist > range * range) continue;
+            if (mission && Mathf.Abs(pickup.transform.position.y - origin.y) > missionHeightTolerance) continue;
             float delay = waveSpeed > 0f ? Mathf.Sqrt(sqrDist) / waveSpeed : 0f;
-            item.StartGlow(glowDuration, delay);
+            // Long-range objective locator responds promptly; the nearby sonar wave stays unchanged.
+            if (mission) delay = Mathf.Min(delay, 1.5f);
+            float duration = mission ? missionGlowDuration : glowDuration;
+            item.StartGlow(duration, delay);
+            if (mission)
+                missionMarkers.Add(new MissionMarker { pickup = pickup, startsAt = Time.time + delay, expiresAt = Time.time + delay + duration });
             found++;
         }
 
-        Debug.Log($"<color=cyan>[탐지기 작동] 반경 {radius}m 안에서 아이템 {found}개를 감지했습니다.</color>");
+        Debug.Log($"<color=cyan>[탐지기 작동] 일반 {radius}m / 임무 {missionScanRadius}m: 아이템 {found}개를 감지했습니다.</color>");
     }
 
     // ------------------------------------------------------------------ 음파(소나) 파동

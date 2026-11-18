@@ -315,3 +315,45 @@ Editor 메뉴의 `VOID LAST/Integration/1 - Add Stage2 Test Setup If Missing`은
 - URP 혈흔 BaseColor를 (1.6, 0.85, 0.85, 1)로 올려 붉은색 대비/불투명도를 강화. 가산 블렌딩이나 광원은 추가하지 않음.
 - 실제 피격점에서 outward 방향으로 0.08m 이동해 외형에 가려지는 현상을 줄임. 풀 3개/정리 1.5초 유지.
 - 프리팹 수정으로 시작점 테스트 개체에도 상속됨. 컴파일/콘솔 오류 0. 어두운 배경 렌더로 혈흔 가시성 확인.
+
+## 플레이어 피격 카메라 흔들림 — 2026-11-18
+- FpsDamageFeedback.cs에 피격 흔들림 추가. 기본 shakeEnabled=true, shakeIntensity=1, shakeDuration=0.32초, shakeAngle=1.4도, shakeDistance=0.018m. 실제 변위는 피해량과 감쇠에 따라 더 작음.
+- DamageTaken 이벤트로만 시작. 회복 시 발생하지 않으며 연속 피격은 상한 1의 impulse로 합침. Inspector에서 끄거나 강도 조절 가능.
+- URP begin/endCameraRendering(또는 Built-in preCull/postRender) 사이에만 카메라 자식 Transform에 임시 offset 적용하고 원래 pose 복구. CameraPivot/마우스 조준값/총알 판정은 변경하지 않음.
+- 비소유자/비활성 카메라/로딩/입력 차단/일시정지/사망 시 흔들림 중단. 컴포넌트 비활성화 시에도 복구. UI prefab이 없어도 흔들림 사용 가능.
+- 검증: 실제 DamageTaken 연결, 연속 40회 상한, 만료 복귀, 중간 비활성화 복구, 허용되지 않는 view 상태 초기화 검사 통과. 실제 URP Camera.Render 콜백 안에서 offset 발생 및 렌더 직후 원위치 확인. 두 FPS 프리팹의 활성/기본값 확인. 실제 멀티플레이 및 플레이 체감은 미검증.
+- 새 컴파일 오류 없음. 콘솔에는 별개 Unity AI 서비스 NoSubscription 오류가 존재하므로 전체 오류 0이라고 보고하지 않음.
+
+## 2층 환경 피해 완화 — 2026-11-18
+- Stage2_Ship_2f BioGrowthSystem: burstDamage 10→3, hazardDamagePerSecond 8→2 (0.2초마다 0.4). 다른 층 설정/몬스터 공격력 변경 없음.
+- Burst 59→44, Hazard 4→3 활성 배치. ID 순으로 Burst를 분산해 15개 비활성화하고 가장 반경이 큰 Hazard 20091 비활성화. Blocker 5개 유지. 삭제하지 않아 복구 가능.
+- 비활성화 ID: 20129, 20133, 20137, 20141, 20145, 20149, 20153, 20157, 20161, 20165, 20169, 20173, 20177, 20181, 20185, 20091
+- BioGrowthSystem에서 비활성 요소의 Update 판정 및 BurstRpc/RemoveLocal 처리를 차단해 보이지 않는 피해 방지.
+
+## 전체 몬스터 체력 소폭 상향 — 2026-11-18
+- Assets/Monster/Prefabs의 MonsterHealth 보유 5종을 약 25% 상향(5 단위 올림).
+- VOID_LAST_BlindLargeMonster: 600 → 750
+- VOID_LAST_BlindMonster: 120 → 150
+- VOID_LAST_EyedLargeMonster: 300 → 375
+- VOID_LAST_FrogMonster: 90 → 115
+- VOID_LAST_SmallMonster: 40 → 50
+- 현재 2층 몬스터 6개(시작점 테스트 포함)는 HP override 없이 공용 프리팹을 상속. 기존 미저장 씬 변경은 저장하지 않음. 공격력/이동속도 변경 없음.
+
+## 임무 아이템 스캐너 수정 — 2026-11-18
+- ItemDetector.cs: 일반 탐지 20m와 별도로 활성 임무 아이템은 100m / 높이 차이 4m 이내 탐지. 기존 20m 밖에 있던 시작점 기준 검역 카드(약 75m), 절단기(약 32m) 포함.
+- 임무 아이템은 최대 1.5초 뒤 8초간 벽 투과 발광 + 화면에 영문 이름/거리 표시(목표 방향을 바라볼 때). 일반 아이템 파동/소음/쿨타임 유지.
+- 비활성 임무 단계, 획득 완료, 다른 씬/층의 아이템은 제외. 활성 임무 아이템의 DetectableItem 누락은 스캔 때 보완. 일반 아이템 layer 필터는 유지, 임무 아이템은 필터와 무관하게 탐지.
+- 격리된 PreviewScene 검증: 근거리 일반/75m 임무 탐지, 먼 일반/비활성/다른 층/100m 초과/획득 완료 제외 등 7건 통과. 임무 마커 1건 생성 확인. 컴파일 오류 없음. 실제 플레이 화면 시각 확인은 별도 필요.
+
+## 스캐너 범위 통일 — 2026-11-18
+- 사용자 요청으로 일반/임무/테스트 키 탐지 범위를 모두 30m로 통일. ItemDetector 기본값, 네트워크 플레이어 프리팹, Stage2_Ship 및 1~5층, itemtest 씬 반영. 임무 표시 8초와 높이 제한 유지. 소음 반경은 기존 20m 유지.
+
+## 검역 카드 탐지 확인 / 피격 흔들림 강화 — 2026-11-18
+- 검역 카드는 기존 IsMissionItem/DetectableItem 연결 유지. 실제 QuarantineCard 프리팹으로 29m 탐지 및 이름 마커 1개 생성, 31m 제외 검증 통과. 표시 이름 QUARANTINE CARD, 거리와 함께 8초 표시. 30m 범위 유지.
+- FpsDamageFeedback 기본값과 플레이어 프리팹 4종: shakeIntensity 1→1.5, shakeAngle 1.4→2도, shakeDistance 0.018→0.025m, shakeDuration 0.32→0.42초. 동일 피해 기준 회전 약 2.14배, 위치 약 2.08배. 렌더링 후 카메라 복원 및 중첩 제한 로직 유지.
+- 컴파일 오류 없음. 실제 플레이 체감 검증은 별도 필요. 현재 Lobby 씬 유지.
+
+## 피격 흔들림 체감 강화 — 2026-11-18
+- FpsDamageFeedback 및 플레이어 프리팹 4종: intensity 2, duration 0.6초, angle 3도, distance 0.04m.
+- 작은 피해도 충격이 보이도록 최소 강도 0.35→0.65, 진동 22→12Hz, 감쇠를 제곱에서 선형으로 변경. 중첩 상한 및 렌더 후 카메라 복원 유지.
+- PreviewScene에서 강도 0.66 / 60fps 첫 프레임 위치 약 5.46cm, 회전 약 2.98도 확인. 지속 시간 종료 후 오프셋 0 복귀 확인. 컴파일 오류 없음. 실제 플레이 체감은 별도 확인 필요.

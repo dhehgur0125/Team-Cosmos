@@ -16746,6 +16746,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VoidLast.Player.FpsDamageFeedback
   bloodOverlayPrefab: {fileID: 6410434145153182886, guid: a1630b3c0bfc06b40a20da35fac99ec2, type: 3}
   fadeSeconds: 1.25
+  shakeEnabled: 1
+  shakeIntensity: 2
+  shakeDuration: 0.6
+  shakeAngle: 3
+  shakeDistance: 0.04
 --- !u!1 &4998313752617456583
 GameObject:
   m_ObjectHideFlags: 0

@@ -42752,6 +42752,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 1
+  index: 0
   actionLabel: "\uC808\uB2E8\uAE30\uB85C \uBCF4\uAD00\uD568\uC744 \uC798\uB77C \uC804\uB825
     \uBAA8\uB4C8 \uAEBC\uB0B4\uAE30"
   holdSeconds: 3
@@ -350912,6 +350913,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 3
+  index: 0
   actionLabel: "\uC2B9\uBB34\uC6D0 \uAE30\uB85D \uD655\uC778"
   holdSeconds: 1
   maxDistance: 2.6
@@ -396493,6 +396495,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 6
+  index: 0
   actionLabel: "\uC5F0\uB8CC \uBC38\uBE0C \uACE0\uCE58\uAE30"
   holdSeconds: 4
   maxDistance: 2.6
@@ -425360,6 +425363,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 5
+  index: 0
   actionLabel: "\uC804\uB825 \uBAA8\uB4C8\uC744 \uC2E3\uACE0 1\uCE35\uC73C\uB85C
     \uB0B4\uB824\uBCF4\uB0B4\uAE30"
   holdSeconds: 3
@@ -465839,6 +465843,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 4
+  index: 0
   actionLabel: "\uAC80\uC5ED \uCE74\uB4DC\uB85C \uBD09\uC1C4 \uD574\uC81C"
   holdSeconds: 2
   maxDistance: 2.6
@@ -484070,7 +484075,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc5f224771b41942936133093f1e329, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemDetector
-  detectRadius: 15
+  detectRadius: 30
   glowDuration: 3
   itemLayer:
     serializedVersion: 2
@@ -484079,7 +484084,7 @@ MonoBehaviour:
   cooldown: 1.5
   requireScannerItem: 1
   scannerCooldown: 15
-  scannerRadius: 20
+  scannerRadius: 30
   waveSpeed: 12
   noiseRadius: 20
   showWave: 1
@@ -484090,6 +484095,9 @@ MonoBehaviour:
   trailLength: 5
   ringSpacing: 1.2
   xrayShader: {fileID: 4800000, guid: 853ce3956ffa2d54fac05ffb6c96a30a, type: 3}
+  missionScanRadius: 30
+  missionHeightTolerance: 4
+  missionGlowDuration: 8
 --- !u!1 &989822263
 GameObject:
   m_ObjectHideFlags: 0
@@ -528116,6 +528124,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 7
+  index: 0
   actionLabel: "\uC791\uB3D9"
   holdSeconds: 2
   maxDistance: 3
@@ -545012,7 +545021,7 @@ MonoBehaviour:
   m_OverrideVoxelSize: 0
   m_VoxelSize: 0.16666667
   m_MinRegionArea: 2
-  m_NavMeshData: {fileID: 23800000, guid: f6de0db4052d7a345b78974135102cfc, type: 2}
+  m_NavMeshData: {fileID: 0}
   m_BuildHeightMesh: 0
 --- !u!1 &1165691777
 GameObject:
@@ -604245,6 +604254,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 7
+  index: 0
   actionLabel: "\uC791\uB3D9"
   holdSeconds: 2
   maxDistance: 3
@@ -700599,6 +700609,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 2
+  index: 0
   actionLabel: "\uC5F0\uB8CC \uCEE4\uD50C\uB7EC\uB97C \uB07C\uC6B0\uACE0 \uCDA9\uC804
     \uC2DC\uC791"
   holdSeconds: 2

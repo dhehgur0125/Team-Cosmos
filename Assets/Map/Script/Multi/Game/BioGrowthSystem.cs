@@ -77,7 +77,7 @@ public sealed class BioGrowthSystem : NetworkBehaviour
         Vector3 p = _localMotor.transform.position;
         foreach (var g in _all.Values)
         {
-            if (g.Gone || g.kind == BioGrowthKind.Blocker) continue;
+            if (g == null || !g.isActiveAndEnabled || g.Gone || g.kind == BioGrowthKind.Blocker) continue;
             Vector3 d = g.transform.position - p;
             if (Mathf.Abs(d.y) > FloorBand || d.x * d.x + d.z * d.z > g.radius * g.radius) continue;
             if (g.kind == BioGrowthKind.Hazard) _localHealth.TakeDamage(hazardDamagePerSecond * CheckInterval);
@@ -94,7 +94,7 @@ public sealed class BioGrowthSystem : NetworkBehaviour
     void BurstRpc(int id)
     {
         BioGrowth g;
-        if (_all.TryGetValue(id, out g) && !g.Gone) RemoveRpc(id, true);
+        if (_all.TryGetValue(id, out g) && g != null && g.isActiveAndEnabled && !g.Gone) RemoveRpc(id, true);
     }
 
     [Rpc(SendTo.ClientsAndHost)]
@@ -103,7 +103,7 @@ public sealed class BioGrowthSystem : NetworkBehaviour
     void RemoveLocal(int id, bool burst)
     {
         BioGrowth g;
-        if (!_all.TryGetValue(id, out g) || g.Gone) return;
+        if (!_all.TryGetValue(id, out g) || g == null || !g.isActiveAndEnabled || g.Gone) return;
         Vector3 pos = g.transform.position;
         g.Remove();
         var clip = burst ? burstClip : breakClip;

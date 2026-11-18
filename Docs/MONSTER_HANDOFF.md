@@ -157,3 +157,11 @@ Git status/diff가 환경 오류로 실패해 전체 작업 트리 변경을 대
 - URP 혈흔 BaseColor를 (1.6, 0.85, 0.85, 1)로 올려 붉은색 대비/불투명도를 강화. 가산 블렌딩이나 광원은 추가하지 않음.
 - 실제 피격점에서 outward 방향으로 0.08m 이동해 외형에 가려지는 현상을 줄임. 풀 3개/정리 1.5초 유지.
 - 프리팹 수정으로 시작점 테스트 개체에도 상속됨. 컴파일/콘솔 오류 0. 어두운 배경 렌더로 혈흔 가시성 확인.
+
+## 플레이어 피격 카메라 흔들림 — 2026-11-18
+- FpsDamageFeedback.cs에 피격 흔들림 추가. 기본 shakeEnabled=true, shakeIntensity=1, shakeDuration=0.32초, shakeAngle=1.4도, shakeDistance=0.018m. 실제 변위는 피해량과 감쇠에 따라 더 작음.
+- DamageTaken 이벤트로만 시작. 회복 시 발생하지 않으며 연속 피격은 상한 1의 impulse로 합침. Inspector에서 끄거나 강도 조절 가능.
+- URP begin/endCameraRendering(또는 Built-in preCull/postRender) 사이에만 카메라 자식 Transform에 임시 offset 적용하고 원래 pose 복구. CameraPivot/마우스 조준값/총알 판정은 변경하지 않음.
+- 비소유자/비활성 카메라/로딩/입력 차단/일시정지/사망 시 흔들림 중단. 컴포넌트 비활성화 시에도 복구. UI prefab이 없어도 흔들림 사용 가능.
+- 검증: 실제 DamageTaken 연결, 연속 40회 상한, 만료 복귀, 중간 비활성화 복구, 허용되지 않는 view 상태 초기화 검사 통과. 실제 URP Camera.Render 콜백 안에서 offset 발생 및 렌더 직후 원위치 확인. 두 FPS 프리팹의 활성/기본값 확인. 실제 멀티플레이 및 플레이 체감은 미검증.
+- 새 컴파일 오류 없음. 콘솔에는 별개 Unity AI 서비스 NoSubscription 오류가 존재하므로 전체 오류 0이라고 보고하지 않음.

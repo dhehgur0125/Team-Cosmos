@@ -5428,6 +5428,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SM_HanginDropSet_3
       objectReference: {fileID: 0}
+    - target: {fileID: 1030990311, guid: abc00000000005987213776572065627, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1030990312, guid: abc00000000005987213776572065627, type: 3}
       propertyPath: m_LocalPosition.x
       value: 6.003009
@@ -6379,6 +6383,10 @@ PrefabInstance:
     - target: {fileID: 1030990451, guid: abc00000000002683073865352376472, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_8
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990451, guid: abc00000000002683073865352376472, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990452, guid: abc00000000002683073865352376472, type: 3}
       propertyPath: m_LocalPosition.x
@@ -9282,6 +9290,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SM_BigPile_TentaEgg
       objectReference: {fileID: 0}
+    - target: {fileID: 1030991263, guid: abc00000000000239303777462593635, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1030991264, guid: abc00000000000239303777462593635, type: 3}
       propertyPath: m_LocalPosition.x
       value: 14.513754
@@ -10072,6 +10084,10 @@ PrefabInstance:
     - target: {fileID: 1030990395, guid: abc00000000008053250333886407518, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990395, guid: abc00000000008053250333886407518, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990396, guid: abc00000000008053250333886407518, type: 3}
       propertyPath: m_LocalPosition.x
@@ -18299,6 +18315,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 1
+  index: 0
   actionLabel: "\uC808\uB2E8\uAE30\uB85C \uBCF4\uAD00\uD568\uC744 \uC798\uB77C \uC804\uB825
     \uBAA8\uB4C8 \uAEBC\uB0B4\uAE30"
   holdSeconds: 3
@@ -39386,6 +39403,10 @@ PrefabInstance:
     - target: {fileID: 1030990423, guid: abc00000000018032539144205008663, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_7
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990423, guid: abc00000000018032539144205008663, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990424, guid: abc00000000018032539144205008663, type: 3}
       propertyPath: m_LocalPosition.x
@@ -66793,6 +66814,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SM_HanginDropSet_2
       objectReference: {fileID: 0}
+    - target: {fileID: 1030990283, guid: abc00000000006662729167743361170, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1030990284, guid: abc00000000006662729167743361170, type: 3}
       propertyPath: m_LocalPosition.x
       value: -28.00582
@@ -81609,6 +81634,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 3
+  index: 0
   actionLabel: "\uC2B9\uBB34\uC6D0 \uAE30\uB85D \uD655\uC778"
   holdSeconds: 1
   maxDistance: 2.6
@@ -105815,6 +105841,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 6
+  index: 0
   actionLabel: "\uC5F0\uB8CC \uBC38\uBE0C \uACE0\uCE58\uAE30"
   holdSeconds: 4
   maxDistance: 2.6
@@ -108213,6 +108240,10 @@ PrefabInstance:
     - target: {fileID: 1030990395, guid: abc00000000008053250333886407518, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990395, guid: abc00000000008053250333886407518, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990396, guid: abc00000000008053250333886407518, type: 3}
       propertyPath: m_LocalPosition.x
@@ -123719,6 +123750,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 5
+  index: 0
   actionLabel: "\uC804\uB825 \uBAA8\uB4C8\uC744 \uC2E3\uACE0 1\uCE35\uC73C\uB85C
     \uB0B4\uB824\uBCF4\uB0B4\uAE30"
   holdSeconds: 3
@@ -133063,6 +133095,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 4
+  index: 0
   actionLabel: "\uAC80\uC5ED \uCE74\uB4DC\uB85C \uBD09\uC1C4 \uD574\uC81C"
   holdSeconds: 2
   maxDistance: 2.6
@@ -135439,7 +135472,7 @@ Light:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 959373232}
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
   m_Color: {r: 1, g: 0.93, b: 0.84, a: 1}
@@ -139649,7 +139682,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc5f224771b41942936133093f1e329, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemDetector
-  detectRadius: 15
+  detectRadius: 30
   glowDuration: 3
   itemLayer:
     serializedVersion: 2
@@ -139658,7 +139691,7 @@ MonoBehaviour:
   cooldown: 1.5
   requireScannerItem: 1
   scannerCooldown: 15
-  scannerRadius: 20
+  scannerRadius: 30
   waveSpeed: 12
   noiseRadius: 20
   showWave: 1
@@ -139669,6 +139702,9 @@ MonoBehaviour:
   trailLength: 5
   ringSpacing: 1.2
   xrayShader: {fileID: 4800000, guid: 853ce3956ffa2d54fac05ffb6c96a30a, type: 3}
+  missionScanRadius: 30
+  missionHeightTolerance: 4
+  missionGlowDuration: 8
 --- !u!1 &989753375
 GameObject:
   m_ObjectHideFlags: 0
@@ -153736,6 +153772,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SM_HanginDropSet_2
       objectReference: {fileID: 0}
+    - target: {fileID: 1030990283, guid: abc00000000006662729167743361170, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1030990284, guid: abc00000000006662729167743361170, type: 3}
       propertyPath: m_LocalPosition.x
       value: 42.99418
@@ -155100,6 +155140,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 7
+  index: 0
   actionLabel: "\uC791\uB3D9"
   holdSeconds: 2
   maxDistance: 3
@@ -156791,6 +156832,10 @@ PrefabInstance:
     - target: {fileID: 1030990451, guid: abc00000000002683073865352376472, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_8
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990451, guid: abc00000000002683073865352376472, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990452, guid: abc00000000002683073865352376472, type: 3}
       propertyPath: m_LocalPosition.x
@@ -173139,10 +173184,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BioGrowthSystem
   ShowTopMostFoldoutHeaderGroup: 1
-  burstDamage: 10
+  burstDamage: 3
   burstDamageRadius: 2.5
   burstNoiseRadius: 18
-  hazardDamagePerSecond: 8
+  hazardDamagePerSecond: 2
   burstClip: {fileID: 0}
   breakClip: {fileID: 0}
 --- !u!1 &1262197257
@@ -180868,6 +180913,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 7
+  index: 0
   actionLabel: "\uC791\uB3D9"
   holdSeconds: 2
   maxDistance: 3
@@ -182661,6 +182707,10 @@ PrefabInstance:
     - target: {fileID: 1030990311, guid: abc00000000005987213776572065627, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990311, guid: abc00000000005987213776572065627, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990312, guid: abc00000000005987213776572065627, type: 3}
       propertyPath: m_LocalPosition.x
@@ -184498,6 +184548,10 @@ PrefabInstance:
     - target: {fileID: 1030990255, guid: abc00000000016270257522462697177, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990255, guid: abc00000000016270257522462697177, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990256, guid: abc00000000016270257522462697177, type: 3}
       propertyPath: m_LocalPosition.x
@@ -195667,6 +195721,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SM_HanginDropSet_8
       objectReference: {fileID: 0}
+    - target: {fileID: 1030990451, guid: abc00000000002683073865352376472, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1030990452, guid: abc00000000002683073865352376472, type: 3}
       propertyPath: m_LocalPosition.x
       value: -36
@@ -205086,7 +205144,7 @@ Light:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1536800368}
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
   m_Color: {r: 0.55, g: 0.65, b: 0.9, a: 1}
@@ -210451,6 +210509,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionInteractable
   kind: 2
+  index: 0
   actionLabel: "\uC5F0\uB8CC \uCEE4\uD50C\uB7EC\uB97C \uB07C\uC6B0\uACE0 \uCDA9\uC804
     \uC2DC\uC791"
   holdSeconds: 2
@@ -230838,6 +230897,10 @@ PrefabInstance:
     - target: {fileID: 1030990367, guid: abc00000000017524841110630768613, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_5
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990367, guid: abc00000000017524841110630768613, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990368, guid: abc00000000017524841110630768613, type: 3}
       propertyPath: m_LocalPosition.x
@@ -261978,6 +262041,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SM_HanginDropSet_3
       objectReference: {fileID: 0}
+    - target: {fileID: 1030990311, guid: abc00000000005987213776572065627, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1030990312, guid: abc00000000005987213776572065627, type: 3}
       propertyPath: m_LocalPosition.x
       value: -65.996994
@@ -265603,6 +265670,10 @@ PrefabInstance:
     - target: {fileID: 1030990339, guid: abc00000000004633071623194113436, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990339, guid: abc00000000004633071623194113436, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990340, guid: abc00000000004633071623194113436, type: 3}
       propertyPath: m_LocalPosition.x
@@ -281122,6 +281193,10 @@ PrefabInstance:
     - target: {fileID: 1030990255, guid: abc00000000016270257522462697177, type: 3}
       propertyPath: m_Name
       value: SM_HanginDropSet_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1030990255, guid: abc00000000016270257522462697177, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1030990256, guid: abc00000000016270257522462697177, type: 3}
       propertyPath: m_LocalPosition.x

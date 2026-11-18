@@ -451,7 +451,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc5f224771b41942936133093f1e329, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemDetector
-  detectRadius: 15
+  detectRadius: 30
   glowDuration: 3
   itemLayer:
     serializedVersion: 2
@@ -460,7 +460,7 @@ MonoBehaviour:
   cooldown: 1.5
   requireScannerItem: 1
   scannerCooldown: 15
-  scannerRadius: 20
+  scannerRadius: 30
   waveSpeed: 12
   noiseRadius: 20
   showWave: 1
@@ -471,6 +471,9 @@ MonoBehaviour:
   trailLength: 5
   ringSpacing: 1.2
   xrayShader: {fileID: 4800000, guid: 853ce3956ffa2d54fac05ffb6c96a30a, type: 3}
+  missionScanRadius: 30
+  missionHeightTolerance: 4
+  missionGlowDuration: 8
 --- !u!114 &3548012353122212086
 MonoBehaviour:
   m_ObjectHideFlags: 0
