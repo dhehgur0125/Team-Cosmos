@@ -13,6 +13,8 @@ namespace VoidLast.Player
         [SerializeField, Min(0)] float helmetAboveHead = 0.27f;
         [SerializeField, Min(0)] float ceilingMargin = 0.04f;
         [SerializeField, Min(0)] float ankleHeight = 0.145f;
+        [Tooltip("골반을 추가로 내릴 수 있는 최대 거리(m). 앉기 애니메이션 자체가 충분히 낮으면(Human Animations 무릎 꿇기) 크게 내리면 다리가 몸통을 뚫습니다.")]
+        [SerializeField, Min(0)] float maxHipDrop = 0.05f;
 
         FpsMotor motor;
         CharacterController controller;
@@ -20,6 +22,7 @@ namespace VoidLast.Player
         Leg left, right;
         Vector3 hipBefore;
         bool initialized, applied;
+        float moving; // 0 = standing still in the crouch, 1 = crouch-walking
 
         sealed class Leg
         {
@@ -62,7 +65,10 @@ namespace VoidLast.Player
         void LateUpdate()
         {
             if (!Initialize() || motor.IsDead) return;
-            ApplyPose(motor.CrouchFraction);
+            // The crouch-walk clips carry their own leg cycle; re-solving the knees every frame while moving
+            // fights it, so the correction fades out as soon as the player moves and back in when they stop.
+            moving = Mathf.MoveTowards(moving, motor.LocalVelocity.sqrMagnitude > 0.01f ? 1 : 0, Time.deltaTime * 6);
+            ApplyPose(motor.CrouchFraction * (1 - moving));
         }
 
         public void ApplyPose(float crouchFraction)
@@ -70,14 +76,17 @@ namespace VoidLast.Player
             if (!Initialize() || crouchFraction <= 0.001f || motor.IsDead) return;
             float weight = Mathf.SmoothStep(0, 1, Mathf.Clamp01(crouchFraction * 4));
             if (weight <= 0) return;
-            hipBefore = hips.localPosition;
-            Capture(left);
-            Capture(right);
             float worldScale = Mathf.Abs(transform.lossyScale.y);
             float modelScale = Mathf.Abs(animator.transform.lossyScale.y);
             float top = transform.position.y + (controller.center.y + controller.height * 0.5f - ceilingMargin) * worldScale;
-            float excess = Mathf.Max(0, head.position.y + helmetAboveHead * modelScale - top);
-            // Controller height already eases through the transition; keep the helmet inside it.
+            // Controller height already eases through the transition; nudge the helmet toward it, but only a little:
+            // folding the legs further than the crouch clip itself pushes the knees into the torso.
+            float excess = Mathf.Min(Mathf.Max(0, head.position.y + helmetAboveHead * modelScale - top), maxHipDrop * worldScale) * weight;
+            if (excess < 0.001f) return; // The clip already fits (or the player is moving); leave its leg pose untouched.
+            weight = excess / Mathf.Max(0.001f, maxHipDrop * worldScale);
+            hipBefore = hips.localPosition;
+            Capture(left);
+            Capture(right);
             hips.position -= Vector3.up * excess;
             Solve(left, weight);
             Solve(right, weight);

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace VoidLast.Player
 {
-    public sealed class FpsItemView : MonoBehaviour
+    public sealed class FpsItemView : MonoBehaviour, IFpsEquipLowering
     {
         [SerializeField] Transform itemRoot;
         [SerializeField] Transform pump;
@@ -36,7 +36,8 @@ namespace VoidLast.Player
         public Transform ItemRoot => itemRoot;
         public float PumpProgress => pumpProgress;
         public Transform WorldItem => worldItem;
-        public bool IsEquipped => equip.IsReady && equip.Key == (int)equipment.SelectedSlot && inventory.IsAlive;
+        public bool IsEquipped => equip.IsReady && equip.Key == (int)equipment.SelectedSlot && inventory.IsAlive && !equipment.IsSwitching;
+        public bool IsShowingEquipment => itemRoot != null && itemRoot.gameObject.activeSelf || uniqueItemRoot != null && uniqueItemRoot.gameObject.activeSelf;
         public bool CanUse => IsEquipped && inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.Syringe;
         void Awake() { inventory = GetComponent<FpsInventory>(); equipment = GetComponent<FpsEquipment>(); if (pump != null) pumpRestPosition = pump.localPosition; if (worldPump != null) worldPumpRestPosition = worldPump.localPosition; Refresh(0); }
         void OnEnable() { equipment.SlotChanged += SelectionChanged; inventory.Changed += ContentsChanged; }
@@ -50,13 +51,14 @@ namespace VoidLast.Player
             bool visible = inventory.IsAlive && inventory.ItemAt(inventory.SelectedIndex) == FarmingItemKind.Syringe;
             bool uniqueVisible = inventory.IsAlive && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Item && uniqueItemRoot != null;
             equip.Tick(visible || uniqueVisible, (int)equipment.SelectedSlot, deltaTime, equipDuration);
-            if (uniqueItemRoot != null) { uniqueItemRoot.gameObject.SetActive(uniqueVisible); uniqueItemRoot.localPosition = uniqueHeldPosition + equipOffset * (1 - equip.Blend); }
+            float raise = Mathf.Min(equip.Blend, equipment.LowerBlend); // Lowers before a slot change, then rises for the new slot.
+            if (uniqueItemRoot != null) { uniqueItemRoot.gameObject.SetActive(uniqueVisible); uniqueItemRoot.localPosition = uniqueHeldPosition + equipOffset * (1 - raise); }
             itemRoot.gameObject.SetActive(visible);
             if (worldItem != null) worldItem.gameObject.SetActive(visible);
             if (handGrip != null) { handGrip.localPosition = handPosition; handGrip.localRotation = Quaternion.Euler(handEuler); handGrip.localScale = Vector3.one * handScale; }
             pose = visible ? Mathf.MoveTowards(pose, inventory.IsUsing ? 1 : 0, Mathf.Max(0, deltaTime) * 3) : 0;
             float blend = Mathf.SmoothStep(0, 1, pose);
-            itemRoot.localPosition = Vector3.Lerp(heldPosition, inventory.IsUsingOnOther ? otherUsePosition : usePosition, blend) + equipOffset * (1 - equip.Blend);
+            itemRoot.localPosition = Vector3.Lerp(heldPosition, inventory.IsUsingOnOther ? otherUsePosition : usePosition, blend) + equipOffset * (1 - raise);
             itemRoot.localRotation = Quaternion.Slerp(Quaternion.Euler(heldEuler), Quaternion.Euler(inventory.IsUsingOnOther ? otherUseEuler : useEuler), blend);
             itemRoot.localScale = Vector3.one * modelScale;
             if (!visible) pumpProgress = 0;

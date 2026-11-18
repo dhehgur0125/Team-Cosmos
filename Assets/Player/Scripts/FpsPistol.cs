@@ -18,6 +18,14 @@ namespace VoidLast.Player
         [SerializeField, Min(0.1f)] float reloadDuration = 1.5f;
         [Tooltip("사격 소리가 몬스터에게 들리는 반경(m, 같은 층만)")]
         [SerializeField, Min(0)] float noiseRadius = 18;
+        [Header("탄 퍼짐(도, 원뿔 반각). 점프 > 이동 > 서있기 > 앉아 이동 > 앉기")]
+        [SerializeField, Min(0)] float jumpSpread = 6f;
+        [SerializeField, Min(0)] float moveSpread = 3f;
+        [SerializeField, Min(0)] float standSpread = 1.2f;
+        [SerializeField, Min(0)] float crouchMoveSpread = 0.7f;
+        [SerializeField, Min(0)] float crouchSpread = 0.25f;
+        [Tooltip("조준(ADS) 시 퍼짐 배율")]
+        [SerializeField, Range(0, 1)] float aimSpreadMultiplier = 0.35f;
         FpsInput input;
         FpsEquipment equipment;
         FpsMotor motor;
@@ -35,7 +43,17 @@ namespace VoidLast.Player
         public event Action Changed;
         public event Action Shot;
         public event Action<RaycastHit> Hit;
-        bool Equipped => equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol && !motor.IsDead;
+        bool Equipped => equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol && !motor.IsDead && !equipment.IsSwitching;
+        /// <summary>현재 자세·이동 상태의 탄 퍼짐 반각(도).</summary>
+        public float CurrentSpread
+        {
+            get
+            {
+                bool moving = motor.LocalVelocity.sqrMagnitude > 0.04f;
+                float spread = motor.IsAirborne ? jumpSpread : motor.IsCrouching ? (moving ? crouchMoveSpread : crouchSpread) : moving ? moveSpread : standSpread;
+                return equipment.IsAiming ? spread * aimSpreadMultiplier : spread;
+            }
+        }
         void Awake()
         {
             input = GetComponent<FpsInput>(); equipment = GetComponent<FpsEquipment>(); motor = GetComponent<FpsMotor>(); view = GetComponent<FpsWeaponView>();
@@ -57,6 +75,14 @@ namespace VoidLast.Player
             if (!Equipped || IsReloading || !view.IsEquipped || Magazine <= 0 || Time.time < nextShot || viewCamera == null) return false;
             Magazine--; nextShot = Time.time + Mathf.Max(0.01f, shotInterval); HasLastHit = false;
             var ray = viewCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f));
+            float spread = CurrentSpread;
+            if (spread > 0)
+            {
+                // Random point inside the cone's cross-section, evenly distributed.
+                Vector2 offset = UnityEngine.Random.insideUnitCircle * Mathf.Tan(spread * Mathf.Deg2Rad);
+                var t = viewCamera.transform;
+                ray.direction = (t.forward + t.right * offset.x + t.up * offset.y).normalized;
+            }
             var hits = Physics.RaycastAll(ray, range, ~0, QueryTriggerInteraction.Ignore);
             float nearest = float.PositiveInfinity;
             foreach (var hit in hits)

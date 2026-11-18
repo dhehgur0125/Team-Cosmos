@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 namespace VoidLast.Player
 {
-    public sealed class FpsFlashEmitterView : MonoBehaviour
+    public sealed class FpsFlashEmitterView : MonoBehaviour, IFpsEquipLowering
     {
         [SerializeField] FpsFlashEmitter emitter;
         [SerializeField] Camera localCamera;
@@ -36,7 +36,8 @@ namespace VoidLast.Player
         int flashFrame = -1;
         Vector3 previousLightPosition;
         bool lightMoved;
-        public bool IsEquipped => localRoot != null && emitter != null && emitter.IsSelected && equip.IsReady;
+        public bool IsEquipped => localRoot != null && emitter != null && emitter.IsSelected && equip.IsReady && !equipment.IsSwitching;
+        public bool IsShowingEquipment => localRoot != null && localRoot.gameObject.activeSelf;
         public Vector3 EmissionPoint => stunOrigin != null ? stunOrigin.position : localMuzzle != null ? localMuzzle.position : transform.position;
         public bool GaugeVisible => chargeGauge != null && chargeGauge.enabled;
         public int FlashesPlayed { get; private set; }
@@ -85,7 +86,7 @@ namespace VoidLast.Player
             if (localRoot != null)
             {
                 localRoot.gameObject.SetActive(visible);
-                localRoot.localPosition = heldPosition + new Vector3(0, -0.35f, -0.05f) * (1 - equip.Blend);
+                localRoot.localPosition = heldPosition + new Vector3(0, -0.35f, -0.05f) * (1 - Mathf.Min(equip.Blend, equipment.LowerBlend));
                 localRoot.localRotation = Quaternion.Euler(heldEuler);
             }
             if (worldRoot != null) worldRoot.gameObject.SetActive(visible);

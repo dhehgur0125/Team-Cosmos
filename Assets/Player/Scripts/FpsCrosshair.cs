@@ -13,6 +13,9 @@ namespace VoidLast.Player
         [SerializeField, Min(0)] float runGap = 16;
         [SerializeField, Min(0)] float crouchGap = 3;
         [SerializeField, Min(0)] float airborneGap = 22;
+        [Tooltip("권총 장착 시 실제 탄 퍼짐 각도에 맞춰 간격을 계산합니다. 끄면 위의 상태별 간격을 씁니다.")]
+        [SerializeField] bool gapFromSpread = true;
+        [SerializeField, Min(0)] float minimumSpreadGap = 3;
         [Header("선 크기와 전환")]
         [SerializeField, Min(1)] float lineLength = 8;
         [SerializeField, Min(1)] float lineThickness = 2;
@@ -24,6 +27,8 @@ namespace VoidLast.Player
         FpsHud hud;
         FpsMotor motor;
         FpsEquipment equipment;
+        FpsPistol pistolLogic;
+        RectTransform canvasRect;
         Camera viewCamera;
         float gap;
 
@@ -33,6 +38,9 @@ namespace VoidLast.Player
             hud = GetComponentInParent<FpsHud>();
             motor = GetComponentInParent<FpsMotor>();
             equipment = GetComponentInParent<FpsEquipment>();
+            pistolLogic = GetComponentInParent<FpsPistol>();
+            var canvas = GetComponentInParent<Canvas>();
+            if (canvas != null) canvasRect = canvas.rootCanvas.transform as RectTransform;
             if (motor != null) viewCamera = motor.GetComponentInChildren<Camera>(true);
             // Use the existing centered Canvas and dot; no extra Canvas or input handler.
             var rect = dot.rectTransform;
@@ -60,6 +68,13 @@ namespace VoidLast.Player
             bool visible = local && !equipment.IsAiming;
             float target = motor == null ? idleGap : motor.IsAirborne ? airborneGap : motor.IsCrouching ? crouchGap
                 : motor.LocalVelocity.sqrMagnitude < 0.01f ? idleGap : motor.IsRunning ? runGap : walkGap;
+            if (gapFromSpread && pistolLogic != null && viewCamera != null && canvasRect != null)
+            {
+                // Lines sit on the edge of the real bullet cone: tan(spread) / tan(halfFov) of half the screen height.
+                float halfHeight = canvasRect.rect.height * 0.5f;
+                float ratio = Mathf.Tan(pistolLogic.CurrentSpread * Mathf.Deg2Rad) / Mathf.Tan(viewCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+                target = Mathf.Max(minimumSpreadGap, ratio * halfHeight);
+            }
             gap = Mathf.Lerp(gap, target, 1 - Mathf.Exp(-transitionSpeed * Time.unscaledDeltaTime));
             for (int i = 0; i < lines.Length; i++)
             {

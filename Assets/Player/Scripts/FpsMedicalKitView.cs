@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace VoidLast.Player
 {
-    public sealed class FpsMedicalKitView : MonoBehaviour
+    public sealed class FpsMedicalKitView : MonoBehaviour, IFpsEquipLowering
     {
         [SerializeField] FpsMedicalKit medicalKit;
         [SerializeField] Transform localRoot;
@@ -21,7 +21,8 @@ namespace VoidLast.Player
         FpsEquipment equipment;
         float pose;
         bool lastUseOnOther;
-        public bool IsEquipped => localRoot != null && medicalKit != null && medicalKit.IsSelected && equip.IsReady;
+        public bool IsEquipped => localRoot != null && medicalKit != null && medicalKit.IsSelected && equip.IsReady && !equipment.IsSwitching;
+        public bool IsShowingEquipment => localRoot != null && localRoot.gameObject.activeSelf;
         public Transform LocalRoot => localRoot;
         public Transform WorldRoot => worldRoot;
         void Awake() => equipment = GetComponent<FpsEquipment>();
@@ -44,7 +45,7 @@ namespace VoidLast.Player
             if (worldRoot != null) worldRoot.gameObject.SetActive(true);
             if (medicalKit.IsUsing) lastUseOnOther = medicalKit.UsingOnOther;
             pose = Mathf.Lerp(pose, medicalKit.IsUsing ? 1 : 0, 1 - Mathf.Exp(-transitionSpeed * Mathf.Max(0, deltaTime)));
-            localRoot.localPosition = heldPosition + equipOffset * (1 - equip.Blend) + (lastUseOnOther ? otherOffset : selfOffset) * pose;
+            localRoot.localPosition = heldPosition + equipOffset * (1 - Mathf.Min(equip.Blend, equipment.LowerBlend)) + (lastUseOnOther ? otherOffset : selfOffset) * pose;
             localRoot.localRotation = Quaternion.Euler(heldEuler + new Vector3(-8 * pose, 0, 0));
             if (usesLabel != null)
             {
