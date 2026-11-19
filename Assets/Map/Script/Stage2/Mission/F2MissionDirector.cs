@@ -32,7 +32,7 @@ using UnityEngine.InputSystem;
 /// 오프라인(씬을 바로 실행): 같은 규칙을 이 컴퓨터에서 그대로 진행한다.
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class F2MissionDirector : NetworkBehaviour, IFloorMission
+public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
 {
     public enum Phase : byte { Objectives = 0, Rally = 1, Cleared = 2, Failed = 3 }
 
@@ -218,6 +218,7 @@ public sealed class F2MissionDirector : NetworkBehaviour, IFloorMission
         AnnounceChanges(s);
         LocalInteraction();
         UpdateHud(s);
+        UpdateScenarioGuide(s);
     }
 
     readonly List<FpsHealth> _players = new List<FpsHealth>();
@@ -696,6 +697,7 @@ public sealed class F2MissionDirector : NetworkBehaviour, IFloorMission
         scaler.referenceResolution = new Vector2(1920, 1080);
         scaler.matchWidthOrHeight = 0.5f;
         var root = canvasGo.transform;
+        BuildScenarioGuide(root);
 
         // 목표 (왼쪽, HP 막대 아래)
         var card = Img(root, "Objectives", new Color(0.063f, 0.07f, 0.1f, 0.78f));

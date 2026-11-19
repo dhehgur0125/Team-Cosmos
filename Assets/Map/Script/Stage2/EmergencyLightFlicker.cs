@@ -33,6 +33,38 @@ public class EmergencyLightFlicker : MonoBehaviour
     public Renderer lampRenderer;
     [ColorUsage(false, true)] public Color lampEmission = new Color(4f, 0.2f, 0.08f);
 
+
+    [Header("최적화")]
+    [Tooltip("현재 카메라에서 먼 비상등의 실시간 조명을 점진적으로 줄입니다.")]
+    public bool distanceOptimization;
+    [Min(10f)] public float fullBrightnessDistance = 30f;
+    [Min(1f)] public float fadeDistance = 10f;
+    [Range(5f, 30f)] public float pulseUpdateRate = 20f;
+    static Camera cachedCamera;
+    static int cameraFrame = -1;
+    double nextSampleTime = double.NegativeInfinity;
+    float originalIntensity, lastIntensity = float.NaN, lastEmissionFactor = float.NaN;
+    MaterialPropertyBlock originalBlock;
+
+    static Camera ViewCamera()
+    {
+        if (cameraFrame != Time.frameCount)
+        {
+            cameraFrame = Time.frameCount;
+            if (cachedCamera == null || !cachedCamera.isActiveAndEnabled || !cachedCamera.CompareTag("MainCamera"))
+                cachedCamera = Camera.main;
+        }
+        return cachedCamera;
+    }
+
+    void OnEnable() { nextSampleTime = double.NegativeInfinity; lastIntensity = lastEmissionFactor = float.NaN; }
+
+    void OnDisable()
+    {
+        if (_light != null) _light.intensity = originalIntensity;
+        if (lampRenderer != null && originalBlock != null) lampRenderer.SetPropertyBlock(originalBlock);
+    }
+
     Light _light;
     MaterialPropertyBlock _mpb;
     static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
@@ -40,19 +72,46 @@ public class EmergencyLightFlicker : MonoBehaviour
     void Awake()
     {
         _light = GetComponent<Light>();
+        originalIntensity = _light.intensity;
+        if (lampRenderer != null) { originalBlock = new MaterialPropertyBlock(); lampRenderer.GetPropertyBlock(originalBlock); }
         if (seed == 0) seed = SyncedClock.SeedFromPosition(transform.position);
         _mpb = new MaterialPropertyBlock();
     }
 
+
     void Update()
     {
-        float f = Evaluate(SyncedClock.Time);
-        _light.intensity = baseIntensity * f;
-        if (lampRenderer != null)
+        double now = SyncedClock.Time;
+        // Sample on shared clock boundaries: multiplayer flicker still uses identical seeds/ticks.
+        if (now >= nextSampleTime - 1.0 && now < nextSampleTime) return;
+        float visibility = 1f;
+        if (distanceOptimization)
+        {
+            Camera camera = ViewCamera();
+            if (camera != null)
+            {
+                float distance = Vector3.Distance(camera.transform.position, transform.position);
+                visibility = 1f - Mathf.SmoothStep(0f, 1f,
+                    Mathf.InverseLerp(fullBrightnessDistance, fullBrightnessDistance + Mathf.Max(1f, fadeDistance), distance));
+            }
+        }
+        float rate = visibility <= 0f ? 5f : (mode == FlickerMode.Pulse ? pulseUpdateRate : tickRate);
+        rate = Mathf.Max(1f, rate);
+        nextSampleTime = (System.Math.Floor(now * rate) + 1.0) / rate;
+        // Distant lamps retain their authored emissive surface without a realtime light.
+        float factor = visibility > 0f ? Evaluate(now) : 0f;
+        float intensity = baseIntensity * factor * visibility;
+        if (!Mathf.Approximately(lastIntensity, intensity))
+        {
+            _light.intensity = intensity;
+            lastIntensity = intensity;
+        }
+        if (lampRenderer != null && visibility > 0f && !Mathf.Approximately(lastEmissionFactor, factor))
         {
             lampRenderer.GetPropertyBlock(_mpb);
-            _mpb.SetColor(EmissionId, lampEmission * f);
+            _mpb.SetColor(EmissionId, lampEmission * factor);
             lampRenderer.SetPropertyBlock(_mpb);
+            lastEmissionFactor = factor;
         }
     }
 

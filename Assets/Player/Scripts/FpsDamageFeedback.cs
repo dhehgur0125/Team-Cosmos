@@ -68,10 +68,26 @@ namespace VoidLast.Player
             flash=Mathf.Clamp(Mathf.Max(flash,0.35f)+amount/health.Maximum,0,0.8f);
             if (!shakeEnabled || LoadingScreen.IsShowing || FpsInput.Blocked || Time.timeScale <= 0 || health.IsDead) return;
             // Restart a bounded impulse: repeated hits never accumulate camera displacement.
-            shakeStrength = Mathf.Min(1f, Mathf.Max(shakeStrength, 0.65f + amount / health.Maximum));
+            StartShakeImpulse(amount, health.Maximum);
+        }
+        // At 10% max HP per hit and above, preserve the previous strong impact.
+        // Small environmental ticks scale down continuously instead of receiving a 65% minimum.
+        static float DamageShakeStrength(float amount, float maximum)
+        {
+            float ratio = Mathf.Max(0f, amount) / Mathf.Max(1f, maximum);
+            return Mathf.Min(1f, 0.65f + ratio) * Mathf.Clamp01(ratio / 0.1f);
+        }
+
+        void StartShakeImpulse(float amount, float maximum)
+        {
+            // Preserve only the remaining envelope, so a tiny follow-up hit cannot
+            // restart an earlier heavy impact at full strength.
+            float remaining = shakeStrength * (1f - Mathf.Clamp01(shakeElapsed / Mathf.Max(0.1f, shakeDuration)));
+            shakeStrength = Mathf.Max(remaining, DamageShakeStrength(amount, maximum));
             shakeElapsed = 0;
             hitSequence++;
         }
+
         void LateUpdate()
         {
             // Safety restore if rendering was interrupted. Never carry a visual offset into gameplay.
