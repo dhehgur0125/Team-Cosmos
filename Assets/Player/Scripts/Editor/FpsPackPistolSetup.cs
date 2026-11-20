@@ -1,6 +1,7 @@
 /* [ 코드 설명 ] Fps Weapons Pack의 팔·권총 모델과 Hand/Gun Animator로 1인칭 권총 리그 프리팹을 만들고 Player 프리팹에 연결합니다. 원본 팩 에셋은 수정하지 않으며(머티리얼은 URP 복사본 사용), 기존 SciFi 권총과 장갑은 삭제하지 않고 비활성화만 합니다. 여러 번 실행해도 같은 결과가 되도록 만들었습니다. */
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -236,6 +237,78 @@ namespace VoidLast.Player.Editor
         {
             foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
             return null;
+        }
+
+        const string SuitAlbedo = "Assets/Astronauts_Pack/Astronaut_Pilot/Textures/Body/Astronaut_Suit_Body_Albedo.tga";
+        const string GloveAlbedo = Pack + "materials/texture resources/gloved arms/gloved arms albedo.png";
+        const string SuitGloveAlbedo = MaterialFolder + "/gloved arms albedo suit.png";
+
+        /// <summary>1인칭 팩 장갑(초록 소매·갈색 가죽)을 3인칭 우주복의 주황 원단 색으로 다시 칠한다. 명암·주름·회색 패드와 버클은 그대로 둔다.</summary>
+        [MenuItem("VOID LAST/Player/Match Pack Gloves To Suit Colour")]
+        public static void MatchGlovesToSuit()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play Mode first.");
+            Color suit = SuitFabricColour();
+            const int N = 2048;
+            var glove = Readable(AssetDatabase.LoadAssetAtPath<Texture>(GloveAlbedo), N);
+            var px = glove.GetPixels();
+            // Region saturation (box-averaged) separates fabric/leather from the grey pads; per-pixel tests leave speckles.
+            var integral = new double[(N + 1) * (N + 1)];
+            for (int y = 0; y < N; y++)
+            {
+                double row = 0;
+                for (int x = 0; x < N; x++) { Color.RGBToHSV(px[y * N + x], out _, out float s, out _); row += s; integral[(y + 1) * (N + 1) + x + 1] = integral[y * (N + 1) + x + 1] + row; }
+            }
+            const int R = 12; // ~6 px at 1024, the preview that looked clean
+            var output = new Color[px.Length];
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    int x0 = Mathf.Max(0, x - R), x1 = Mathf.Min(N, x + R + 1), y0 = Mathf.Max(0, y - R), y1 = Mathf.Min(N, y + R + 1);
+                    double regionSaturation = (integral[y1 * (N + 1) + x1] - integral[y0 * (N + 1) + x1] - integral[y1 * (N + 1) + x0] + integral[y0 * (N + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+                    var c = px[y * N + x];
+                    Color.RGBToHSV(c, out float h, out _, out float v);
+                    float w = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.10f, 0.16f, (float)regionSaturation));
+                    if (v > 0.8f) w = 0; // studs and buckles stay metal
+                    float reference = h >= 0.12f && h <= 0.5f ? 0.17f : 0.21f; // average brightness of the green sleeve / brown leather
+                    float k = Mathf.Clamp(v / reference, 0.45f, 1.5f);
+                    output[y * N + x] = Color.Lerp(c, new Color(Mathf.Clamp01(suit.r * k), Mathf.Clamp01(suit.g * k), Mathf.Clamp01(suit.b * k), c.a), w);
+                }
+            glove.SetPixels(output); glove.Apply();
+            File.WriteAllBytes(SuitGloveAlbedo, glove.EncodeToPNG());
+            AssetDatabase.ImportAsset(SuitGloveAlbedo, ImportAssetOptions.ForceUpdate);
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(SuitGloveAlbedo);
+
+            var material = UrpCopy("gloved arms mat"); // Shared by the pistol arms and every item arm.
+            material.SetTexture("_BaseMap", texture); material.SetTexture("_MainTex", texture);
+            material.SetFloat("_Smoothness", 0.3f); // Suit fabric, not shiny leather.
+            EditorUtility.SetDirty(material);
+            AssetDatabase.SaveAssets();
+            Debug.Log("Pack gloves recoloured to the suit orange " + suit);
+        }
+
+        static Color SuitFabricColour()
+        {
+            var suit = Readable(AssetDatabase.LoadAssetAtPath<Texture>(SuitAlbedo), 512);
+            Vector3 sum = Vector3.zero; int n = 0;
+            foreach (var c in suit.GetPixels())
+            {
+                Color.RGBToHSV(c, out float h, out float s, out float v);
+                if (h > 0.02f && h < 0.08f && s > 0.45f && v > 0.45f) { sum += new Vector3(c.r, c.g, c.b); n++; }
+            }
+            sum /= Mathf.Max(1, n);
+            return new Color(sum.x, sum.y, sum.z);
+        }
+
+        static Texture2D Readable(Texture source, int size)
+        {
+            var rt = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Graphics.Blit(source, rt);
+            var previous = RenderTexture.active; RenderTexture.active = rt;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.ReadPixels(new Rect(0, 0, size, size), 0, 0); texture.Apply();
+            RenderTexture.active = previous; RenderTexture.ReleaseTemporary(rt);
+            return texture;
         }
 
         const string WorldMesh = "Assets/Player/Prefabs/Weapons/PackPistol_World.asset";
