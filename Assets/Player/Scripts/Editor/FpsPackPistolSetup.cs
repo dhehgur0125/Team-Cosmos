@@ -170,6 +170,44 @@ namespace VoidLast.Player.Editor
             });
             Debug.Log("Slot 3 items now held by the pack gloves");
         }
+        /// <summary>탄약 팩(4~6번)도 구급상자처럼 팩 장갑이 윗 손잡이를 쥐게 한다. 들고 있는 모델은 실행 중에 만들어지므로 아이템 종류로 찾아 따라간다.</summary>
+        [MenuItem("VOID LAST/Player/Apply Pack Hands To Ammo Pack")]
+        public static void ApplyAmmoPackHands()
+        {
+            var pickup = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/FarmingItems/AmmoPack.prefab");
+            if (pickup == null) throw new InvalidOperationException("Run 'Build Ammo Pack Item' first.");
+            float handleTop = float.MinValue;
+            foreach (var r in pickup.transform.Find("Model").GetComponentsInChildren<MeshRenderer>(true))
+            {
+                var filter = r.GetComponent<MeshFilter>(); var b = filter.sharedMesh.bounds;
+                handleTop = Mathf.Max(handleTop, r.transform.localPosition.y + b.max.y * r.transform.localScale.y);
+            }
+            EditPlayer(player =>
+            {
+                var camera = player.GetComponentInChildren<Camera>(true).transform;
+                var arms = BuildArms(player, camera, "ItemArms (AmmoPack)");
+                // Same grip as the medical kit: the handle bar (pack +X) runs through the fist, the hand comes in from the right.
+                Vector3 down = GripDown.normalized;
+                Vector3 forward = Vector3.ProjectOnPlane(Vector3.forward, down).normalized;
+                Quaternion grip = Quaternion.LookRotation(forward, Vector3.Cross(forward, down));
+                Vector3 gripPosition = GripCentre - grip * new Vector3(0, handleTop - 0.015f, 0);
+
+                FpsItemHands hands = null;
+                foreach (var existing in player.GetComponents<FpsItemHands>())
+                    if (new SerializedObject(existing).FindProperty("carriedItem").intValue == (int)FarmingItemKind.AmmoPack) hands = existing;
+                if (hands == null) hands = player.AddComponent<FpsItemHands>();
+                var fields = new SerializedObject(hands);
+                fields.FindProperty("anchor").objectReferenceValue = null;
+                fields.FindProperty("carriedItem").intValue = (int)FarmingItemKind.AmmoPack;
+                fields.FindProperty("arms").objectReferenceValue = arms;
+                Quaternion inverse = Quaternion.Inverse(grip);
+                fields.FindProperty("offsetPosition").vector3Value = inverse * (ArmsPlacement - gripPosition);
+                fields.FindProperty("offsetEuler").vector3Value = inverse.eulerAngles;
+                fields.ApplyModifiedPropertiesWithoutUndo();
+            });
+            Debug.Log("Ammo pack now held by the pack gloves (handle top " + handleTop.ToString("F3") + ")");
+        }
+
         // Chosen from Play renders: self = pressed down toward the body (hand stays on screen); other = needle forward, arm reaching out.
         static readonly Vector3 SelfUseOffset = new Vector3(-0.04f, -0.05f, -0.03f);
         static readonly Vector3 SelfUseTilt = new Vector3(20, 0, 0);

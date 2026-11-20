@@ -21,7 +21,7 @@ namespace VoidLast.Player
         public static bool IsHeavy(FarmingItemKind kind) => kind == FarmingItemKind.PowerCell;
 
         /// <summary>Resources에서 읽어 오는 아이템인지 (주사기·무전기는 대원 프리팹에 직접 연결되어 있음)</summary>
-        public static bool IsCatalogItem(FarmingItemKind kind) => kind == FarmingItemKind.Battery || kind == FarmingItemKind.Scanner || IsMissionItem(kind);
+        public static bool IsCatalogItem(FarmingItemKind kind) => kind == FarmingItemKind.Battery || kind == FarmingItemKind.Scanner || kind == FarmingItemKind.AmmoPack || IsMissionItem(kind);
 
         /// <summary>스캔에 표시되는지: 배터리는 직접 찾아야 한다</summary>
         public static bool IsScannable(FarmingItemKind kind) => kind != FarmingItemKind.Battery;
@@ -41,6 +41,7 @@ namespace VoidLast.Player
                 case FarmingItemKind.AdminCard: return "ADMIN CARD";
                 case FarmingItemKind.ToolKit: return "TOOL KIT";
                 case FarmingItemKind.PowerCell: return "POWER CELL";
+                case FarmingItemKind.AmmoPack: return "AMMO PACK";
                 default: return "ITEM";
             }
         }

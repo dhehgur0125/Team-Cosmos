@@ -6,7 +6,7 @@ namespace VoidLast.Player
 {
     // 프리팹·씬에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
     // 씬·프리팹에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
-    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler, Scanner, AdminCard, ToolKit, PowerCell }
+    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler, Scanner, AdminCard, ToolKit, PowerCell, AmmoPack }
 
     [DefaultExecutionOrder(-50)]
     public sealed class FpsInventory : MonoBehaviour
@@ -14,6 +14,9 @@ namespace VoidLast.Player
         public const int Capacity = 3;
         [SerializeField, Min(0.1f)] float useDuration = 3;
         [SerializeField, Range(0, 1)] float syringeHealFraction = 0.3f;
+        [Header("탄약 팩 (좌클릭 길게: 몸에 가져다 대고 예비 탄약 추가)")]
+        [SerializeField, Min(0.1f)] float ammoPackUseDuration = 2;
+        [SerializeField, Min(1)] int ammoPackRounds = 10;
         readonly FarmingItemKind[] items = new FarmingItemKind[Capacity];
         FpsEquipment equipment;
         FpsHealth health;
@@ -22,6 +25,7 @@ namespace VoidLast.Player
         FpsItemInteractor interactor;
         FpsItemView view;
         FpsHealth recipient;
+        FpsPistol pistol;
         int usingIndex = -1;
         float elapsed;
         public event Action Changed;
@@ -34,8 +38,13 @@ namespace VoidLast.Player
         bool networkUsingOnOther;
         public bool HasItem(FarmingItemKind kind) => Array.IndexOf(items, kind) >= 0;
         public bool IsAlive => health != null && !health.IsDead && !motor.IsDead;
-        public float UseProgress => IsUsing ? Mathf.Clamp01(elapsed / useDuration) : 0;
-        public float UseDuration => useDuration;
+        public float UseProgress => IsUsing ? Mathf.Clamp01(elapsed / DurationFor(ItemAt(usingIndex))) : 0;
+        /// <summary>지금 사용 중인(없으면 선택된) 아이템의 사용 시간</summary>
+        public float UseDuration => DurationFor(IsUsing ? ItemAt(usingIndex) : ItemAt(SelectedIndex));
+        /// <summary>사용 중인 아이템 종류 (사용 중이 아니면 None)</summary>
+        public FarmingItemKind UsingItem => IsUsing ? ItemAt(usingIndex) : FarmingItemKind.None;
+        float DurationFor(FarmingItemKind kind) => kind == FarmingItemKind.AmmoPack ? ammoPackUseDuration : useDuration;
+        static bool IsUsable(FarmingItemKind kind) => kind == FarmingItemKind.Syringe || kind == FarmingItemKind.AmmoPack;
         public bool IsFull => Array.IndexOf(items, FarmingItemKind.None) < 0;
         public FarmingItemKind ItemAt(int index) => index >= 0 && index < Capacity ? items[index] : FarmingItemKind.None;
 
@@ -45,6 +54,7 @@ namespace VoidLast.Player
             input = GetComponent<FpsInput>(); motor = GetComponent<FpsMotor>();
             interactor = GetComponent<FpsItemInteractor>();
             view = GetComponent<FpsItemView>();
+            pistol = GetComponent<FpsPistol>();
         }
         void OnEnable() { equipment.SlotChanged += SelectionChanged; health.Died += CancelUse; }
         void OnDisable() { equipment.SlotChanged -= SelectionChanged; health.Died -= CancelUse; CancelUse(); }
@@ -68,7 +78,7 @@ namespace VoidLast.Player
             items[0] = a; items[1] = b; items[2] = c;
             usingIndex = usingSlot >= 0 && usingSlot < Capacity ? usingSlot : -1;
             networkUsingOnOther = onOther;
-            elapsed = usingIndex >= 0 ? Mathf.Clamp01(progress) * useDuration : 0;
+            elapsed = usingIndex >= 0 ? Mathf.Clamp01(progress) * DurationFor(items[usingIndex]) : 0;
             if (changed) Changed?.Invoke();
         }
         /// <summary>층 이동 후: 이전 층의 핫바 내용을 그대로 이어받는다</summary>
@@ -134,7 +144,16 @@ namespace VoidLast.Player
         public bool TryStartUse(FpsHealth target = null)
         {
             target = target == null ? health : target;
-            if (!IsAlive || IsUsing || ItemAt(SelectedIndex) != FarmingItemKind.Syringe || !target.CanHeal || view == null || !view.CanUse) return false;
+            var kind = ItemAt(SelectedIndex);
+            if (kind == FarmingItemKind.AmmoPack)
+            {
+                // Ammo goes into the user's own pistol only; it is held up and pressed to the body like the syringe.
+                if (!IsAlive || IsUsing || target != health || pistol == null || equipment.IsSwitching) return false;
+                recipient = health; usingIndex = SelectedIndex; elapsed = 0;
+                Changed?.Invoke(); ShowHotbar();
+                return true;
+            }
+            if (!IsAlive || IsUsing || kind != FarmingItemKind.Syringe || !target.CanHeal || view == null || !view.CanUse) return false;
             if (target != health && !interactor.CanReachPlayer(target)) return false;
             recipient = target;
             usingIndex = SelectedIndex; elapsed = 0;
@@ -145,12 +164,20 @@ namespace VoidLast.Player
         {
             if (!IsUsing) return;
             bool onOther = recipient != health;
-            if (!IsAlive || recipient == null || recipient.IsDead || usingIndex != SelectedIndex || ItemAt(usingIndex) != FarmingItemKind.Syringe ||
+            if (!IsAlive || recipient == null || recipient.IsDead || usingIndex != SelectedIndex || !IsUsable(ItemAt(usingIndex)) ||
                 (onOther ? !otherHeld || !interactor.CanReachPlayer(recipient) : !selfHeld)) { CancelUse(); return; }
             elapsed += Mathf.Max(0, deltaTime);
-            if (elapsed < useDuration) return;
+            if (elapsed < DurationFor(ItemAt(usingIndex))) return;
             int completedIndex = usingIndex;
             usingIndex = -1; elapsed = 0;
+            if (items[completedIndex] == FarmingItemKind.AmmoPack)
+            {
+                pistol.AddReserve(ammoPackRounds);
+                items[completedIndex] = FarmingItemKind.None;
+                recipient = null;
+                Changed?.Invoke(); ShowHotbar();
+                return;
+            }
             // A different healing source may fill HP during use; in that case keep the syringe.
             if (recipient.Heal(recipient.Maximum * syringeHealFraction)) items[completedIndex] = FarmingItemKind.None;
             recipient = null;

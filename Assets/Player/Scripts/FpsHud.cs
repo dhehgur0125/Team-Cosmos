@@ -42,7 +42,7 @@ namespace VoidLast.Player
         {
             float target = Time.unscaledTime - lastActivity <= visibleSeconds ? 1 : 0;
             hotbar.alpha = Mathf.MoveTowards(hotbar.alpha, target, Time.unscaledDeltaTime / fadeSeconds);
-            contextLabel.text = !inventory.IsAlive ? "" : inventory.IsUsing ? (inventory.IsUsingOnOther ? "HEALING PLAYER  " : "HEALING SELF  ") + (inventory.UseProgress * inventory.UseDuration).ToString("F1") + " / " + inventory.UseDuration.ToString("F1") + " s"
+            contextLabel.text = !inventory.IsAlive ? "" : inventory.IsUsing ? (inventory.UsingItem == FarmingItemKind.AmmoPack ? "LOADING AMMO  " : inventory.IsUsingOnOther ? "HEALING PLAYER  " : "HEALING SELF  ") + (inventory.UseProgress * inventory.UseDuration).ToString("F1") + " / " + inventory.UseDuration.ToString("F1") + " s"
                 : interactor.Target != null ? inventory.IsFull ? "HOTBAR FULL" : "F  PICK UP " + FarmingItems.HudLabel(interactor.Target.Item)
                 : "";
         }

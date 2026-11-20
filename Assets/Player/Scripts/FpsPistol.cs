@@ -109,6 +109,12 @@ namespace VoidLast.Player
             Magazine = Mathf.Clamp(magazine, 0, magazineCapacity); Reserve = Mathf.Max(0, reserve);
             IsReloading = false; reloadElapsed = 0; Changed?.Invoke();
         }
+        /// <summary>탄약 팩: 예비 탄약을 늘린다</summary>
+        public void AddReserve(int rounds)
+        {
+            if (rounds <= 0) return;
+            Reserve += rounds; Changed?.Invoke();
+        }
         public bool TryReload()
         {
             if (!Equipped || IsReloading || !view.IsEquipped || Magazine >= magazineCapacity || Reserve <= 0) return false;

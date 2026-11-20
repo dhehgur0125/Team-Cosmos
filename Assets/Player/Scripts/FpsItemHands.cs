@@ -8,6 +8,8 @@ namespace VoidLast.Player
     {
         [Tooltip("FpsItemView의 ItemRoot (주사기)")]
         [SerializeField] Transform anchor;
+        [Tooltip("anchor 대신: 실행 중에 FpsCarriedItemView가 만드는 이 아이템의 1인칭 모델을 따라간다 (None이면 anchor 사용)")]
+        [SerializeField] FarmingItemKind carriedItem = FarmingItemKind.None;
         [Tooltip("카메라 아래의 팩 팔 인스턴스 (Animator 없이 잡는 자세로 고정)")]
         [SerializeField] Transform arms;
         [Tooltip("ItemRoot 기준 팔 위치/회전 (스케일 제외)")]
@@ -19,11 +21,13 @@ namespace VoidLast.Player
         [Tooltip("펌프 진행률의 몇 배 빠르게 엄지가 캡 위로 올라가는지")]
         [SerializeField, Min(1)] float thumbLead = 3;
         FpsItemView view;
+        FpsCarriedItemView carried;
+        FpsInventory inventory;
         Quaternion[] thumbRest;
 
         void Awake()
         {
-            view = GetComponent<FpsItemView>();
+            view = GetComponent<FpsItemView>(); carried = GetComponent<FpsCarriedItemView>(); inventory = GetComponent<FpsInventory>();
             thumbRest = new Quaternion[thumbBones.Length];
             for (int i = 0; i < thumbBones.Length; i++) if (thumbBones[i] != null) thumbRest[i] = thumbBones[i].localRotation;
             if (arms != null) arms.gameObject.SetActive(false);
@@ -31,8 +35,15 @@ namespace VoidLast.Player
         void OnDisable() { if (arms != null) arms.gameObject.SetActive(false); }
         void LateUpdate()
         {
-            if (arms == null || anchor == null) return;
-            bool show = anchor.gameObject.activeInHierarchy;
+            if (arms == null) return;
+            if (carriedItem != FarmingItemKind.None)
+            {
+                // The carried model is created on first selection; look it up only while that item is in hand.
+                bool selected = inventory != null && inventory.IsAlive && inventory.ItemAt(inventory.SelectedIndex) == carriedItem;
+                anchor = selected && carried != null ? carried.FirstPersonModel(carriedItem) : null;
+            }
+            bool show = anchor != null && anchor.gameObject.activeInHierarchy;
+            if (anchor == null) { if (arms.gameObject.activeSelf) arms.gameObject.SetActive(false); return; }
             if (arms.gameObject.activeSelf != show) arms.gameObject.SetActive(show);
             if (!show) return;
             arms.SetPositionAndRotation(anchor.position + anchor.rotation * offsetPosition, anchor.rotation * Quaternion.Euler(offsetEuler));
