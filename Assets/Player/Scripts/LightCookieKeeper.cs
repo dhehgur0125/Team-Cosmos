@@ -33,7 +33,9 @@ namespace VoidLast.Player
             keeper.shadows = source.shadows == LightShadows.None ? LightShadows.Soft : source.shadows;
             keeper.shadowNearPlane = 0.1f;
             keeper.renderMode = LightRenderMode.ForcePixel;
-            keeper.lightmapBakeType = LightmapBakeType.Realtime;
+#if UNITY_EDITOR
+            keeper.lightmapBakeType = LightmapBakeType.Realtime;   // 에디터 전용 설정 (빌드에서는 실행 중 만든 빛이 원래 실시간)
+#endif
             var data = go.GetComponent<UniversalAdditionalLightData>();
             if (data == null) data = go.AddComponent<UniversalAdditionalLightData>();
             // 그림자 칸 크기 "낮음"(256). 공개 설정 함수가 없어 내부 값을 바꾼다 (실패해도 동작에는 문제없음)
