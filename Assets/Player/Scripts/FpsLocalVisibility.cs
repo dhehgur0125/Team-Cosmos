@@ -11,6 +11,8 @@ namespace VoidLast.Player
         [SerializeField] Camera localCamera;
         [SerializeField, FormerlySerializedAs("headRenderers")] Renderer[] worldRenderers;
         [SerializeField] Renderer[] firstPersonRenderers;
+        [Tooltip("켜 두면 실행 시 FPS 카메라 아래 렌더러는 1인칭, 전신 Animator 아래 렌더러는 전신으로 자동 분류해 목록에 더한다. 프리팹 Variant가 목록을 덮어써도 새 모델(팩 팔·권총 등)이 빠지지 않는다.")]
+        [SerializeField] bool autoCollect = true;
         bool[] worldPrevious, firstPersonPrevious;
         bool overridden;
         static readonly int PerCameraVisibility = Shader.PropertyToID("_FpsPerCameraVisibility");
@@ -52,6 +54,7 @@ namespace VoidLast.Player
         }
         void OnEnable()
         {
+            if (autoCollect) Collect();
             worldRenderers = Concat(worldRenderers, null);
             firstPersonRenderers = Concat(firstPersonRenderers, null);
             PreparePerCameraMeshes(worldRenderers);
@@ -62,6 +65,20 @@ namespace VoidLast.Player
             RenderPipelineManager.endCameraRendering += EndSrp;
             Camera.onPreCull += Begin;
             Camera.onPostRender += End;
+        }
+        // Everything under the FPS camera belongs to the first-person view; everything on the humanoid body to the world view.
+        void Collect()
+        {
+            var firstPerson = localCamera != null ? localCamera.GetComponentsInChildren<Renderer>(true) : new Renderer[0];
+            var world = new List<Renderer>();
+            foreach (var animator in GetComponentsInChildren<Animator>(true))
+            {
+                if (!animator.isHuman) continue;
+                foreach (var renderer in animator.GetComponentsInChildren<Renderer>(true))
+                    if (localCamera == null || !renderer.transform.IsChildOf(localCamera.transform)) world.Add(renderer);
+            }
+            worldRenderers = Concat(worldRenderers, world.ToArray());
+            firstPersonRenderers = Concat(firstPersonRenderers, firstPerson);
         }
         void OnDisable()
         {
