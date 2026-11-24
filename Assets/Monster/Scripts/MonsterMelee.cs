@@ -47,6 +47,8 @@ namespace VoidLast.Monster
         public float LungeDistance => lungeDistance;
         public float RecoveryDuration => attackRecoveryTime;
         public float Damage => attackDamage;
+        /// <summary>밸런스 설정(GameBalance) 값 적용</summary>
+        public void ApplyBalance(float damage) { attackDamage = damage; }
         public int Swings { get; private set; }
         public int PlayersHit { get; private set; }
         float? networkLean;
@@ -147,7 +149,7 @@ namespace VoidLast.Monster
                 Vector3 toPlayer = Vector3.ProjectOnPlane(player.transform.position - transform.position, Vector3.up);
                 if (arc && toPlayer.sqrMagnitude > 0.01f && Vector3.Angle(forward, toPlayer) > attackAngle * 0.5f) continue;
                 if (!vision.ClearLine(transform.position + Vector3.up * 1.3f, collider.bounds.center, player.transform)) continue;
-                struck.Add(player); player.TakeDamage(attackDamage); PlayersHit++;
+                struck.Add(player); player.TakeDamage(attackDamage); PlayLog.MonsterHit(gameObject, attackDamage); PlayersHit++;
             }
         }
         public void Cancel()

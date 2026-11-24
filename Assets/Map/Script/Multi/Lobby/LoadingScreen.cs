@@ -61,6 +61,9 @@ public sealed class LoadingScreen : MonoBehaviour
     public static void Show() { if (Instance != null) Instance.Begin(Stage.Starting); }
     /// <summary>시작이 실패했을 때 닫는다</summary>
     public static void Cancel() { if (Instance != null) Instance.Abort(); }
+    /// <summary>진행 중인 게임에 다시 참가: 방장 화면의 층을 받아 오고 내 대원이 나타날 때까지 (최대 2분)</summary>
+    public static void BeginRejoin() { if (Instance != null) { Instance._rejoin = true; Instance.Begin(Stage.Waiting); } }
+    bool _rejoin;
 
     /// <summary>로딩 화면이 없으면 만든다 (층 이동 때 사용. 로비 씬에는 미리 놓여 있음)</summary>
     public static LoadingScreen Ensure(TMP_FontAsset font)
@@ -240,7 +243,7 @@ public sealed class LoadingScreen : MonoBehaviour
                 break;
             case Stage.Waiting:
             case Stage.Spawning:
-                if (nm == null || !nm.IsListening || FpsNetworkPlayer.Local != null || stageAge > 45f) SetStage(Stage.Done);
+                if (nm == null || !nm.IsListening || FpsNetworkPlayer.Local != null || stageAge > (_rejoin ? 120f : 45f)) { _rejoin = false; SetStage(Stage.Done); }
                 break;
         }
 

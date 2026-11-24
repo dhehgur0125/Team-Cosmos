@@ -53,7 +53,7 @@ public class LobbyPlayerSpawner : MonoBehaviour
         {
             _nm.OnServerStarted -= OnServerStarted;
             _nm.OnServerStopped -= OnServerStopped;
-            if (_hooked && _nm.SceneManager != null) _nm.SceneManager.OnLoadEventCompleted -= OnLoadEventCompleted;
+            if (_hooked && _nm.SceneManager != null) { _nm.SceneManager.OnLoadEventCompleted -= OnLoadEventCompleted; _nm.SceneManager.OnSynchronizeComplete -= OnSynchronizeComplete; }
         }
         SceneManager.sceneLoaded -= OnUnitySceneLoaded;
     }
@@ -62,12 +62,13 @@ public class LobbyPlayerSpawner : MonoBehaviour
     {
         if (_hooked || _nm.SceneManager == null) return;
         _nm.SceneManager.OnLoadEventCompleted += OnLoadEventCompleted;
+        _nm.SceneManager.OnSynchronizeComplete += OnSynchronizeComplete;
         _hooked = true;
     }
 
     void OnServerStopped(bool wasHost)
     {
-        if (_hooked && _nm.SceneManager != null) _nm.SceneManager.OnLoadEventCompleted -= OnLoadEventCompleted;
+        if (_hooked && _nm.SceneManager != null) { _nm.SceneManager.OnLoadEventCompleted -= OnLoadEventCompleted; _nm.SceneManager.OnSynchronizeComplete -= OnSynchronizeComplete; }
         _hooked = false;
     }
 
@@ -102,6 +103,31 @@ public class LobbyPlayerSpawner : MonoBehaviour
         }
         if (timedOut != null && timedOut.Count > 0)
             Debug.LogWarning($"[Lobby] 씬 로드 시간 초과 대원 {timedOut.Count}명");
+    }
+
+    /// <summary>
+    /// 게임 도중 들어온 대원(재접속): 방장 화면의 층을 다 받은 뒤 그 층의 A 계단 도착 지점(없으면 시작 지점)에 대원을 만든다.
+    /// 로비에서 방에 들어온 경우(지금 씬이 로비)는 아무것도 하지 않는다.
+    /// </summary>
+    void OnSynchronizeComplete(ulong clientId)
+    {
+        if (!_nm.IsServer) return;
+        string sceneName = SceneManager.GetActiveScene().name;
+        var prefab = PrefabFor(sceneName);
+        if (sceneName == lobbySceneName || prefab == null) return;
+        if (_nm.ConnectedClients.TryGetValue(clientId, out var client) && client.PlayerObject != null) return;
+        if (FloorTransition.Instance != null && FloorTransition.Instance.IsMoving) return;   // 층을 옮기는 중이면 다음 층 불러오기 때 함께 만들어진다
+
+        var saved = KeywordOverride;
+        KeywordOverride = new[] { "Arrival_A" };
+        var points = FindSpawnPoints(sceneName);
+        KeywordOverride = saved;
+        int index = (int)(clientId % 4);
+        Vector3 pos = points.Count > 0 ? points[index % points.Count].position : prefab.transform.position;
+        Quaternion rot = points.Count > 0 ? points[index % points.Count].rotation : prefab.transform.rotation;
+        var go = Instantiate(prefab, pos, rot);
+        go.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
+        Debug.Log($"[Lobby] {sceneName}: 게임 도중 들어온 Client {clientId} 플레이어 스폰 @ {pos}");
     }
 
     GameObject PrefabFor(string sceneName)

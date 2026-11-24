@@ -117,6 +117,9 @@ public sealed class F1MissionDirector : NetworkBehaviour, IFloorMission
     void Awake()
     {
         Instance = this;
+        // 밸런스 설정: 점화 시간 × 인원 배율, 고정 장치 시간 제한 (GameBalance). 점화 소음(층 전체)은 일부러 그대로
+        countdownSeconds *= GameBalance.HoldoutScale;
+        clampWindow = GameBalance.SyncWindow;
         FloorMission.Register(this);
         if (hangarDoors != null) foreach (var d in hangarDoors) if (d != null && d.leaf != null) d.closedPos = d.leaf.position;
         _clankClip = F2MissionDirector.MakeClank();

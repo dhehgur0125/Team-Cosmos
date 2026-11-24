@@ -175,6 +175,9 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
     void Awake()
     {
         Instance = this;
+        // 밸런스 설정: 충전 시간 × 인원 배율, 소음 반경·간격 (GameBalance)
+        fuelSeconds *= GameBalance.HoldoutScale;
+        pumpNoiseRadius = GameBalance.Current.holdoutNoiseRadius;
         FloorMission.Register(this);
         if (lockdownDoors != null)
             foreach (var d in lockdownDoors) if (d != null && d.leaf != null) d.closedPos = d.leaf.position;
@@ -268,7 +271,7 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
                 if (guarded && !s.valveBroken) _fuelAccum = Mathf.Min(1f, _fuelAccum + dt / fuelSeconds);
                 // 화면/네트워크용 값은 0.5% 단위로 끊어서 보낸다 (매 프레임 아주 작게 늘어나는 값을 반올림하면 0에 머무르므로 내림)
                 s.fuelProgress = _fuelAccum >= 1f ? 1f : Mathf.Floor(_fuelAccum * 200f) / 200f;
-                if (Time.time >= _nextNoise) { _nextNoise = Time.time + pumpNoiseInterval; MissionNoise(fuelPump, pumpNoiseRadius); }
+                if (Time.time >= _nextNoise) { _nextNoise = Time.time + GameBalance.NextHoldoutNoise((1f - _fuelAccum) * fuelSeconds); MissionNoise(fuelPump, pumpNoiseRadius); }
                 if (_fuelAccum >= 1f) { s.fuel = 2; s.fuelPaused = false; }
             }
             if (s.module == 2 && s.fuel == 2) s.phase = (byte)Phase.Rally;
@@ -395,7 +398,7 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
                 if (!objectives || s.fuel != 0 || s.module != 2) return;
                 s.fuel = 1; s.fuelProgress = 0f; s.fuelPaused = false; s.valveBroken = false; _fuelAccum = 0f; _valveBrokeOnce = false;
                 _valveBreakAt = UnityEngine.Random.Range(valveBreakRange.x, valveBreakRange.y);
-                _nextNoise = Time.time + pumpNoiseInterval;
+                _nextNoise = Time.time + GameBalance.NextHoldoutNoise(fuelSeconds);
                 MissionNoise(device, pumpNoiseRadius);
                 break;
             case MissionInteractable.Kind.FuelValve:

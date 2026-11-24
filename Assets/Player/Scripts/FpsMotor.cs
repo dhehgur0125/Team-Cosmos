@@ -1,4 +1,5 @@
-/* [ 코드 설명 ] CharacterController로 이동·중력·웅크리기·지상 점프를 처리합니다. 캡슐 바닥을 유지하며 높이를 바꾸고 천장·착지를 검사합니다. Root Motion은 사용하지 않습니다. */
+/* [ 코드 설명 ] CharacterController로 이동·중력·웅크리기·지상 점프를 처리합니다. 캡슐 바닥을 유지하며 높이를 바꾸고 천장·착지를 검사합니다. Root Motion은 사용하지 않습니다.
+   지구력(Stamina 0~1): 달리면 줄고(GameBalance.runSeconds 동안), 걷거나 서 있으면 찬다. 다 쓰면 exhaustedResume까지 찰 때까지 못 달린다. 점프도 조금 쓴다. 내 대원에서만 계산한다. */
 using UnityEngine;
 
 namespace VoidLast.Player
@@ -45,6 +46,10 @@ namespace VoidLast.Player
         public float CrouchFraction => controller == null ? 0 : Mathf.InverseLerp(standingHeight, crouchingHeight, controller.height);
         /// <summary>멀티플레이: 다른 대원의 복제본이면 입력으로 움직이지 않고 네트워크 상태만 받아 애니메이션에 넘긴다.</summary>
         public bool IsNetworkProxy { get; private set; }
+        /// <summary>지구력 (0~1). 1이면 가득</summary>
+        public float Stamina { get; private set; } = 1f;
+        /// <summary>지구력을 다 써서 다시 찰 때까지 못 달리는 중</summary>
+        public bool Exhausted { get; private set; }
 
         void Awake()
         {
@@ -81,13 +86,17 @@ namespace VoidLast.Player
             controller.center = Vector3.up * (controller.height * 0.5f);
             move = Vector2.ClampMagnitude(move, 1);
             bool usingItem = inventory != null && inventory.IsUsing;
-            IsRunning = sprint && !usingItem && !IsCrouching && move.y > 0.1f;
+            IsRunning = sprint && !usingItem && !IsCrouching && move.y > 0.1f && !Exhausted;
             float speed = IsCrouching ? crouchSpeed : IsRunning ? runSpeed : walkSpeed;
             if (usingItem) speed *= itemUseSpeedMultiplier;
             Vector3 displacement = transform.TransformDirection(new Vector3(move.x, 0, move.y)) * speed;
             if (controller.isGrounded && verticalSpeed < 0) verticalSpeed = -2;
-            if (jump && groundedBeforeMove && !crouch && !IsCrouching && CrouchFraction < 0.01f && !IsDead)
+            var balance = GameBalance.Current;
+            if (jump && groundedBeforeMove && !crouch && !IsCrouching && CrouchFraction < 0.01f && !IsDead && !Exhausted)
+            {
                 verticalSpeed = Mathf.Sqrt(-2 * gravity * jumpHeight);
+                SpendStamina(balance.jumpCost);
+            }
             verticalSpeed = Mathf.Max(verticalSpeed + gravity * deltaTime, -50);
             displacement.y = verticalSpeed;
             Vector3 before = transform.position;
@@ -97,7 +106,25 @@ namespace VoidLast.Player
             if (IsGrounded) verticalSpeed = -2;
             var local = transform.InverseTransformDirection((transform.position - before) / deltaTime);
             LocalVelocity = new Vector2(local.x, local.z);
+
+            // 지구력: 달리면 줄고, 걷거나 서 있으면 찬다
+            if (IsRunning) SpendStamina(deltaTime / Mathf.Max(0.5f, balance.runSeconds));
+            else if (!IsDead && Stamina < 1f)
+            {
+                bool moving = move.sqrMagnitude > 0.01f && !IsCrouching;
+                Stamina = Mathf.Min(1f, Stamina + (moving ? balance.walkRecoverPerSecond : balance.restRecoverPerSecond) * deltaTime);
+            }
+            if (Exhausted && Stamina >= balance.exhaustedResume) Exhausted = false;
         }
+
+        void SpendStamina(float amount)
+        {
+            Stamina = Mathf.Max(0f, Stamina - amount);
+            if (Stamina <= 0f) Exhausted = true;
+        }
+
+        /// <summary>층 이동·부활 등: 지구력을 가득 채운다</summary>
+        public void RefillStamina() { Stamina = 1f; Exhausted = false; }
 
         public bool CanStand()
         {
@@ -114,7 +141,7 @@ namespace VoidLast.Player
         }
 
         public void StopForDeath() { IsDead = true; IsRunning = false; LocalVelocity = Vector2.zero; }
-        public void ResumeAfterRevive() { IsDead = false; verticalSpeed = 0; }
+        public void ResumeAfterRevive() { IsDead = false; verticalSpeed = 0; RefillStamina(); }
         void OnValidate()
         {
             var capsule = GetComponent<CharacterController>();

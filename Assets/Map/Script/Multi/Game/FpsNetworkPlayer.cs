@@ -158,6 +158,9 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
             _inventory.GiveStartingItem(0, FarmingItemKind.Radio);
 
         _healthComp.Changed += PushHealth;
+        // 재접속: 이번 게임의 내 표식을 방장에게 알린다 (방장은 명단과 비교해 다시 들어온 대원이면 HP를 되돌려 줌)
+        if (string.IsNullOrEmpty(Rejoin.Token)) Rejoin.NewToken();
+        RegisterRejoinRpc(new FixedString64Bytes(Rejoin.Token), new FixedString64Bytes(Truncate(auth, 60)));
         _pistol.Shot += OnLocalShot;
         _equipment.MeleeRequested += OnLocalMelee;
         if (!IsServer)
@@ -250,7 +253,33 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         if (IsOwner && IsSpawned) _health.Value = _healthComp.Current;
     }
 
-    void OnHealthChanged(float previous, float current) => _healthComp.ApplyNetworkHealth(current);
+    void OnHealthChanged(float previous, float current)
+    {
+        _healthComp.ApplyNetworkHealth(current);
+        if (IsServer) Rejoin.ServerTrackHealth(OwnerClientId, current);
+    }
+
+    // ------------------------------------------------------------------ 재접속
+    [Rpc(SendTo.Server)]
+    void RegisterRejoinRpc(FixedString64Bytes token, FixedString64Bytes authId)
+    {
+        Rejoin.ServerRegister(this, token.ToString(), authId.ToString());
+        if (!IsOwner) Rejoin.ServerTrackHealth(OwnerClientId, _health.Value);
+    }
+
+    /// <summary>방장 전용: 다시 들어온 대원에게 나가기 전 HP를 되돌려 준다 (0이면 죽은 상태 그대로 → 관전)</summary>
+    public void RestoreAfterRejoin(float health)
+    {
+        if (IsServer) RestoreRejoinRpc(health);
+    }
+
+    [Rpc(SendTo.Owner)]
+    void RestoreRejoinRpc(float health)
+    {
+        if (_healthComp == null) return;
+        FloorCarryOver.ArrivedDead = health <= 0f;
+        _healthComp.RestoreFromCarryOver(health <= 0f ? 0f : Mathf.Max(1f, health));
+    }
 
     [Rpc(SendTo.Owner)]
     void DamageRpc(float amount)

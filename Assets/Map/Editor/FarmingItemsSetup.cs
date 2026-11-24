@@ -1,4 +1,6 @@
-/* [ 코드 설명 ] 층마다 파밍 아이템(탄알집 5개, 주사기 3개)을 정해진 자리에 놓는 에디터 메뉴입니다.
+/* [ 코드 설명 ] 층마다 파밍 아이템(최대 탄알집 6개, 주사기 4개)을 정해진 자리에 놓는 에디터 메뉴입니다.
+   인원별 보정: 아이템마다 PlayerCountGate(몇 번째 아이템인지)를 붙여, 시작 인원이 모자라면 층에 들어올 때 뺀다 (1인 3·2, 2인 4·3, 3인 5·3, 4인 6·4 — GameBalance 표).
+   6번째 탄알집·4번째 주사기(4인 전용)는 기획 배치도에 없어서, 그 층 첫 주사기·첫 탄알집 자리 옆(약 0.8m)에 놓습니다.
    자리는 "VOID LAST 파밍 배치도"(claude.ai/artifact/TnoeG6sUjtQyMvCLz9BRxi)와 같은 표(Spots)이며, 높이는 놓을 때 아래로 광선을 쏴서
    그 자리의 상자·책상·바닥 윗면에 맞춥니다. 각 층 씬에 "Farming Items" 묶음을 (다시) 만들고, 그 밖에 씬에 놓여 있던 시험용 주사기는 지웁니다.
    메뉴 9(층 씬 다시 나누기)도 층마다 이것을 자동으로 실행합니다. 놓인 아이템은 NetworkPickupRegistry가 모든 대원 화면에서 맞춰 줍니다. */
@@ -77,7 +79,13 @@ namespace VoidLast.MapTools
             var root = new GameObject(RootName).transform;
             int placed = 0, ammoCount = 0, healCount = 0;
             var missing = new List<string>();
-            foreach (var s in Spots.Where(s => s.floor == floor))
+            var spots = Spots.Where(s => s.floor == floor).ToList();
+            // 4인 전용 추가 자리: 첫 주사기 옆에 탄알집, 첫 탄알집 옆에 주사기
+            var firstHeal = spots.FirstOrDefault(s => s.kind == 'H');
+            var firstAmmo = spots.FirstOrDefault(s => s.kind == 'A');
+            if (firstHeal.room != null) spots.Add((floor, 'A', firstHeal.room + " 추가", firstHeal.x + 0.8f, firstHeal.z + 0.4f));
+            if (firstAmmo.room != null) spots.Add((floor, 'H', firstAmmo.room + " 추가", firstAmmo.x + 0.8f, firstAmmo.z + 0.4f));
+            foreach (var s in spots)
             {
                 if (!Physics.Raycast(new Vector3(s.x, floorY + 2.6f, s.z), Vector3.down, out var hit, 3.4f, ~0, QueryTriggerInteraction.Ignore))
                 { missing.Add(s.room); continue; }
@@ -85,6 +93,9 @@ namespace VoidLast.MapTools
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(isAmmo ? ammo : syringe, root);
                 int n = isAmmo ? ++ammoCount : ++healCount;
                 go.name = (isAmmo ? "AmmoPack " : "Syringe ") + n + " (" + s.room + ")";
+                var gate = go.AddComponent<PlayerCountGate>();
+                gate.rule = isAmmo ? PlayerCountGate.Rule.AmmoPack : PlayerCountGate.Rule.Syringe;
+                gate.index = n;
                 // 같은 자리라도 조금씩 다른 방향 (자리 좌표로 정해서 다시 실행해도 같음)
                 float yaw = Mathf.Repeat(s.x * 37.1f + s.z * 53.7f, 360f);
                 go.transform.SetPositionAndRotation(hit.point, Quaternion.Euler(0f, yaw, 0f));

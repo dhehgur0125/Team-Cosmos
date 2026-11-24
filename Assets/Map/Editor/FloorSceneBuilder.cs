@@ -144,6 +144,10 @@ namespace VoidLast.MapTools
             if (floor == 4) log.Add(F4MissionSetup.BuildInOpenScene());
             // 6e) 파밍 아이템 (탄알집 5 · 주사기 3, 메뉴 6f와 같은 자리)
             log.Add(FarmingItemsSetup.BuildInOpenScene(floor));
+            // 6f) 인원별 몬스터 (5층 쪼꼬미, 1·2층 3~4인 추가 몬스터)
+            log.Add(BalanceMonstersSetup.BuildInOpenScene(floor));
+            // 6g) 계단실 맨 위 천장 판 (보기용, 뚫려 보이지 않게)
+            log.Add(StairCeilingSetup.BuildInOpenScene(floor));
 
             // 7) 고치 (그 층에서 걸어갈 수 있는 자리를 골라 저장)
             log.Add(CocoonSetup.BuildInOpenScene(floor));

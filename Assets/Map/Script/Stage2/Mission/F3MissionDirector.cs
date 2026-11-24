@@ -145,6 +145,9 @@ public sealed class F3MissionDirector : NetworkBehaviour, IFloorMission
     void Awake()
     {
         Instance = this;
+        // 밸런스 설정: 내려받기 시간 × 인원 배율, 소음 반경·간격 (GameBalance)
+        downloadSeconds *= GameBalance.HoldoutScale;
+        downloadNoiseRadius = GameBalance.Current.holdoutNoiseRadius;
         FloorMission.Register(this);
         RememberClosed(securityDoors);
         RememberClosed(bridgeDoors);
@@ -234,7 +237,7 @@ public sealed class F3MissionDirector : NetworkBehaviour, IFloorMission
                 if (guarded) _downloadAccum = Mathf.Min(1f, _downloadAccum + dt / downloadSeconds);
                 // 화면/네트워크용 값은 0.5% 단위로 끊어서 보낸다
                 s.downloadProgress = _downloadAccum >= 1f ? 1f : Mathf.Floor(_downloadAccum * 200f) / 200f;
-                if (Time.time >= _nextNoise) { _nextNoise = Time.time + downloadNoiseInterval; MissionNoise(routeDownload, downloadNoiseRadius); }
+                if (Time.time >= _nextNoise) { _nextNoise = Time.time + GameBalance.NextHoldoutNoise((1f - _downloadAccum) * downloadSeconds); MissionNoise(routeDownload, downloadNoiseRadius); }
                 if (_downloadAccum >= 1f) { s.download = 2; s.downloadPaused = false; }
             }
             if (s.sent) s.phase = (byte)Phase.Exit;
@@ -325,7 +328,7 @@ public sealed class F3MissionDirector : NetworkBehaviour, IFloorMission
             case MissionInteractable.Kind.RouteDownload:
                 if (!allOn || !s.statusChecked || s.download != 0) return;
                 s.download = 1; s.downloadProgress = 0f; s.downloadPaused = false; _downloadAccum = 0f;
-                _nextNoise = Time.time + downloadNoiseInterval;
+                _nextNoise = Time.time + GameBalance.NextHoldoutNoise(downloadSeconds);
                 MissionNoise(routeDownload, downloadNoiseRadius);
                 break;
             case MissionInteractable.Kind.HangarUplink:

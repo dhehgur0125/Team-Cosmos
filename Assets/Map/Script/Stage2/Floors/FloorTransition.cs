@@ -82,8 +82,16 @@ public sealed class FloorTransition : NetworkBehaviour
                 if (c.name.Contains("_Stairwell_") && !c.gameObject.activeSelf) c.gameObject.SetActive(true);
         BuildStairs();
         PlaceArrivalPoints();
+        PlayerCountGate.ApplyAll();   // 인원별 보정: 시작 인원이 모자라면 추가 아이템·몬스터를 뺀다 (아이템 번호 매기기 전)
         RestoreFarmingItems();
         BuildPrompt();
+        PlayLog.BeginFloor(floor);
+        // 5층 = 시작 층: 목표 안내, 게임을 막 시작했으면 경보·함내 방송(글자)·도움말
+        if (floor == 5)
+        {
+            var intro = new GameObject("Floor5 Intro").AddComponent<Floor5Intro>();
+            intro.Init(font, !FloorCarryOver.Pending);
+        }
         if (FloorCarryOver.Pending)
         {
             // 다른 층에서 온 경우: 도착 연출이 끝날 때까지 조작 금지, 화면은 검은 상태로 시작. 문은 연출에서 연다
@@ -92,6 +100,31 @@ public sealed class FloorTransition : NetworkBehaviour
             SetCutscene(true);
             ScreenFader.Set(1f);
         }
+    }
+
+    // ------------------------------------------------------------------ 깬 층 (게임 도중 들어온 대원도 같은 기준으로 내려갈 수 있게 방장 값을 받는다)
+    readonly NetworkVariable<byte> _clearedMask = new NetworkVariable<byte>();
+
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer)
+        {
+            byte mask = 0;
+            foreach (int f in FloorCarryOver.ClearedFloors) if (f >= 1 && f <= 7) mask |= (byte)(1 << f);
+            _clearedMask.Value = mask;
+        }
+        else
+        {
+            ApplyClearedMask(0, _clearedMask.Value);
+            _clearedMask.OnValueChanged += ApplyClearedMask;
+        }
+    }
+
+    public override void OnNetworkDespawn() { _clearedMask.OnValueChanged -= ApplyClearedMask; }
+
+    static void ApplyClearedMask(byte previous, byte mask)
+    {
+        for (int f = 1; f <= 7; f++) if ((mask & (1 << f)) != 0) FloorCarryOver.ClearedFloors.Add(f);
     }
 
     public override void OnDestroy()
@@ -343,6 +376,7 @@ public sealed class FloorTransition : NetworkBehaviour
         // 이 층을 기억: 내려가면 깬 층. 올라갈 때도 임무를 이미 깼으면 깬 층으로 기억
         var mission = FloorMission.Current;
         RememberFloor(!up || mission == null || mission.ExitUnlocked || FloorCarryOver.IsCleared(floor));
+        PlayLog.EndFloor(up ? "올라감" : "내려감");
         SetCutscene(true);
         SetPrompt("");
         int target = up ? floor + 1 : floor - 1;
@@ -379,8 +413,15 @@ public sealed class FloorTransition : NetworkBehaviour
     }
 
     // ------------------------------------------------------------------ 매 프레임
+    float _nextTrack;
+
     void Update()
     {
+        if (Time.unscaledTime >= _nextTrack)
+        {
+            _nextTrack = Time.unscaledTime + 1f;
+            PlayLog.Track(LocalPlayer(out _));   // 판 기록: 내 대원의 피해·사격·아이템 (같은 대원이면 아무것도 안 함)
+        }
         if (_arrivalPending) { ArrivalUpdate(); return; }
         ServerReadyTick();
         LocalStairInput();

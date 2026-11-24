@@ -18,15 +18,17 @@ public class LobbyChat : NetworkBehaviour
     /// 방장만 호출: 게임 시작을 모든 대원에게 바로 알린다.
     /// 네트워크 씬 불러오기는 방장이 씬을 다 불러온 뒤에야 참가자에게 신호를 보내므로, 그 사이 참가자 화면이 대기실에 멈춰 있지 않게 한다.
     /// </summary>
-    public void AnnounceGameStart(bool starting)
+    /// <param name="players">게임을 시작하는 인원 (인원별 밸런스 보정 기준, GameBalance.StartPlayers). 0이면 바꾸지 않음</param>
+    public void AnnounceGameStart(bool starting, int players = 0)
     {
         if (!IsSpawned || !IsServer) return;
-        GameStartRpc(starting);
+        GameStartRpc(starting, (byte)Mathf.Clamp(players, 0, 4));
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    void GameStartRpc(bool starting)
+    void GameStartRpc(bool starting, byte players)
     {
+        if (starting && players > 0) GameBalance.StartPlayers = players;
         GameStartChanged?.Invoke(starting);
     }
 

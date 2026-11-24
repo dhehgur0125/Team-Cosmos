@@ -8,7 +8,9 @@ using VoidLast.Player;
 ///  - 씬에 배치된 아이템: 모든 화면에서 같은 순서(위치 기준)로 번호를 매긴다. 아직 꺼져 있는 물건(임무가 진행되면 나타나는 물건)도 포함한다.
 ///  - 누가 주우면: 서버에 알려서 다른 대원 화면에서도 사라지게 한다. (같은 순간 두 명이 주우면 서버가 먼저 받은 쪽만 인정)
 ///  - Q로 내려놓거나 죽어서 떨어뜨리면: 다른 대원 화면에도 같은 자리에 같은 아이템을 만든다.
+///  - 게임 도중 들어온 대원(재접속): 방장이 지금 남아 있는 아이템 목록을 보내 줘서, 그새 주운 것은 지우고 떨어진 것은 만든다.
 /// 아이템 자체는 NetworkObject가 아니어서 기존 FpsWorldPickup/FpsItemInteractor 동작을 그대로 쓴다.
+/// 씬 아이템 번호는 위치·이름으로 정한다 (예전에 주워서 없어진 아이템이 화면마다 달라도 번호가 밀리지 않게). 떨어뜨린 아이템 번호는 10억 미만.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class NetworkPickupRegistry : NetworkBehaviour
@@ -27,12 +29,51 @@ public sealed class NetworkPickupRegistry : NetworkBehaviour
         RegisterScenePickups();
         FpsWorldPickup.Collected += OnCollected;
         FpsItemInteractor.Dropped += OnDropped;
+        if (IsServer && NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnSynchronizeComplete += OnLateJoin;
     }
 
     public override void OnNetworkDespawn()
     {
         FpsWorldPickup.Collected -= OnCollected;
         FpsItemInteractor.Dropped -= OnDropped;
+        if (NetworkManager != null && NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnSynchronizeComplete -= OnLateJoin;
+    }
+
+    const int SceneIdBase = 1000000000;
+
+    // ------------------------------------------------------------------ 게임 도중 들어온 대원
+    void OnLateJoin(ulong clientId)
+    {
+        if (!IsServer || clientId == NetworkManager.ServerClientId) return;
+        var scene = new List<int>();
+        var dropIds = new List<int>(); var dropKinds = new List<byte>(); var dropPos = new List<Vector3>();
+        foreach (var kv in _byId)
+        {
+            if (kv.Value == null) continue;
+            if (kv.Key >= SceneIdBase) scene.Add(kv.Key);
+            else if (kv.Value.gameObject.activeInHierarchy && !kv.Value.IsClaimed)
+            {
+                dropIds.Add(kv.Key); dropKinds.Add((byte)kv.Value.Item); dropPos.Add(kv.Value.transform.position);
+            }
+        }
+        LateJoinRpc(scene.ToArray(), dropIds.ToArray(), dropKinds.ToArray(), dropPos.ToArray(), RpcTarget.Single(clientId, RpcTargetUse.Temp));
+        Debug.Log($"[Pickup] 게임 도중 들어온 Client {clientId}에게 아이템 상태 전송 (씬 {scene.Count}, 떨어진 것 {dropIds.Count})");
+    }
+
+    [Rpc(SendTo.SpecifiedInParams)]
+    void LateJoinRpc(int[] sceneAlive, int[] dropIds, byte[] dropKinds, Vector3[] dropPositions, RpcParams rpcParams = default)
+    {
+        var alive = new HashSet<int>(sceneAlive);
+        var remove = new List<int>();
+        foreach (var kv in _byId) if (kv.Key >= SceneIdBase && !alive.Contains(kv.Key)) remove.Add(kv.Key);
+        foreach (int id in remove)
+        {
+            var pickup = _byId[id];
+            _byId.Remove(id);
+            if (pickup != null) { _ids.Remove(pickup); pickup.RemoveByNetwork(); }
+        }
+        for (int i = 0; i < dropIds.Length && i < dropKinds.Length && i < dropPositions.Length; i++)
+            SpawnDrop(dropIds[i], (FarmingItemKind)dropKinds[i], dropPositions[i], Quaternion.identity, Vector3.zero);
     }
 
     void RegisterScenePickups()
@@ -46,7 +87,24 @@ public sealed class NetworkPickupRegistry : NetworkBehaviour
             int c = Key(a.transform.position).CompareTo(Key(b.transform.position));
             return c != 0 ? c : string.CompareOrdinal(a.name, b.name);
         });
-        for (int i = 0; i < list.Count; i++) Register(i + 1, list[i]);
+        // 번호 = 위치·이름으로 만든 값 (모든 화면에서 같음). 겹치면 정렬 순서대로 다음 빈 번호
+        foreach (var p in list)
+        {
+            int id = SceneIdBase + (int)(Hash(Key(p.transform.position), p.name) % 1000000000u);
+            while (_byId.ContainsKey(id)) id = id >= 2000000000 ? SceneIdBase : id + 1;
+            Register(id, p);
+        }
+    }
+
+    static uint Hash(long key, string name)
+    {
+        unchecked
+        {
+            uint h = 2166136261;
+            for (int i = 0; i < 8; i++) { h ^= (byte)(key >> (i * 8)); h *= 16777619; }
+            foreach (char c in name ?? "") { h ^= c; h *= 16777619; }
+            return h;
+        }
     }
 
     static long Key(Vector3 p)

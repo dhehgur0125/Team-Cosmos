@@ -147,6 +147,8 @@ public sealed class GameOverScreen : MonoBehaviour
         _status.text = "";
         SetStep(Step.FadingIn);
         Debug.Log(_escape ? "[GameOver] 탈출 성공" : "[GameOver] 모든 대원이 사망 → 게임 오버");
+        PlayLog.EndFloor(_escape ? "탈출" : "전멸");
+        PlayLog.NewGame();
     }
 
     void MoveToLobby()

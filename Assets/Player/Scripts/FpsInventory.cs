@@ -173,13 +173,14 @@ namespace VoidLast.Player
             if (items[completedIndex] == FarmingItemKind.AmmoPack)
             {
                 pistol.AddReserve(ammoPackRounds);
+                PlayLog.ItemUsed(this, FarmingItemKind.AmmoPack);
                 items[completedIndex] = FarmingItemKind.None;
                 recipient = null;
                 Changed?.Invoke(); ShowHotbar();
                 return;
             }
             // A different healing source may fill HP during use; in that case keep the syringe.
-            if (recipient.Heal(recipient.Maximum * syringeHealFraction)) items[completedIndex] = FarmingItemKind.None;
+            if (recipient.Heal(recipient.Maximum * syringeHealFraction)) { items[completedIndex] = FarmingItemKind.None; PlayLog.ItemUsed(this, FarmingItemKind.Syringe); }
             recipient = null;
             Changed?.Invoke(); ShowHotbar();
         }

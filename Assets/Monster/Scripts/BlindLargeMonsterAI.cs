@@ -61,6 +61,8 @@ namespace VoidLast.Monster
         public Mode State { get; private set; }
         /// <summary>멀티플레이: 방장(서버)이 아닌 화면의 복제본이면 AI를 돌리지 않고 서버가 보낸 상태로 연출만 한다.</summary>
         public bool NetworkProxy { get; set; }
+        /// <summary>밸런스 설정(GameBalance) 값 적용</summary>
+        public void ApplyBalance(float investigate, float strikeDamage) { investigateSpeed = investigate; damage = strikeDamage; }
         /// <summary>복제본 전용: 서버 AI의 상태를 받는다.</summary>
         public void ApplyNetworkState(int mode)
         {
@@ -258,7 +260,7 @@ namespace VoidLast.Monster
                 if (Vector3.Distance(chest, closest) > strikeReach) continue;
                 if (flat.sqrMagnitude > 0.04f && Vector3.Angle(transform.forward, flat) > strikeAngle * 0.5f) continue;
                 if (!ClearTouch(chest, closest, player.transform)) continue;
-                player.TakeDamage(damage);
+                player.TakeDamage(damage); PlayLog.MonsterHit(gameObject, damage);
                 StrikesLanded++;
             }
         }

@@ -117,6 +117,10 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
     void Awake()
     {
         Instance = this;
+        // 밸런스 설정: 발전기 시간 × 인원 배율, 소음 반경·간격, 스위치 시간 제한 (GameBalance)
+        generatorSeconds *= GameBalance.HoldoutScale;
+        noiseRadius = GameBalance.Current.holdoutNoiseRadius;
+        switchWindow = GameBalance.SyncWindow;
         FloorMission.Register(this);
         _clankClip = F2MissionDirector.MakeClank();
         _alarmClip = F2MissionDirector.MakeAlarm();
@@ -202,7 +206,7 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
                 if (!_brokeOnce && _genAccum >= _breakAt) { _brokeOnce = true; s.genBroken = true; }
                 if (guarded && !s.genBroken) _genAccum = Mathf.Min(1f, _genAccum + dt / generatorSeconds);
                 s.genProgress = _genAccum >= 1f ? 1f : Mathf.Floor(_genAccum * 200f) / 200f;   // 화면/네트워크용 값은 0.5% 단위
-                if (Time.time >= _nextNoise) { _nextNoise = Time.time + noiseInterval; MissionNoise(generator); }
+                if (Time.time >= _nextNoise) { _nextNoise = Time.time + GameBalance.NextHoldoutNoise((1f - _genAccum) * generatorSeconds); MissionNoise(generator); }
                 if (_genAccum >= 1f) { s.generator = 2; s.genPaused = false; }
             }
 
@@ -303,7 +307,7 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
                 if (s.generator != 0 || !Fueled(s)) return;
                 s.generator = 1; s.genProgress = 0f; s.genPaused = false; s.genBroken = false; _genAccum = 0f; _brokeOnce = false;
                 _breakAt = UnityEngine.Random.Range(breakRange.x, breakRange.y);
-                _nextNoise = Time.time + noiseInterval;
+                _nextNoise = Time.time + GameBalance.NextHoldoutNoise(generatorSeconds);
                 MissionNoise(generator);
                 break;
             case MissionInteractable.Kind.PowerSwitch:

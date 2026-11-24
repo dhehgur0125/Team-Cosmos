@@ -66,8 +66,10 @@ public sealed class Stage2NetworkBootstrap : MonoBehaviour
     void OnClientDisconnect(ulong clientId)
     {
         var nm = NetworkManager.Singleton;
-        if (nm == null || nm.IsServer) return;
-        if (clientId == nm.LocalClientId || clientId == NetworkManager.ServerClientId) _ = ReturnToLobbyAsync("방장과의 연결이 끊어졌어요.");
+        if (nm == null) return;
+        if (nm.IsServer) { Rejoin.ServerClientLeft(clientId); return; }   // 방장: 나간 대원을 기억해 다시 들어올 수 있게
+        if (clientId == nm.LocalClientId || clientId == NetworkManager.ServerClientId)
+            _ = ReturnToLobbyAsync(!string.IsNullOrEmpty(nm.DisconnectReason) ? nm.DisconnectReason : "방장과의 연결이 끊어졌어요.");
     }
 
     void OnServerStopped(bool wasHost) { }

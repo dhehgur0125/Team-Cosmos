@@ -44,7 +44,7 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
         {
             _health.Value = _hp != null ? _hp.Current : 0;
             if (_small != null) _small.Screamed += OnServerScream;
-            if (_hp != null) _hp.HitConfirmed += OnServerHit;
+            if (_hp != null) { _hp.HitConfirmed += OnServerHit; _hp.WakingSoon += OnServerWakingSoon; }
             return;
         }
 
@@ -61,7 +61,7 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         if (_small != null) _small.Screamed -= OnServerScream;
-        if (_hp != null) _hp.HitConfirmed -= OnServerHit;
+        if (_hp != null) { _hp.HitConfirmed -= OnServerHit; _hp.WakingSoon -= OnServerWakingSoon; }
         _health.OnValueChanged -= OnHealth;
         _mode.OnValueChanged -= OnMode;
         if (_hp != null) _hp.NetworkHitRedirect = null;
@@ -135,6 +135,15 @@ public sealed class MonsterNetworkSync : NetworkBehaviour
     void BloodHitRpc(Vector3 point, Vector3 outward)
     {
         GetComponent<MonsterHitFeedback>()?.PlayBlood(point, outward);
+    }
+
+    // ------------------------------------------------------------------ 곧 일어남 (꿈틀거림·소리)
+    void OnServerWakingSoon() => WakingSoonRpc();
+
+    [Rpc(SendTo.NotServer)]
+    void WakingSoonRpc()
+    {
+        if (_hp != null) _hp.RaiseWakingSoon();
     }
 
     // ------------------------------------------------------------------ 비명 소리

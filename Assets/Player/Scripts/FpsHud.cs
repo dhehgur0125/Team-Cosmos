@@ -29,7 +29,7 @@ namespace VoidLast.Player
         /// <summary>핫바 위치 (관전 중인 대원 이름을 그 위에 표시할 때 사용)</summary>
         public RectTransform HotbarRect => hotbar != null ? (RectTransform)hotbar.transform : null;
         public string HealthText => healthLabel.text;
-        void Awake() { health = GetComponent<FpsHealth>(); inventory = GetComponent<FpsInventory>(); interactor = GetComponent<FpsItemInteractor>(); equipment = GetComponent<FpsEquipment>(); pistol = GetComponent<FpsPistol>(); }
+        void Awake() { if (healthFill != null && GetComponent<FpsStaminaHud>() == null) gameObject.AddComponent<FpsStaminaHud>().Init(healthFill.rectTransform, healthBarWidth); health = GetComponent<FpsHealth>(); inventory = GetComponent<FpsInventory>(); interactor = GetComponent<FpsItemInteractor>(); equipment = GetComponent<FpsEquipment>(); pistol = GetComponent<FpsPistol>(); }
         void OnEnable()
         {
             health.Changed += Refresh; inventory.Changed += Refresh; inventory.Activity += ShowHotbar;
