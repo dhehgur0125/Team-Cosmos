@@ -49,7 +49,11 @@ public sealed class CocoonSystem : NetworkBehaviour
     [Header("모습")]
     [Tooltip("대원 크기의 1.2배")]
     public Vector3 size = new Vector3(0.72f, 2.22f, 0.72f);
+    [Tooltip("알 모습의 가로 폭 (m). 대원이 들어 있는 느낌이 나도록 대원보다 넉넉하게. 높이는 size.y")]
+    [Min(0.5f)] public float eggWidth = 1.7f;
     public Material material;
+    [Tooltip("고치 모습 (Lil Pupinduy/Spider minion/SpiderEgg). 비어 있으면 Cube로 보인다")]
+    public GameObject cocoonPrefab;
     public TMP_FontAsset font;
 
     public static CocoonSystem Instance { get; private set; }
@@ -204,10 +208,29 @@ public sealed class CocoonSystem : NetworkBehaviour
         foreach (var pair in _cubes) if (!current.Contains(pair.Key)) gone.Add(pair.Key);
         foreach (var id in gone)
         {
-            if (_cubes[id] != null) Destroy(_cubes[id].gameObject);
+            var cube = _cubes[id];
+            // 구출(대원이 아직 게임에 있음)이면 알이 터지는 연출 뒤 사라지고, 대원이 나갔으면 바로 없앤다
+            if (cube != null)
+            {
+                if (FindPlayer(id) != null) Burst(cube);
+                else Destroy(cube.gameObject);
+            }
             _cubes.Remove(id);
             _seen.Remove(id);
         }
+    }
+
+    /// <summary>고치가 터진다: 더 맞거나 스캔되지 않게 판정을 먼저 떼고, 알이 열리는 연출이 끝나면 없앤다</summary>
+    void Burst(CocoonTarget cube)
+    {
+        var go = cube.gameObject;
+        var egg = go.GetComponentInChildren<CocoonEggIdle>();
+        if (egg == null) { Destroy(go); return; }   // 알 에셋이 없으면(예전 Cube) 바로 없앤다
+        foreach (var c in go.GetComponents<Collider>()) Destroy(c);
+        var detectable = go.GetComponent<DetectableItem>();
+        if (detectable != null) Destroy(detectable);
+        Destroy(cube);
+        egg.Burst(go);
     }
 
     CocoonTarget BuildCube(Entry entry)
@@ -220,6 +243,25 @@ public sealed class CocoonSystem : NetworkBehaviour
         go.transform.localScale = size;
         var renderer = go.GetComponent<MeshRenderer>();
         if (material != null) renderer.sharedMaterial = material;
+        if (cocoonPrefab != null)
+        {
+            // Cube는 맞히는 판정(콜라이더)으로만 쓰고, 보이는 모습은 알 에셋으로 바꾼다
+            Destroy(renderer);   // 꺼 두기만 하면 스캔 발광(DetectableItem)이 상자 모양으로 그려진다
+            Destroy(go.GetComponent<MeshFilter>());
+            var visual = Instantiate(cocoonPrefab, go.transform, false);
+            visual.name = "Visual";
+            // 알 모델은 대략 폭 1.3m·높이 1.1m, 바닥이 원점 → 고치 상자(부모 크기)에 맞춰 세로로 길쭉하게
+            visual.transform.localPosition = new Vector3(0f, -0.5f, 0f);
+            visual.transform.localRotation = Quaternion.identity;
+            // 부모(상자)는 size 크기라서, 가로는 eggWidth가 되도록 나눠 준다 (알 모델 폭 약 1.3m)
+            float widthScale = eggWidth / (1.3f * Mathf.Max(0.01f, size.x));
+            visual.transform.localScale = new Vector3(widthScale, 1f / 1.1f, widthScale);
+            // 맞히는 판정도 넓어진 알에 맞춘다 (가장자리는 둥글어서 폭의 75%)
+            var box = go.GetComponent<BoxCollider>();
+            if (box != null) box.size = new Vector3(eggWidth * 0.75f / Mathf.Max(0.01f, size.x), 1f, eggWidth * 0.75f / Mathf.Max(0.01f, size.z));
+            foreach (var c in visual.GetComponentsInChildren<Collider>(true)) Destroy(c);
+            visual.AddComponent<CocoonEggIdle>();   // 에셋 애니메이션은 몇 초 뒤 알이 터지므로 닫힌 알로 유지
+        }
         var target = go.AddComponent<CocoonTarget>();
         target.System = this;
         target.PlayerId = entry.playerId;
@@ -233,12 +275,16 @@ public sealed class CocoonSystem : NetworkBehaviour
     /// <summary>맞을수록 밝아진다</summary>
     void Paint(CocoonTarget cube)
     {
-        var renderer = cube.GetComponent<MeshRenderer>();
         if (_block == null) _block = new MaterialPropertyBlock();
-        renderer.GetPropertyBlock(_block);
         float t = shotsToRescue > 0 ? (float)cube.Hits / shotsToRescue : 0f;
-        _block.SetColor(EmissionId, Color.Lerp(new Color(0.25f, 0.02f, 0.02f), new Color(2.2f, 0.45f, 0.1f), t));
-        renderer.SetPropertyBlock(_block);
+        var color = Color.Lerp(new Color(0.25f, 0.02f, 0.02f), new Color(2.2f, 0.45f, 0.1f), t);
+        foreach (var renderer in cube.GetComponentsInChildren<Renderer>())
+        {
+            if (renderer is ParticleSystemRenderer) continue;
+            renderer.GetPropertyBlock(_block);
+            _block.SetColor(EmissionId, color);
+            renderer.SetPropertyBlock(_block);
+        }
     }
 
     void Announce(Entry entry)

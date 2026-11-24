@@ -54,6 +54,7 @@ namespace VoidLast.MapTools
             go.AddComponent<NetworkObject>();
             var system = go.AddComponent<CocoonSystem>();
             system.font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MultiplayerSetup.FontAssetPath);
+            system.cocoonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Lil Pupinduy/Character/Spider minion/Prefabs/SpiderEgg_V1.prefab");
             system.material = F2MissionItemAssets.Mat("M_Cocoon", new Color(0.32f, 0.08f, 0.07f), 0f, 0.65f, new Color(0.25f, 0.02f, 0.02f));
 
             var player = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);

@@ -76,6 +76,10 @@ namespace VoidLast.Player
             LeftTarget = RightTarget + aimRotation * supportHandOffset;
             rightGoal = aimRotation * (pistol ? pistolRightRotation : syringeRightRotation);
             leftGoal = aimRotation * pistolLeftRotation;
+            // 옆·뒤로 걸으면 걷기 동작이 허리를 진행 방향으로 돌린다. 손은 앞을 향한 총에 고정되어 있어 팔이 몸통을 뚫으므로
+            // 총을 든 동안에는 상체(척추)를 바라보는 방향으로 되돌린다. LookAt은 손 IK보다 먼저 풀린다.
+            animator.SetLookAtWeight(leftWeight, 1f, 0.7f, 0f, 0.2f);
+            animator.SetLookAtPosition(chest.position + aimRotation * Vector3.forward * 10f);
             Hand(AvatarIKGoal.RightHand, RightTarget, rightGoal * rightIkOffset, rightWeight);
             Hand(AvatarIKGoal.LeftHand, LeftTarget, leftGoal * leftIkOffset, leftWeight);
             Hint(AvatarIKHint.RightElbow, chest.position + facing * new Vector3(0.4f, -0.25f, 0.05f), rightWeight);

@@ -25,6 +25,7 @@ namespace VoidLast.Player
             firstPersonRenderers = Concat(firstPersonRenderers, firstPerson);
             PreparePerCameraMeshes(worldRenderers);
             PreparePerCameraMeshes(firstPersonRenderers);
+            DisableFirstPersonShadows();
             worldPrevious = new bool[worldRenderers.Length];
             firstPersonPrevious = new bool[firstPersonRenderers.Length];
         }
@@ -52,6 +53,14 @@ namespace VoidLast.Player
                 renderer.SetPropertyBlock(perCameraProperties);
             }
         }
+        // 1인칭 총·장갑은 카메라 앞에 따로 띄운 모델이라 실제 몸 위치가 아니다. 총 끝에 달린 손전등 앞에서 그림자를 만들면
+        // 벽·바닥·다른 대원 위에 엉뚱한 크기의 그림자가 찍히므로 그림자를 끈다 (일반 FPS와 같은 방식).
+        void DisableFirstPersonShadows()
+        {
+            if (firstPersonRenderers == null) return;
+            foreach (var renderer in firstPersonRenderers)
+                if (renderer != null) renderer.shadowCastingMode = ShadowCastingMode.Off;
+        }
         void OnEnable()
         {
             if (autoCollect) Collect();
@@ -59,6 +68,7 @@ namespace VoidLast.Player
             firstPersonRenderers = Concat(firstPersonRenderers, null);
             PreparePerCameraMeshes(worldRenderers);
             PreparePerCameraMeshes(firstPersonRenderers);
+            DisableFirstPersonShadows();
             worldPrevious = new bool[worldRenderers == null ? 0 : worldRenderers.Length];
             firstPersonPrevious = new bool[firstPersonRenderers == null ? 0 : firstPersonRenderers.Length];
             RenderPipelineManager.beginCameraRendering += BeginSrp;

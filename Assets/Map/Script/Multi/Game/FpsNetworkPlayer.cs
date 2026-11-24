@@ -70,6 +70,8 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     readonly NetworkVariable<FixedString64Bytes> _authId = new NetworkVariable<FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     /// <summary>대기실에서 고른 고유 아이템 (UniqueItemKind 번호). 다른 대원 화면에서도 3번 칸에 같은 아이템이 보이도록</summary>
     readonly NetworkVariable<byte> _uniqueItem = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    /// <summary>로비 칸 번호 (0 = 1P). 우주복 색을 정한다 (PlayerSuitColor)</summary>
+    readonly NetworkVariable<byte> _suitSlot = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
     public static FpsNetworkPlayer Local { get; private set; }
     public static readonly List<FpsNetworkPlayer> All = new List<FpsNetworkPlayer>();
@@ -134,6 +136,7 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         GunNoise.Emitted -= OnLocalGunNoise;
         _health.OnValueChanged -= OnHealthChanged;
         _uniqueItem.OnValueChanged -= OnUniqueItemChanged;
+        _suitSlot.OnValueChanged -= OnSuitSlotChanged;
     }
 
     void SetupOwner()
@@ -148,6 +151,11 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         catch (Exception) { }
         _authId.Value = new FixedString64Bytes(Truncate(auth, 60));
         _health.Value = _healthComp.Current;
+
+        // 우주복 색: 로비에서 내 칸 번호 (로비를 거치지 않은 테스트면 접속 번호로)
+        int suit = PlayerSuitColor.LocalSlot >= 0 ? PlayerSuitColor.LocalSlot : (int)(OwnerClientId % PlayerSuitColor.SlotCount);
+        _suitSlot.Value = (byte)suit;
+        PlayerSuitColor.Apply(gameObject, suit);
 
         // 고유 아이템: 대기실에서 고른 것을 3번 칸에 넣고 다른 대원에게 알린다
         var unique = UniqueItems.LocalChoice;
@@ -185,10 +193,13 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _healthComp.ApplyNetworkHealth(_health.Value);
         _uniqueItem.OnValueChanged += OnUniqueItemChanged;
         _unique.Assign((UniqueItemKind)_uniqueItem.Value);
+        _suitSlot.OnValueChanged += OnSuitSlotChanged;
+        PlayerSuitColor.Apply(gameObject, _suitSlot.Value);
         ApplyState(_state.Value);
     }
 
     void OnUniqueItemChanged(byte previous, byte current) => _unique.Assign((UniqueItemKind)current);
+    void OnSuitSlotChanged(byte previous, byte current) => PlayerSuitColor.Apply(gameObject, current);
 
     static string Truncate(string s, int max) => string.IsNullOrEmpty(s) ? "" : s.Length > max ? s.Substring(0, max) : s;
 

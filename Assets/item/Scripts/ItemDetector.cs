@@ -112,15 +112,82 @@ public class ItemDetector : MonoBehaviour
             }
             if (Time.time < marker.startsAt) continue;
             Vector3 point = markerCamera.WorldToViewportPoint(pickup.transform.position);
-            // Markers appear when looking toward an objective, including through walls.
-            if (point.z <= 0f) continue;
             string label = FarmingItems.HudLabel(pickup.Item) + "\n" +
                 Mathf.RoundToInt(Vector3.Distance(transform.position, pickup.transform.position)) + " m";
+            // 화면 밖·뒤에 있으면 화면 가장자리에 그 방(목표)이 있는 쪽을 가리키는 화살표를 띄운다
+            if (point.z <= 0f || point.x < 0f || point.x > 1f || point.y < 0f || point.y > 1f)
+            {
+                DrawEdgeArrow(point, label);
+                continue;
+            }
             float width = 220f, height = markerStyle.fontSize * 2f + 16f;
             float x = Mathf.Clamp(point.x * Screen.width - width * 0.5f, 8f, Mathf.Max(8f, Screen.width - width - 8f));
             float y = Mathf.Clamp((1f - point.y) * Screen.height - height - 12f, 8f, Mathf.Max(8f, Screen.height - height - 8f));
             GUI.Label(new Rect(x, y, width, height), label, markerStyle);
         }
+    }
+
+    /// <summary>화면 밖 목표: 화면 가운데에서 목표 쪽으로 향하는 가장자리 위치에 화살표 + 이름·거리</summary>
+    private void DrawEdgeArrow(Vector3 viewport, string label)
+    {
+        Vector2 dir = new Vector2(viewport.x - 0.5f, viewport.y - 0.5f);
+        if (viewport.z <= 0f) dir = -dir;   // 카메라 뒤쪽이면 투영이 뒤집힌다
+        dir.x *= Screen.width; dir.y *= Screen.height;
+        if (dir.sqrMagnitude < 0.0001f) dir = Vector2.down;   // 바로 뒤
+        dir.Normalize();
+        Vector2 guiDir = new Vector2(dir.x, -dir.y);   // GUI 좌표는 y가 아래로
+        float margin = 70f;
+        Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        float sx = Mathf.Abs(guiDir.x) > 0.0001f ? (center.x - margin) / Mathf.Abs(guiDir.x) : float.MaxValue;
+        float sy = Mathf.Abs(guiDir.y) > 0.0001f ? (center.y - margin) / Mathf.Abs(guiDir.y) : float.MaxValue;
+        Vector2 pos = center + guiDir * Mathf.Min(sx, sy);
+
+        float arrowSize = Mathf.Clamp(Screen.height / 14f, 40f, 90f);
+
+        // 이름·거리는 화살표 안쪽(화면 가운데 쪽)에, 화살표와 겹치지 않게 축마다 따로 밀어 넣는다
+        float width = 220f, height = markerStyle.fontSize * 2f + 16f;
+        Vector2 labelCenter = pos - new Vector2(guiDir.x * (width * 0.5f + arrowSize * 0.6f), guiDir.y * (height * 0.5f + arrowSize * 0.6f));
+        float x = Mathf.Clamp(labelCenter.x - width * 0.5f, 8f, Mathf.Max(8f, Screen.width - width - 8f));
+        float y = Mathf.Clamp(labelCenter.y - height * 0.5f, 8f, Mathf.Max(8f, Screen.height - height - 8f));
+        GUI.Label(new Rect(x, y, width, height), label, markerStyle);
+
+        // 화살표: 방향(10° 단위)마다 삼각형 텍스처를 만들어 두고 그린다 (폰트·GUI 회전에 의존하지 않음)
+        int bucket = Mathf.RoundToInt(Mathf.Repeat(Mathf.Atan2(guiDir.y, guiDir.x) * Mathf.Rad2Deg, 360f) / 10f) % 36;
+        if (arrowTextures[bucket] == null) arrowTextures[bucket] = BuildArrowTexture(bucket * 10f);
+        Color savedColor = GUI.color;
+        GUI.color = new Color(0.35f, 1f, 1f, 0.95f);
+        GUI.DrawTexture(new Rect(pos.x - arrowSize * 0.5f, pos.y - arrowSize * 0.5f, arrowSize, arrowSize), arrowTextures[bucket]);
+        GUI.color = savedColor;
+    }
+
+    private readonly Texture2D[] arrowTextures = new Texture2D[36];
+
+    /// <summary>GUI 좌표(y 아래쪽)에서 angleDeg 방향을 가리키는 흰 삼각형 (가장자리 부드럽게)</summary>
+    private static Texture2D BuildArrowTexture(float angleDeg)
+    {
+        const int size = 64;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "ScanArrow (runtime)", hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+        var pixels = new Color32[size * size];
+        float rad = angleDeg * Mathf.Deg2Rad;
+        Vector2 forward = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));   // 꼭짓점 방향
+        Vector2 side = new Vector2(-forward.y, forward.x);
+        for (int py = 0; py < size; py++)
+        {
+            // 텍스처의 맨 위 줄(py = size-1)이 화면 위에 그려진다 → GUI 좌표 y = 아래로
+            float gy = 0.5f - (py + 0.5f) / size;
+            for (int px = 0; px < size; px++)
+            {
+                Vector2 p = new Vector2((px + 0.5f) / size - 0.5f, gy);
+                float along = Vector2.Dot(p, forward), across = Mathf.Abs(Vector2.Dot(p, side));
+                float halfWidth = (0.44f - along) * 0.6f;
+                float edge = Mathf.Min(halfWidth - across, along + 0.34f, 0.44f - along);
+                byte alpha = (byte)(Mathf.Clamp01(edge * size * 0.75f) * 255f);
+                pixels[py * size + px] = new Color32(255, 255, 255, alpha);
+            }
+        }
+        tex.SetPixels32(pixels);
+        tex.Apply();
+        return tex;
     }
 
     private sealed class Wave
@@ -175,6 +242,12 @@ private void Awake()
         foreach (Wave wave in waves) DestroyWaveMaterial(wave);
         waves.Clear();
         missionMarkers.Clear();
+    }
+
+    private void OnDestroy()
+    {
+        for (int i = 0; i < arrowTextures.Length; i++)
+            if (arrowTextures[i] != null) { Destroy(arrowTextures[i]); arrowTextures[i] = null; }
     }
 
 private void Update()

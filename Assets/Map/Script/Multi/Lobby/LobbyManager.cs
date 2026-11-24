@@ -308,6 +308,7 @@ public class LobbyManager : MonoBehaviour
     Dictionary<string, PlayerProperty> MyPlayerProperties(bool ready)
     {
         UniqueItems.LocalChoice = UniqueItemKind.None;
+        PlayerSuitColor.LocalSlot = -1;
         return new Dictionary<string, PlayerProperty>
         {
             { KeyName, new PlayerProperty(Nickname, VisibilityPropertyOptions.Member) },
@@ -629,6 +630,7 @@ public class LobbyManager : MonoBehaviour
                 var p = players[i];
                 bool isHost = p.Id == _session.Host;
                 bool isMe = p.Id == myId;
+                if (isMe) PlayerSuitColor.LocalSlot = i;   // 1~4P 칸 번호 = 게임 속 우주복 색
                 string pid = p.Id;
                 _knownNames[p.Id] = PlayerName(p);
                 slots[i].SetPlayer(PlayerName(p), isHost, isHost || PlayerReady(p), isMe,
