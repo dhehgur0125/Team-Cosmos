@@ -156,6 +156,12 @@ public sealed class VoiceChatService : MonoBehaviour
         catch (Exception) { return false; }
     }
 
+    bool InAnyChannel()
+    {
+        try { return IsLoggedIn && VivoxService.Instance.ActiveChannels.Count > 0; }
+        catch (Exception) { return false; }
+    }
+
     public async Task JoinGroupAsync(string channel)
     {
         if (_wanted.Contains(channel)) return;
@@ -263,17 +269,19 @@ public sealed class VoiceChatService : MonoBehaviour
     }
 
     /// <summary>
-    /// 내 대원이 죽었을 때: 근거리·무전 채널에서 나가고(살아있는 대원에게 들리지 않음) 사망자 채널에만 말하고 듣는다.
+    /// 내 대원이 죽었을 때: 사망자 채널에만 말한다(살아있는 대원에게는 들리지 않음).
+    /// 근거리 채널에는 듣기만 하려고 남는다 → 관전 중인 대원 자리에서 그 대원의 목소리를 듣는다 (InGameVoiceChat이 듣는 위치를 옮김).
+    /// 무전 채널에서는 나간다.
     /// </summary>
-    public async Task EnterDeadAsync()
+    public async Task EnterDeadAsync(Channel3DProperties props)
     {
-        SetTransmission(TransmissionMode.Single, DeadChannel);
-        await LeaveAsync(NearChannel);
+        SetTransmission(TransmissionMode.Single, DeadChannel);   // 사망자 채널에 들어가기 전까지는 아무 데도 말하지 않음 (ReapplyTransmission)
         await LeaveAsync(RadioChannel);
         await JoinGroupAsync(DeadChannel);
+        await JoinPositionalAsync(NearChannel, props);   // 이미 들어가 있으면 그대로 (듣기 전용)
     }
 
-    /// <summary>고치에서 구출됐을 때: 사망자 채널에서 나와 근거리 채널로 돌아간다.</summary>
+    /// <summary>고치에서 구출됐을 때: 사망자 채널에서 나와 근거리 채널에 다시 말한다.</summary>
     public async Task LeaveDeadAsync(Channel3DProperties props)
     {
         SetTransmission(TransmissionMode.Single, NearChannel);
@@ -303,7 +311,14 @@ public sealed class VoiceChatService : MonoBehaviour
                 _txDirty = false;
                 if (!IsLoggedIn) break;
                 var mode = _txMode; var ch = _txChannel;
-                if (mode == TransmissionMode.Single && (string.IsNullOrEmpty(ch) || !IsInChannel(ch))) break;
+                if (mode == TransmissionMode.Single && (string.IsNullOrEmpty(ch) || !IsInChannel(ch)))
+                {
+                    // 말할 채널에 아직 못 들어갔으면 그동안은 아무 데도 말하지 않는다
+                    // (예: 죽은 직후 사망자 채널에 들어가기 전에 근거리 채널로 목소리가 새는 것 방지)
+                    // 채널에 들어가는 순간 Vivox가 송신 대상을 바꿀 수 있어서, 들어가 있는 채널이 있으면 매번 다시 끈다
+                    if (!InAnyChannel()) break;
+                    mode = TransmissionMode.None; ch = null;
+                }
                 try
                 {
                     await VivoxService.Instance.SetChannelTransmissionModeAsync(mode, mode == TransmissionMode.Single ? ch : null);

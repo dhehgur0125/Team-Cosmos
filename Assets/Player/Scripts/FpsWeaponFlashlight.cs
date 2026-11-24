@@ -1,4 +1,4 @@
-/* [ 코드 설명 ] 권총 총열 아래에 단 손전등입니다. E로 켜고 끄며, 권총을 들고 있을 때만 빛이 나갑니다(다른 장비로 바꾸면 꺼졌다가 다시 들면 켜짐).
+/* [ 코드 설명 ] 권총 총열 아래에 단 손전등입니다. 권총을 들고 있을 때만 E로 켜고 끌 수 있고, 권총을 들고 있을 때만 빛이 나갑니다(다른 장비로 바꾸면 꺼졌다가 다시 들면 켜짐).
    빛은 1인칭 총에 붙은 스포트라이트(원형 쿠키 텍스처)로 화면 가운데에 또렷한 원을 만들고, 켜져 있는 동안 내 화면 가장자리를 어둡게 해서 시야를 좁힙니다.
    멀티플레이에서는 켜짐 상태만 받아 다른 대원의 손전등도 보이게 하며, 다른 대원 손전등은 그림자를 계산하지 않습니다. */
 using System;
@@ -89,9 +89,10 @@ namespace VoidLast.Player
 
         void Update()
         {
-            if (!IsNetworkProxy && input != null && input.isActiveAndEnabled && input.Flashlight && (motor == null || !motor.IsDead)) Toggle();
-
             bool pistol = equipment != null && equipment.SelectedSlot == FpsEquipment.EquipmentSlot.Pistol;
+            // E는 권총을 들고 있을 때만 켜고 끈다 (다른 것을 들었거나 맨손이면 무시)
+            if (!IsNetworkProxy && pistol && input != null && input.isActiveAndEnabled && input.Flashlight && (motor == null || !motor.IsDead)) Toggle();
+
             lit = On && pistol && (motor == null || !motor.IsDead) && beam != null && beam.transform.gameObject.activeInHierarchy;
 
             // 켤 때 잠깐 지직거림

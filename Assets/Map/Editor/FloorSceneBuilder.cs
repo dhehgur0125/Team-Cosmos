@@ -2,7 +2,7 @@
 // 메뉴: Tools/VOID LAST/Multiplayer/9 Split Stage2 Into Floor Scenes
 //  - 원본: Assets/Map/Scenes/Stage2_Ship.unity (편집은 여기서 하고, 이 메뉴로 다시 나누면 됨)
 //  - 결과: Assets/Map/Scenes/Floors/Stage2_Ship_1f ~ 5f.unity
-//  - 각 층 씬에는 그 층 + 위층에서 내려오는 계단(도착 연출용)만 남기고, 층 이동(FloorTransition)·도착 지점을 넣는다.
+//  - 각 층 씬에는 그 층 + 이웃 층의 계단실 조각 + 위층들의 계단실 모양(보기용)만 남기고, 층 이동(FloorTransition)·도착 지점을 넣는다.
 //  - 빌드 설정: 로비 + 층 씬 5개 (원본은 빌드에서 뺌), 로비 게임 시작 씬 = 5층
 #if UNITY_EDITOR
 using System;
@@ -61,6 +61,8 @@ namespace VoidLast.MapTools
             //    - 아래층(F n-1): 이 층에서 내려가는 계단의 아래쪽 벽 → 내려가는 연출 (없으면 계단 밖 우주가 보임)
             if (floor < 5) log.Add("stairwell up " + Borrow(ship.transform, floor, floor + 1, Y, Y + 8.5f));
             if (floor > 1) log.Add("stairwell down " + Borrow(ship.transform, floor, floor - 1, Y - 8.5f, Y - 0.05f));
+            //    - 그 위 모든 층: 위로 가는 계단에서 올려다볼 때 천장이 뚫려 보이지 않도록 계단실 모양을 5층 천장까지 (보기용)
+            if (floor < 5) log.Add("stairwell above " + BorrowAbove(ship.transform, ship.transform, floor));
 
             // 2) 다른 층 지우기
             for (int f = 1; f <= 5; f++)
@@ -140,6 +142,8 @@ namespace VoidLast.MapTools
             if (floor == 1) log.Add(F1MissionSetup.BuildInOpenScene());
             // 6d) 4층 임무·몬스터 (4층 씬에만 만든다. A 계단으로만 내려가게 바뀜)
             if (floor == 4) log.Add(F4MissionSetup.BuildInOpenScene());
+            // 6e) 파밍 아이템 (탄알집 5 · 주사기 3, 메뉴 6f와 같은 자리)
+            log.Add(FarmingItemsSetup.BuildInOpenScene(floor));
 
             // 7) 고치 (그 층에서 걸어갈 수 있는 자리를 골라 저장)
             log.Add(CocoonSetup.BuildInOpenScene(floor));
@@ -210,6 +214,88 @@ namespace VoidLast.MapTools
                     count++;
                 }
             return count;
+        }
+
+        const string AboveTag = "_Stairwell_Above";
+        /// <summary>위층 계단실 모양을 가져오는 높이 끝 (5층 계단실 천장 위)</summary>
+        const float StairwellTopY = 36.6f;
+
+        /// <summary>
+        /// 바로 윗층(floor+1)의 계단실 모양을 이 층 씬에 넣는다 (위 계단 조각 Y+8.5 위부터).
+        /// 보기용: 충돌·조명 없음, 그림자 안 만듦. src = 5개 층이 다 있는 배(원본 씬), dst = 이 층 씬의 배.
+        /// </summary>
+        static int BorrowAbove(Transform srcShip, Transform dstShip, int floor)
+        {
+            var old = dstShip.Cast<Transform>().FirstOrDefault(t => t.name.StartsWith("F" + floor + AboveTag));
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            if (!AssetDatabase.IsValidFolder(StairwellMeshDir)) AssetDatabase.CreateFolder("Assets/Map/Stage2_Ship", "FloorStairwell");
+            var group = new GameObject("F" + floor + AboveTag + " (보기용, 위층 계단실 모양)").transform;
+            group.SetParent(dstShip, false);
+            float Y = (floor - 1) * 8f, yMin = Y + 8.5f, cy = (yMin + StairwellTopY) * 0.5f, h = StairwellTopY - yMin;
+            var regions = new[]
+            {
+                new Bounds(new Vector3(-50.05f, cy, 0f), new Vector3(17.3f, h, 17.4f)),
+                new Bounds(new Vector3(50.05f, cy, 0f), new Vector3(17.3f, h, 17.4f)),
+            };
+            int count = 0;
+            // 바로 윗층 계단실만 가져온다 (그보다 위층은 최적화를 위해 넣지 않음)
+            for (int from = floor + 1; from <= floor + 1 && from <= 5; from++)
+            {
+                var visual = srcShip.Find(FloorRoots[from])?.Find("Visual");
+                if (visual == null) continue;
+                foreach (Transform c in visual)
+                {
+                    var mf = c.GetComponent<MeshFilter>();
+                    var mr = c.GetComponent<MeshRenderer>();
+                    if (mf == null || mr == null || mf.sharedMesh == null || !regions.Any(b => b.Intersects(mr.bounds))) continue;
+                    var mesh = Clip(mf, regions);
+                    if (mesh == null) continue;
+                    string path = StairwellMeshDir + "/F" + floor + "_above_from" + from + "_" + c.name + ".asset";
+                    if (File.Exists(path)) AssetDatabase.DeleteAsset(path);
+                    AssetDatabase.CreateAsset(mesh, path);
+                    var go = new GameObject(c.name + " (위층 계단실)");
+                    go.layer = c.gameObject.layer;
+                    go.transform.SetParent(group, false);
+                    go.transform.SetPositionAndRotation(c.position, c.rotation);
+                    go.transform.localScale = c.lossyScale;
+                    go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                    var r = go.AddComponent<MeshRenderer>();
+                    r.sharedMaterials = mr.sharedMaterials;
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // 멀리 위쪽이라 그림자 생략
+                    r.receiveShadows = mr.receiveShadows;
+                    GameObjectUtility.SetStaticEditorFlags(go, GameObjectUtility.GetStaticEditorFlags(c.gameObject));
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>이미 만든 1~4층 씬에 위층 계단실 모양만 (다시) 넣는다. 원본 씬에서 잘라 옴 (메뉴 9를 다시 돌릴 필요 없음)</summary>
+        [MenuItem("Tools/VOID LAST/Multiplayer/7d Extend Stairwell Upward (Visual)")]
+        public static string ExtendStairwellsUpward()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) { Debug.LogWarning("[FloorSceneBuilder] play 중에는 실행할 수 없음"); return "playing"; }
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return "cancelled";
+            var log = new List<string>();
+            for (int f = 1; f <= 4; f++)
+            {
+                var scene = EditorSceneManager.OpenScene(ScenePath(f), OpenSceneMode.Single);
+                var master = EditorSceneManager.OpenScene(MasterPath, OpenSceneMode.Additive);
+                try
+                {
+                    var dst = Root(scene, "VOID_LAST_Ship");
+                    var src = Root(master, "VOID_LAST_Ship");
+                    SceneManager.SetActiveScene(scene);
+                    log.Add(SceneName(f) + ": " + BorrowAbove(src.transform, dst.transform, f));
+                }
+                finally { EditorSceneManager.CloseScene(master, true); }
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+            }
+            AssetDatabase.SaveAssets();
+            string s = string.Join(" | ", log);
+            Debug.Log("[FloorSceneBuilder] 위층 계단실 모양 " + s);
+            return s;
         }
 
         /// <summary>메시에서 무게중심이 regions 안에 있는 삼각형만 남긴 새 메시 (없으면 null)</summary>

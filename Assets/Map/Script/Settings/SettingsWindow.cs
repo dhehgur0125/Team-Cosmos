@@ -10,7 +10,7 @@ using UnityEngine.UI;
 /// 위쪽 탭 Sound | Key | Graphic 중 누른 탭의 설정만 보인다. 바꾸면 바로 적용·저장된다.
 ///  - Sound: 전체·배경음·효과음·음성 채팅·마이크 (GameSettings → GameAudio)
 ///  - Key: 마우스 감도 + 기능별 키 (GameKeys). 키 버튼을 누르고 새 키를 누르면 바뀐다(ESC 취소). 겹치면 서로 바뀐다.
-///  - Graphic: 자동 / 낮음 / 높음 (GraphicsQuality)
+///  - Graphic: 화면 모드·화면 비율 (DisplaySettings) + 그래픽 품질 자동 / 낮음 / 높음 (GraphicsQuality)
 /// ESC: 키 입력 대기 중이면 취소, 아니면 창 닫기.
 /// </summary>
 public sealed class SettingsWindow : MonoBehaviour
@@ -133,7 +133,7 @@ public sealed class SettingsWindow : MonoBehaviour
     {
         if (_tab == Tab.Sound) GameSettings.ResetSound();
         else if (_tab == Tab.Key) { GameKeys.ResetAll(); GameSettings.ResetSensitivity(); }
-        else GraphicsQuality.SetMode(GraphicsQuality.Mode.Auto);
+        else { GraphicsQuality.SetMode(GraphicsQuality.Mode.Auto); DisplaySettings.ResetAll(); }
         ShowTab(_tab);
         SetMessage("이 탭의 설정을 처음 값으로 되돌렸어요.", 3f);
     }
@@ -247,44 +247,68 @@ public sealed class SettingsWindow : MonoBehaviour
     // ------------------------------------------------------------------ Graphic
     void BuildGraphic()
     {
-        var list = VerticalList(_content, 22);
-        var heading = UiKit.NewText(list, "그래픽 품질", 26, LobbyStyle.Text);
-        heading.fontStyle = FontStyles.Bold;
-        heading.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
+        var list = VerticalList(_content, 16);
 
-        var row = UiKit.NewRect(list, "Modes");
-        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 72;
-        var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 14; layout.childControlWidth = layout.childControlHeight = true;
-        layout.childForceExpandWidth = layout.childForceExpandHeight = true;
+        ChoiceRow(list, "화면 모드", "전체 화면 / 창", DisplaySettings.ModeLabels, (int)DisplaySettings.CurrentMode, i =>
+        {
+            DisplaySettings.SetMode((DisplaySettings.Mode)i);
+            ShowTab(Tab.Graphic);
+            SetMessage(DisplayChangedMessage(), 4f);
+        });
+        ChoiceRow(list, "화면 비율", "자동 = 모니터 비율", DisplaySettings.AspectLabels, (int)DisplaySettings.CurrentAspect, i =>
+        {
+            DisplaySettings.SetAspect((DisplaySettings.Aspect)i);
+            ShowTab(Tab.Graphic);
+            SetMessage(DisplayChangedMessage(), 4f);
+        });
+
         var modes = new[] { GraphicsQuality.Mode.Auto, GraphicsQuality.Mode.Low, GraphicsQuality.Mode.High };
         string[] labels = { "자동", "낮음", "높음" };
-        var current = GraphicsQuality.Current;
-        for (int i = 0; i < modes.Length; i++)
+        ChoiceRow(list, "그래픽 품질", "자동 = 컴퓨터 사양에 맞춰", labels, System.Array.IndexOf(modes, GraphicsQuality.Current), i =>
         {
-            var mode = modes[i];
-            var b = UiKit.NewButton(row, labels[i], 26, () =>
-            {
-                GraphicsQuality.SetMode(mode);
-                ShowTab(Tab.Graphic);
-                SetMessage("그래픽: " + GraphicsQuality.DisplayName + (mode == GraphicsQuality.Mode.Auto ? " (자동)" : "") + " 로 바꿨어요.", 3f);
-            });
-            UiKit.SetColor(b, mode == current ? LobbyStyle.Accent : LobbyStyle.ButtonDark);
-        }
+            GraphicsQuality.SetMode(modes[i]);
+            ShowTab(Tab.Graphic);
+            SetMessage("그래픽: " + GraphicsQuality.DisplayName + (modes[i] == GraphicsQuality.Mode.Auto ? " (자동)" : "") + " 로 바꿨어요.", 3f);
+        });
 
-        string now = "지금: <b>" + GraphicsQuality.DisplayName + "</b>"
+        string now = "지금: <b>" + DisplaySettings.Describe() + "</b>  ·  그래픽 <b>" + GraphicsQuality.DisplayName + "</b>"
             + (GraphicsQuality.IsAuto ? "  <color=#8A949E>(자동으로 골라짐)</color>" : "");
-        var info = UiKit.NewText(list, now, 24, LobbyStyle.Text);
-        info.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
+        var info = UiKit.NewText(list, now, 22, LobbyStyle.Text);
+        info.gameObject.AddComponent<LayoutElement>().preferredHeight = 36;
 
         var desc = UiKit.NewText(list,
-            "<b>낮음</b>  텍스처 절반 크기, 화면을 80% 해상도로 그린 뒤 선명하게 키움, 그림자 거리·품질과 화면 효과를 줄여 가볍게 돌아가요. 노트북·내장 그래픽에 알맞아요.\n" +
-            "<b>높음</b>  원래 화질로 그려요.\n" +
-            "<b>자동</b>  컴퓨터 사양을 보고 골라요. 이 컴퓨터는 <b>" + (GraphicsQuality.AutoPrefersLow() ? "낮음" : "높음") + "</b>으로 골라져요.\n" +
-            "<color=#8A949E>그래픽 카드: " + SystemInfo.graphicsDeviceName + " · " + SystemInfo.graphicsMemorySize + "MB</color>",
-            21, LobbyStyle.TextDim);
-        desc.lineSpacing = 18;
-        desc.gameObject.AddComponent<LayoutElement>().preferredHeight = 220;
+            "<b>화면</b>  모니터와 다른 비율을 고르면 전체 화면에서 양옆(또는 위아래)이 검게 비어요. 창 모드는 창 크기를 끌어서 바꿀 수 있어요.\n" +
+            "<b>낮음</b>  텍스처 절반, 80% 해상도로 그린 뒤 키움, 그림자·화면 효과를 줄여 가볍게 돌아가요 (노트북·내장 그래픽).  <b>높음</b>  원래 화질.\n" +
+            "<color=#8A949E>자동 품질은 이 컴퓨터에서 " + (GraphicsQuality.AutoPrefersLow() ? "낮음" : "높음") + " · 그래픽 카드: " + SystemInfo.graphicsDeviceName + " · " + SystemInfo.graphicsMemorySize + "MB</color>",
+            19, LobbyStyle.TextDim);
+        desc.lineSpacing = 12;
+        desc.gameObject.AddComponent<LayoutElement>().preferredHeight = 150;
+    }
+
+    static string DisplayChangedMessage()
+        => "화면: " + DisplaySettings.Describe() + (DisplaySettings.CanApply ? " 로 바꿨어요." : " — 에디터에서는 저장만 되고 빌드에서 적용돼요.");
+
+    /// <summary>[이름 + 설명] [선택 버튼 여러 개] 한 줄. 고른 버튼만 강조색</summary>
+    static void ChoiceRow(RectTransform parent, string name, string hint, string[] labels, int selected, Action<int> onPick)
+    {
+        var row = UiKit.NewRect(parent, name);
+        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 64;
+        var label = UiKit.NewText(row, name + "\n<size=17><color=#8A949E>" + hint + "</color></size>", 24, LobbyStyle.Text);
+        label.alignment = TextAlignmentOptions.MidlineLeft; label.lineSpacing = -10;
+        label.rectTransform.anchorMin = new Vector2(0, 0); label.rectTransform.anchorMax = new Vector2(0, 1);
+        label.rectTransform.pivot = new Vector2(0, 0.5f); label.rectTransform.sizeDelta = new Vector2(300, 0);
+        label.rectTransform.anchoredPosition = Vector2.zero;
+
+        var buttons = UiKit.NewRect(row, "Choices").Fill(330, 4, 0, 4);
+        var layout = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 10; layout.childControlWidth = layout.childControlHeight = true;
+        layout.childForceExpandWidth = layout.childForceExpandHeight = true;
+        for (int i = 0; i < labels.Length; i++)
+        {
+            int index = i;
+            var b = UiKit.NewButton(buttons, labels[i], 22, () => onPick(index));
+            UiKit.SetColor(b, i == selected ? LobbyStyle.Accent : LobbyStyle.ButtonDark);
+        }
     }
 
     // ------------------------------------------------------------------ 공통 줄

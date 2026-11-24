@@ -280,7 +280,7 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
             foreach (var p in _players) if (Alive(p) && InRally(p.transform.position + Vector3.up * 0.5f)) inside++;
             s.rallyIn = (byte)Mathf.Min(255, inside);
             s.rallyNeed = (byte)Mathf.Min(255, alive);
-            // 하나로 된 예전 씬에서만: 계단 안에 모두 들어가면 클리어. 층별 씬에서는 계단 문을 열면 FloorTransition이 아래층으로 이동시킨다
+            // 하나로 된 예전 씬에서만: 계단 안에 모두 들어가면 클리어. 층별 씬에서는 계단 안 투명 벽 앞에서 F를 누르면 FloorTransition이 아래층으로 이동시킨다
             if (FloorTransition.Instance == null && alive > 0 && inside >= alive) s.phase = (byte)Phase.Cleared;
         }
         SetState(s);
@@ -671,7 +671,7 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
         }
         if (_shown.phase != s.phase)
         {
-            if (s.phase == (byte)Phase.Rally) Toast(FloorTransition.Instance != null ? "탈출 준비 완료 · <b>A 계단 문을 열고 1층으로 내려가세요</b> (문 앞에서 F)" : "탈출 준비 완료 · <b>1층으로 내려가는 계단</b>으로 들어가세요 (문 앞에서 F)");
+            if (s.phase == (byte)Phase.Rally) Toast(FloorTransition.Instance != null ? "탈출 준비 완료 · <b>A 계단 안으로 들어가 1층으로 내려가세요</b> (계단 반쯤에서 F)" : "탈출 준비 완료 · <b>1층으로 내려가는 계단</b>으로 들어가세요 (문 앞에서 F)");
             if (s.phase == (byte)Phase.Cleared) { Banner("2층 클리어", "1층 보조 우주선 격납고로 내려가세요", Green); FloorCleared?.Invoke(); }
             if (s.phase == (byte)Phase.Failed) Banner("임무 실패", "살아남은 대원이 없습니다", Red);
         }
@@ -782,7 +782,7 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
         lines++;
         if (s.phase == (byte)Phase.Rally)
         {
-            sb.Append(FloorTransition.Instance != null ? "\n<color=#FCD34D>▶</color> <b>A 계단 문을 열고 1층으로 내려가기</b>" : "\n<color=#FCD34D>▶</color> <b>1층으로 내려가는 계단으로 이동</b>  " + s.rallyIn + " / " + s.rallyNeed + "명");
+            sb.Append(FloorTransition.Instance != null ? "\n<color=#FCD34D>▶</color> <b>A 계단 안에서 1층으로 내려가기</b>" : "\n<color=#FCD34D>▶</color> <b>1층으로 내려가는 계단으로 이동</b>  " + s.rallyIn + " / " + s.rallyNeed + "명");
             lines++;
         }
         else if (s.phase == (byte)Phase.Cleared) { sb.Append("\n<color=#6EE7B7>■ 2층 클리어</color>"); lines++; }

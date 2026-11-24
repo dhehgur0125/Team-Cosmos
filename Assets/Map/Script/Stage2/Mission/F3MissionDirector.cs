@@ -594,7 +594,7 @@ public sealed class F3MissionDirector : NetworkBehaviour, IFloorMission
         {
             if (s.phase == (byte)Phase.Exit)
             {
-                _hud.Toast("항로 데이터 전송 완료 · 1층 격납고 잠금 해제 · <b>B 계단 문을 열고 2층으로 내려가세요</b> (문 앞에서 " + GameKeys.Label(GameAction.Interact) + ")");
+                _hud.Toast("항로 데이터 전송 완료 · 1층 격납고 잠금 해제 · <b>B 계단 안으로 들어가 2층으로 내려가세요</b> (계단 반쯤에서 " + GameKeys.Label(GameAction.Interact) + ")");
                 if (hangarUplink != null) PlayAt(hangarUplink.transform.position, _clankClip);
             }
             if (s.phase == (byte)Phase.Failed) _hud.Banner("임무 실패", "살아남은 대원이 없습니다", MissionHud.Red);
@@ -626,7 +626,7 @@ public sealed class F3MissionDirector : NetworkBehaviour, IFloorMission
         }
         if (s.download == 2) _hud.Line(s.sent, "격납고 관제실에서 항로 데이터 전송");
         if (allOn && s.phase == (byte)Phase.Objectives) _hud.Raw("<color=#7FA7B8>◇</color> <color=#9FB3C2>중앙 관제실 감시 화면에서 몬스터 위치 확인 가능</color>");
-        if (s.phase == (byte)Phase.Exit) _hud.Raw("<color=#FCD34D>▶</color> <b>B 계단 문을 열고 2층으로 내려가기</b>");
+        if (s.phase == (byte)Phase.Exit) _hud.Raw("<color=#FCD34D>▶</color> <b>B 계단 안에서 2층으로 내려가기</b>");
         else if (s.phase == (byte)Phase.Failed) _hud.Raw("<color=#FCA5A5>■ 임무 실패</color>");
         _hud.EndObjectives();
         _hud.Tick();

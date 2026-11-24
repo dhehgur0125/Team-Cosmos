@@ -506,7 +506,7 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
         }
         if (_shown.phase != s.phase)
         {
-            if (s.phase == (byte)Phase.Exit) _hud.Toast("전력 연결 완료 · <b>A 계단 문을 열고 3층으로 내려가세요</b> (문 앞에서 " + GameKeys.Label(GameAction.Interact) + ")");
+            if (s.phase == (byte)Phase.Exit) _hud.Toast("전력 연결 완료 · <b>A 계단 안으로 들어가 3층으로 내려가세요</b> (계단 반쯤에서 " + GameKeys.Label(GameAction.Interact) + ")");
             if (s.phase == (byte)Phase.Failed) _hud.Banner("임무 실패", "살아남은 대원이 없습니다", MissionHud.Red);
         }
         _shown = s;
@@ -538,7 +538,7 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
             string note = All(s.switches, SwitchMask) ? "" : s.switchSeconds > 0 ? "  <color=#FCA5A5>남은 시간 " + s.switchSeconds + "초</color>" : "  <color=#9FB3C2>(배전실 · 전력 제어실, 10초 안에 둘 다)</color>";
             _hud.Line(All(s.switches, SwitchMask), "전력 스위치 올리기  <b>" + Count(s.switches) + " / " + switchCount + "</b>" + note);
         }
-        if (s.phase == (byte)Phase.Exit) _hud.Raw("<color=#FCD34D>▶</color> <b>A 계단 문을 열고 3층으로 내려가기</b>");
+        if (s.phase == (byte)Phase.Exit) _hud.Raw("<color=#FCD34D>▶</color> <b>A 계단 안에서 3층으로 내려가기</b>");
         else if (s.phase == (byte)Phase.Failed) _hud.Raw("<color=#FCA5A5>■ 임무 실패</color>");
         _hud.EndObjectives();
         _hud.Tick();

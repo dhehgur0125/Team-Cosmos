@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 using VoidLast.Player;
 
 /// <summary>
 /// 층(씬)을 옮길 때 이어서 가져가는 정보. 씬이 바뀌어도 남는 정적 데이터.
-///  - 어느 계단(A/B)으로 내려왔는지 → 다음 층에서 같은 계단 문 앞에 도착 연출
+///  - 어느 계단(A/B)으로 왔는지 → 다음 층에서 같은 계단 안(문 바로 뒤)에 도착
+///  - 한 번 깬 층(다시 가면 바로 내려갈 수 있음), 층마다 떠날 때 남아 있던 파밍 아이템 이름
 ///  - 내 대원의 HP·핫바·탄약·손전등 → 다음 층에서 그대로 이어받기 (죽은 대원은 죽은 채로)
 /// 멀티플레이에서는 대원마다 자기 대원 정보만 저장하고 적용한다 (HP·핫바는 주인이 관리하므로).
 /// </summary>
@@ -25,6 +27,12 @@ public static class FloorCarryOver
     public static bool Flashlight;
     /// <summary>죽은 채로 다음 층에 도착함 (관전 모드로 바로 넘어가기)</summary>
     public static bool ArrivedDead;
+    /// <summary>한 번 깬 층 (다시 와도 바로 내려갈 수 있음)</summary>
+    public static readonly HashSet<int> ClearedFloors = new HashSet<int>();
+    /// <summary>층 → 그 층을 떠날 때 남아 있던 파밍 아이템 이름 (다시 오면 이것만 놓임)</summary>
+    public static readonly Dictionary<int, HashSet<string>> FarmingLeft = new Dictionary<int, HashSet<string>>();
+
+    public static bool IsCleared(int floor) => ClearedFloors.Contains(floor);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() => ResetAll();
@@ -36,6 +44,7 @@ public static class FloorCarryOver
         HasPlayerState = false; Health = 0; Dead = false; ArrivedDead = false;
         for (int i = 0; i < Items.Length; i++) Items[i] = FarmingItemKind.None;
         Magazine = Reserve = 0; Flashlight = false;
+        ClearedFloors.Clear(); FarmingLeft.Clear();
     }
 
     public static void SavePlayer(GameObject player)

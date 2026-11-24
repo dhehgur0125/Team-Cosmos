@@ -4,17 +4,13 @@ using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 using VoidLast.Player;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 /// <summary>
-/// 층마다 계단(A·B) 입구를 막고 있던 격벽 문을 F로 열고 닫는다.
-///  - 문 앞에서 문을 보고 F → 문짝 두 장이 위로 올라가 천장 속(벽 두께 안)으로 들어가고 통과할 수 있게 된다. 다시 F → 내려와 닫힌다.
-///  - 문 사이에 대원이 서 있으면 닫히지 않는다.
+/// 층마다 계단(A·B) 입구의 격벽 문. 살아 있는 대원이 문 앞뒤 autoOpenDistance(2.5m) 안에 있으면 저절로 열리고,
+/// 아무도 없으면 저절로 닫힌다 (문짝 두 장이 위로 올라가 천장 속으로 들어감).
+///  - 문 사이에 대원이 서 있으면 닫히지 않는다. 몬스터와 죽은 대원(관전자)은 문을 열지 못한다.
+///  - 임무와 상관없이 열린다. 층 이동은 계단 안 투명 벽 앞에서 F (FloorTransition).
 ///  - 멀티플레이: 방장(서버)이 열림 상태를 정하고 모든 대원에게 같은 문 상태가 보인다. 오프라인에서도 그대로 동작한다.
-///  - 층별 씬(FloorTransition이 있는 씬): 문은 잠겨 있고, 이 층의 클리어 조건을 만족하면 F로 문을 열고 아래층으로 내려간다
-///    (층 이동 연출은 FloorTransition). 1층의 계단 문은 위층으로 돌아갈 수 없으므로 열리지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class StairDoorController : NetworkBehaviour
@@ -28,7 +24,7 @@ public sealed class StairDoorController : NetworkBehaviour
         public Transform[] leaves;
         [Tooltip("닫혀 있을 때 길을 막는 콜라이더")]
         public Collider blocker;
-        [Tooltip("문을 바라볼 때 맞는 트리거")]
+        [Tooltip("문 위치 (문 가운데를 정할 때 사용)")]
         public Collider interactTrigger;
         [Tooltip("열린 위치 = 닫힌 위치 + 이 값 (월드)")]
         public Vector3 openOffset = new Vector3(0, 4f, 0);
@@ -39,25 +35,30 @@ public sealed class StairDoorController : NetworkBehaviour
 
     public Door[] doors;
     [Min(0.2f)] public float openSeconds = 1.2f;
-    [Min(1f)] public float interactDistance = 3.2f;
+    [Tooltip("이 거리(m) 안에 살아 있는 대원이 있으면 열림 (문 앞뒤 모두)")]
+    [Min(0.5f)] public float autoOpenDistance = 2.5f;
     public TMP_FontAsset font;
 
     public static StairDoorController Instance { get; private set; }
 
     readonly NetworkVariable<int> _mask = new NetworkVariable<int>();
     int _offlineMask, _shownMask, _localMask;
-    readonly Dictionary<Collider, int> _byCollider = new Dictionary<Collider, int>();
-    TMP_Text _prompt;
     AudioClip _openClip, _closeClip;
-    float _denyUntil;
+    float _nextCheck;
+    readonly List<Transform> _people = new List<Transform>();
+    float _nextPeopleScan;
 
     int Mask => IsSpawned ? _mask.Value : _offlineMask;
     /// <summary>화면에 보이는 열림 상태 = 네트워크 상태 + 연출용으로 내 화면에서만 연 문</summary>
     int DisplayMask => Mask | _localMask;
     bool HasAuthority => !IsSpawned || IsServer;
     public bool IsOpen(int index) => (DisplayMask & (1 << index)) != 0;
+    /// <summary>방장이 자동 규칙으로 연 상태인지 (내 화면에서만 연 것은 빼고)</summary>
+    public bool IsAutoOpen(int index) => (Mask & (1 << index)) != 0;
+    /// <summary>도착 연출 중: 방장이 문을 자동으로 열지 않는다 (각자 화면에서 연출로 연다)</summary>
+    public static bool SuppressAuto;
 
-    /// <summary>층 이동 연출: 내 화면에서만 문을 열고 닫는다</summary>
+    /// <summary>도착 연출: 내 화면에서만 문을 열어 둔다 (끄면 다시 자동 규칙을 따름)</summary>
     public void SetLocalOpen(int index, bool open)
     {
         if (index < 0 || index >= doors.Length) return;
@@ -73,10 +74,8 @@ public sealed class StairDoorController : NetworkBehaviour
         return -1;
     }
 
-    static char SideOf(Door d) => d != null && d.id != null && d.id.EndsWith("StairB") ? 'B' : 'A';
-
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { Instance = null; }
+    static void ResetStatics() { Instance = null; SuppressAuto = false; }
 
     void Awake()
     {
@@ -89,20 +88,24 @@ public sealed class StairDoorController : NetworkBehaviour
             if (d == null || d.root == null) continue;
             d.closedPos = new Vector3[d.leaves.Length];
             for (int k = 0; k < d.leaves.Length; k++) d.closedPos[k] = d.leaves[k].position;
-            if (d.interactTrigger != null) _byCollider[d.interactTrigger] = i;
-            if (d.blocker != null) _byCollider[d.blocker] = i;
             d.audio = d.root.gameObject.AddComponent<AudioSource>();
             d.audio.playOnAwake = false; d.audio.spatialBlend = 1f; d.audio.minDistance = 2f; d.audio.maxDistance = 25f; d.audio.volume = 0.8f;
             GameAudio.Route(d.audio);
         }
-        BuildPrompt();
     }
 
     void OnDestroy() { if (Instance == this) Instance = null; }
 
-    // ------------------------------------------------------------------ 매 프레임: 애니메이션 + 내 입력
+    // ------------------------------------------------------------------ 매 프레임: 자동 열림 판정(방장) + 애니메이션
     void Update()
     {
+        if (HasAuthority && !SuppressAuto && Time.unscaledTime >= _nextCheck)
+        {
+            _nextCheck = Time.unscaledTime + 0.1f;
+            int want = AutoMask();
+            if (want != Mask) { if (IsSpawned) _mask.Value = want; else _offlineMask = want; }
+        }
+
         int mask = DisplayMask;
         if (mask != _shownMask)
         {
@@ -124,8 +127,6 @@ public sealed class StairDoorController : NetworkBehaviour
             for (int k = 0; k < d.leaves.Length; k++) d.leaves[k].position = d.closedPos[k] + d.openOffset * e;
             SetBlocker(d);
         }
-
-        LocalInput();
     }
 
     static void SetBlocker(Door d)
@@ -135,100 +136,49 @@ public sealed class StairDoorController : NetworkBehaviour
         if (d.blocker.enabled != block) d.blocker.enabled = block;
     }
 
-    static FpsHealth LocalPlayer()
+    /// <summary>방장: 문마다 가까이 살아 있는 대원이 있는지로 열림 상태를 정한다</summary>
+    int AutoMask()
     {
-        if (Stage2NetworkBootstrap.IsOnline) return FpsNetworkPlayer.Local != null ? FpsNetworkPlayer.Local.Health : null;
-        var cam = Camera.main;
-        return cam != null ? cam.GetComponentInParent<FpsHealth>() : null;
-    }
-
-    static bool InteractPressed()
-    {
-#if ENABLE_INPUT_SYSTEM
-        return Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame;
-#else
-        return GameKeys.Down(GameAction.Interact);
-#endif
-    }
-
-    void LocalInput()
-    {
-        int target = -1;
-        var me = LocalPlayer();
-        var cam = Camera.main;
-        if (me != null && !me.IsDead && cam != null && Cursor.lockState == CursorLockMode.Locked && !FloorTransition.InCutscene)
+        var people = LivingPlayers();
+        int current = Mask, mask = 0;
+        for (int i = 0; i < doors.Length; i++)
         {
-            var hits = Physics.SphereCastAll(cam.ViewportPointToRay(new Vector3(0.5f, 0.5f)), 0.2f, interactDistance, ~0, QueryTriggerInteraction.Collide);
-            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-            foreach (var h in hits)
+            var d = doors[i];
+            if (d == null || d.root == null) continue;
+            Vector3 c = Center(d);
+            bool near = false;
+            foreach (var p in people)
             {
-                if (h.collider.transform.IsChildOf(me.transform)) continue;
-                if (_byCollider.TryGetValue(h.collider, out int idx)) { target = idx; break; }
-                if (!h.collider.isTrigger) break;   // 다른 물체에 가려짐
+                Vector3 v = p.position - c;
+                if (Mathf.Abs(v.y + 1.5f) > 3f) continue;   // 다른 높이 (발 위치 기준)
+                v.y = 0;
+                if (v.sqrMagnitude <= autoOpenDistance * autoOpenDistance) { near = true; break; }
             }
+            bool open = (current & (1 << i)) != 0;
+            if (near || (open && Blocked(i))) mask |= 1 << i;   // 문 사이에 사람이 있으면 닫지 않음
         }
+        return mask;
+    }
 
-        if (_prompt == null) return;
-        if (target < 0) { _prompt.text = ""; return; }
+    static Vector3 Center(Door d) => d.interactTrigger != null ? d.interactTrigger.bounds.center : d.root.position;
 
-        // 층별 씬: 클리어해야 열리는 출구 문
-        var floor = FloorTransition.Instance;
-        if (floor != null)
+    /// <summary>살아 있는 대원들의 위치 (온라인: 네트워크 대원 / 오프라인: 씬의 대원)</summary>
+    List<Transform> LivingPlayers()
+    {
+        _people.Clear();
+        if (IsSpawned || Stage2NetworkBootstrap.IsOnline)
         {
-            bool allowed = floor.AllowsSide(SideOf(doors[target]));
-            if (!floor.HasNextFloor) _prompt.text = "<color=#94A3B8>위층으로는 다시 올라갈 수 없어요</color>";
-            else if (floor.IsDescending) _prompt.text = "";
-            else if (!allowed) _prompt.text = "<color=#FCA5A5>잠김</color> · 이 계단은 막혀 있어요. 다른 계단으로 가세요";
-            else if (floor.CanDescend) _prompt.text = "[" + GameKeys.Label(GameAction.Interact) + "] 문 열고 " + FloorTransition.FloorName(floor.floor - 1).Split(' ')[0] + "으로 내려가기";
-            else _prompt.text = "<color=#FCA5A5>잠김</color> · 이 층의 임무를 먼저 완료하세요";
-            if (InteractPressed() && floor.CanDescend && allowed) Request(target, me);
-            return;
+            foreach (var p in FpsNetworkPlayer.All)
+                if (p != null && p.Health != null && !p.Health.IsDead) _people.Add(p.transform);
+            return _people;
         }
-
-        bool open = IsOpen(target);
-        if (Time.unscaledTime < _denyUntil) _prompt.text = "<color=#FCA5A5>문 사이에 누가 있어서 닫을 수 없어요</color>";
-        else _prompt.text = "[" + GameKeys.Label(GameAction.Interact) + (open ? "] 문 닫기" : "] 문 열기");
-
-        if (InteractPressed())
-        {
-            if (open && Blocked(target)) { _denyUntil = Time.unscaledTime + 1.5f; return; }
-            Request(target, me);
-        }
+        if (Time.unscaledTime >= _nextPeopleScan) { _nextPeopleScan = Time.unscaledTime + 1f; _offline = FindObjectsByType<FpsHealth>(FindObjectsSortMode.None); }
+        if (_offline != null)
+            foreach (var h in _offline)
+                if (h != null && h.isActiveAndEnabled && !h.IsDead) _people.Add(h.transform);
+        return _people;
     }
-
-    // ------------------------------------------------------------------ 열기/닫기 요청
-    void Request(int index, FpsHealth who)
-    {
-        if (HasAuthority) Toggle(index, who != null ? who.transform.position : Vector3.zero, who != null);
-        else ToggleRpc(index);
-    }
-
-    [Rpc(SendTo.Server)]
-    void ToggleRpc(int index, RpcParams rpcParams = default)
-    {
-        var player = FpsNetworkPlayer.FindByClient(rpcParams.Receive.SenderClientId);
-        if (player == null || player.Health == null || player.Health.IsDead) return;
-        Toggle(index, player.transform.position, true);
-    }
-
-    void Toggle(int index, Vector3 from, bool checkDistance)
-    {
-        if (index < 0 || index >= doors.Length || doors[index] == null || doors[index].root == null) return;
-        var d = doors[index];
-        if (checkDistance && Vector3.Distance(from, ClosestPoint(d, from)) > interactDistance + 2f) return;
-        var floor = FloorTransition.Instance;
-        if (floor != null) { floor.TryBeginDescent(SideOf(d)); return; }   // 층별 씬: 문 열기 = 아래층으로 내려가기
-        bool open = (Mask & (1 << index)) != 0;
-        if (open && Blocked(index)) return;   // 문 사이에 사람이 있으면 닫지 않음
-        int mask = Mask ^ (1 << index);
-        if (IsSpawned) _mask.Value = mask; else _offlineMask = mask;
-    }
-
-    static Vector3 ClosestPoint(Door d, Vector3 p)
-    {
-        if (d.interactTrigger != null) return d.interactTrigger.ClosestPoint(p);
-        return d.root.position;
-    }
+    FpsHealth[] _offline;
 
     /// <summary>닫히는 자리에 대원(캐릭터 컨트롤러)이 있는지</summary>
     bool Blocked(int index)
@@ -244,30 +194,7 @@ public sealed class StairDoorController : NetworkBehaviour
         return false;
     }
 
-    // ------------------------------------------------------------------ UI / 소리
-    void BuildPrompt()
-    {
-        var canvasGo = new GameObject("Stair Door Prompt", typeof(RectTransform));
-        canvasGo.transform.SetParent(transform, false);
-        var canvas = canvasGo.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 36;
-        var scaler = canvasGo.AddComponent<UnityEngine.UI.CanvasScaler>();
-        scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 0.5f;
-        var go = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer));
-        go.transform.SetParent(canvasGo.transform, false);
-        var t = go.AddComponent<TextMeshProUGUI>();
-        if (font != null) t.font = font;
-        t.fontSize = 22; t.color = Color.white; t.alignment = TextAlignmentOptions.Center; t.raycastTarget = false;
-        t.textWrappingMode = TextWrappingModes.NoWrap; t.richText = true;
-        var r = t.rectTransform;
-        r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f); r.pivot = new Vector2(0.5f, 0.5f);
-        r.anchoredPosition = new Vector2(0, -90); r.sizeDelta = new Vector2(900, 34);
-        _prompt = t;
-    }
-
+    // ------------------------------------------------------------------ 소리
     /// <summary>문 소리: 공압 '치익' + 끝에 '쿵'</summary>
     static AudioClip DoorSound(string name, bool opening)
     {

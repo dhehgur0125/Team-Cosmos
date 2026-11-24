@@ -1,4 +1,4 @@
-/* [ 코드 설명 ] 무전으로 들어온 목소리를 무전기 음질로 바꾸는 오디오 필터입니다. 좁은 대역(저음·고음 깎기), 약한 찌그러짐과 비트 줄이기, 말하는 동안에만 깔리는 치지직 잡음과 툭툭 튀는 소리를 더합니다. RadioVoiceEffect가 Vivox 참가자 탭 오브젝트에 붙이며, 오디오 스레드에서 메모리 할당 없이 동작합니다. */
+/* [ 코드 설명 ] 무전으로 들어온 목소리를 무전기 음질로 바꾸는 오디오 필터입니다. 좁은 대역(저음·고음 깎기), 약한 찌그러짐과 비트 줄이기를 더합니다. 치지직 잡음·툭툭 튀는 소리는 기본으로 꺼 두었습니다(hiss·crackle 값을 올리면 다시 켜짐). RadioVoiceEffect가 Vivox 참가자 탭 오브젝트에 붙이며, 오디오 스레드에서 메모리 할당 없이 동작합니다. */
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -13,10 +13,10 @@ public sealed class RadioVoiceFilter : MonoBehaviour
     [Tooltip("낮을수록 거칠어짐")]
     [Range(3, 16)] public int bitDepth = 7;
 
-    [Header("치지직 잡음 (말하는 동안 + 짧은 꼬리)")]
-    [Range(0f, 0.3f)] public float hiss = 0.05f;
-    [Range(0f, 40f)] public float cracklesPerSecond = 14f;
-    [Range(0f, 1f)] public float crackleLevel = 0.3f;
+    [Header("치지직 잡음 (말하는 동안 + 짧은 꼬리) — 기본은 꺼 둠(0)")]
+    [Range(0f, 0.3f)] public float hiss = 0f;
+    [Range(0f, 40f)] public float cracklesPerSecond = 0f;
+    [Range(0f, 1f)] public float crackleLevel = 0f;
 
     [Header("출력")]
     [Range(0f, 2f)] public float outputGain = 1.2f;

@@ -21,7 +21,8 @@ using UnityEngine.InputSystem;
 ///            새어 나감 방지: V를 누르면 먼저 '무전 중' 신호를 보내고 무전 채널로만 말하다가, 신호가 다른 대원에게 도착할 만큼
 ///            (네트워크 왕복 시간 기준) 기다린 뒤에 육성(근거리 채널)을 함께 켠다. 그래서 멀리 있는 대원이 음소거하기 전에 목소리가 새지 않는다.
 ///  - M: 내 마이크 끄기/켜기
-///  - 내 대원이 죽으면 근거리·무전 채널에서 나가고, 죽은 대원끼리만 들리는 사망자 채널로 옮긴다.
+///  - 내 대원이 죽으면 무전 채널에서 나가고, 죽은 대원끼리만 들리는 사망자 채널에만 말한다 (살아있는 대원에게는 안 들림).
+///    근거리 채널에는 듣기만 하며 남아서, 관전 중인 대원의 머리 위치에서 듣는다 → 관전 대상의 목소리(와 그 주변 소리)가 들린다.
 /// 화면 오른쪽 위에 음성 상태 HUD를 그린다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -48,12 +49,12 @@ public sealed class InGameVoiceChat : MonoBehaviour
     bool _entered, _radioJoined, _transmitting, _wantRadio, _dead;
     float _radioToggleAt, _nextPosition, _nextHud, _meter;
     readonly List<string> _speakers = new List<string>();
-    readonly HashSet<string> _radioSpeakersBefore = new HashSet<string>();
     readonly HashSet<string> _nearMuted = new HashSet<string>();   // 무전 중이라 내 쪽에서 육성을 끈 대원
     bool _nearPending;      // 무전 시작 직후: 육성(근거리)은 아직 끈 상태
     float _nearOnAt;
+    GameObject _listenPoint;   // 죽은 뒤 근거리 음성을 듣는 자리 (관전 대상 머리)
     AudioSource _sfx;
-    AudioClip _clickOn, _clickOff, _squelch;
+    AudioClip _clickOn, _clickOff;
 
     // HUD
     Image _dot;
@@ -75,7 +76,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
         if (FloorCarryOver.Pending && FloorCarryOver.HasPlayerState && FloorCarryOver.Dead && !string.IsNullOrEmpty(_voice.SessionKey))
         {
             _dead = true;
-            await _voice.EnterDeadAsync();
+            await _voice.EnterDeadAsync(NearProperties());
             _entered = true;
             return;
         }
@@ -111,6 +112,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
             }
         }
         if (_player != null) _player.SetRadioTalking(false);
+        if (_listenPoint != null) Destroy(_listenPoint);
     }
 
     void OnApplicationFocus(bool focus)
@@ -136,9 +138,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
             _dead = true;
             if (_transmitting) SetTransmitting(false);
             _radioJoined = false; _wantRadio = false;
-            _radioSpeakersBefore.Clear();
-            _nearMuted.Clear();
-            _ = _voice.EnterDeadAsync();
+            _ = _voice.EnterDeadAsync(NearProperties());
         }
         // 고치에서 구출되면 근거리 채널로 돌아간다
         else if (_player != null && _entered && _dead && _player.Health != null && !_player.Health.IsDead)
@@ -176,8 +176,20 @@ public sealed class InGameVoiceChat : MonoBehaviour
                 _voice.Set3DPosition(cam != null ? cam.gameObject : _player.gameObject, _voice.NearChannel);
             }
 
-            RadioSquelch(hasRadio);
-            UpdateRadioVoiceMutes();
+            UpdateRadioVoiceMutes(MyHead());
+        }
+        else if (_player != null && _entered && _dead)
+        {
+            // 죽은 뒤: 근거리 채널에서 듣기만 한다. 듣는 위치 = 관전 중인 대원의 머리 (관전 전이면 내 몸 자리)
+            Vector3 ear = ListenPosition(out Quaternion facing);
+            if (Time.unscaledTime >= _nextPosition)
+            {
+                _nextPosition = Time.unscaledTime + 0.1f;
+                if (_listenPoint == null) _listenPoint = new GameObject("Voice Listen Point (Spectator)") { hideFlags = HideFlags.HideInHierarchy };
+                _listenPoint.transform.SetPositionAndRotation(ear, facing);
+                _voice.Set3DPosition(_listenPoint, _voice.NearChannel);
+            }
+            UpdateRadioVoiceMutes(ear);
         }
 
         UpdateHud();
@@ -223,21 +235,41 @@ public sealed class InGameVoiceChat : MonoBehaviour
     /// 듣는 쪽 처리: 무전으로 말하고 있는 대원이 바로 옆(radioVoiceNearDistance)보다 멀리 있으면
     /// 근거리 채널의 그 사람 목소리를 내 쪽에서 끈다 → 무전기가 없으면 무전 내용이 들리지 않는다 (무전기가 있으면 무전 채널로 들림).
     /// </summary>
-    void UpdateRadioVoiceMutes()
+    void UpdateRadioVoiceMutes(Vector3 me)
     {
-        var cam = _player.ViewCamera;
-        Vector3 me = cam != null ? cam.transform.position : _player.transform.position + Vector3.up * 1.6f;
         foreach (var p in FpsNetworkPlayer.All)
         {
             if (p == null || p == _player) continue;
             string id = p.AuthPlayerId;
             if (string.IsNullOrEmpty(id)) continue;
-            Vector3 head = p.cameraPivot != null ? p.cameraPivot.position : p.transform.position + Vector3.up * 1.6f;
+            Vector3 head = HeadOf(p);
             bool mute = p.IsRadioTalking && Vector3.Distance(me, head) > radioVoiceNearDistance;
             if (mute == _nearMuted.Contains(id)) continue;
             if (!_voice.SetLocalMute(_voice.NearChannel, id, mute) && mute) continue;   // 아직 채널에 없으면 다음에 다시 시도
             if (mute) _nearMuted.Add(id); else _nearMuted.Remove(id);
         }
+    }
+
+    Vector3 MyHead()
+    {
+        var cam = _player.ViewCamera;
+        return cam != null ? cam.transform.position : _player.transform.position + Vector3.up * 1.6f;
+    }
+
+    static Vector3 HeadOf(FpsNetworkPlayer p) => p.cameraPivot != null ? p.cameraPivot.position : p.transform.position + Vector3.up * 1.6f;
+
+    /// <summary>죽은 뒤 근거리 음성을 듣는 자리: 관전 중인 대원의 머리 (관전 카메라 방향으로 들음)</summary>
+    Vector3 ListenPosition(out Quaternion facing)
+    {
+        var target = SpectatorSystem.IsSpectating ? SpectatorSystem.Target : null;
+        if (target != null)
+        {
+            var view = Camera.main;
+            facing = view != null ? view.transform.rotation : target.transform.rotation;
+            return HeadOf(target);
+        }
+        facing = _player.transform.rotation;
+        return MyHead();
     }
 
     /// <summary>
@@ -265,16 +297,6 @@ public sealed class InGameVoiceChat : MonoBehaviour
         return Mathf.Clamp(0.12f + rttMs / 1000f, 0.2f, 0.6f);
     }
 
-    /// <summary>다른 대원이 무전을 시작하면 짧은 잡음 소리</summary>
-    void RadioSquelch(bool hasRadio)
-    {
-        if (!hasRadio || !_voice.IsInChannel(_voice.RadioChannel)) { _radioSpeakersBefore.Clear(); return; }
-        _voice.GetSpeakers(_voice.RadioChannel, _speakers);
-        foreach (var id in _speakers) if (!_radioSpeakersBefore.Contains(id)) { PlayClip(_squelch); break; }
-        _radioSpeakersBefore.Clear();
-        foreach (var id in _speakers) _radioSpeakersBefore.Add(id);
-    }
-
     // ------------------------------------------------------------------ input helpers
     // 키는 설정 창(Key 탭)에서 바꿀 수 있다: 무전 = GameAction.Radio(기본 V), 마이크 = GameAction.MicMute(기본 M)
     const int KeyV = 0, KeyM = 1;
@@ -290,7 +312,6 @@ public sealed class InGameVoiceChat : MonoBehaviour
         GameAudio.Route(_sfx);
         _clickOn = Tone("RadioOn", new[] { 1250f, 1650f }, 0.07f);
         _clickOff = Tone("RadioOff", new[] { 1650f, 1100f }, 0.08f);
-        _squelch = Noise("RadioSquelch", 0.16f);
     }
 
     void PlayClip(AudioClip clip) { if (_sfx != null && clip != null) _sfx.PlayOneShot(clip, radioClickVolume); }
@@ -306,25 +327,6 @@ public sealed class InGameVoiceChat : MonoBehaviour
             float t = (float)i / rate, local = (float)(i % per) / per;
             float env = Mathf.Clamp01(local * 20f) * Mathf.Clamp01((1 - local) * 12f);
             data[i] = Mathf.Sin(2 * Mathf.PI * f * t) * 0.5f * env;
-        }
-        var clip = AudioClip.Create(name, n, 1, rate, false);
-        clip.SetData(data, 0);
-        return clip;
-    }
-
-    static AudioClip Noise(string name, float seconds)
-    {
-        int rate = 44100, n = (int)(rate * seconds);
-        var data = new float[n];
-        var rng = new System.Random(7);
-        float prev = 0;
-        for (int i = 0; i < n; i++)
-        {
-            float t = (float)i / n;
-            float env = Mathf.Clamp01(t * 30f) * (1 - t);
-            float white = (float)(rng.NextDouble() * 2 - 1);
-            prev = Mathf.Lerp(prev, white, 0.35f);   // 살짝 둥글게 (치익)
-            data[i] = prev * 0.35f * env;
         }
         var clip = AudioClip.Create(name, n, 1, rate, false);
         clip.SetData(data, 0);
@@ -439,10 +441,12 @@ public sealed class InGameVoiceChat : MonoBehaviour
         if (_dead)
         {
             if (!_voice.IsInChannel(_voice.DeadChannel)) SetHud("사망자 대화 연결 중...", "죽은 대원끼리만 대화할 수 있어요", new Color(0.99f, 0.88f, 0.28f));
-            else SetHud("사망자 대화", "죽은 대원끼리만 들려요 · 살아있는 대원에게는 들리지 않아요", new Color(0.75f, 0.68f, 1f));
+            else SetHud("사망자 대화", "내 목소리는 죽은 대원끼리만 들려요 · 관전 중인 대원의 목소리가 들려요", new Color(0.75f, 0.68f, 1f));
             var dead = new List<string>();
             _voice.GetSpeakers(_voice.DeadChannel, _speakers);
             foreach (var id in _speakers) dead.Add(NameOf(id));
+            _voice.GetSpeakers(_voice.NearChannel, _speakers);   // 관전 대상 근처에서 말하는 살아있는 대원
+            foreach (var id in _speakers) if (!_nearMuted.Contains(id)) dead.Add(NameOf(id) + " <color=#6EE7B7>(관전)</color>");
             _speakingText.text = dead.Count > 0 ? "말하는 중: " + string.Join(", ", dead) : "";
             _hint.text = "[" + GameKeys.Label(GameAction.MicMute) + "] 마이크 " + (_voice.MicMuted ? "켜기" : "끄기");
             return;
