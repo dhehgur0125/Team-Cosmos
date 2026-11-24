@@ -105,6 +105,9 @@ namespace VoidLast.MapTools
                 }
             }
 
+            // 3b) 2층: 시작 지점을 A 계단실 안(문 바로 뒤 계단참, 문을 봄)으로
+            if (floor == 2) log.Add(PlaceStartInStairA(test, multi, Y));
+
             // 4) 계단 문 (이 층 것만)
             log.Add(StairDoorSetup.BuildInOpenScene());
 
@@ -157,6 +160,26 @@ namespace VoidLast.MapTools
             int renderers = scene.GetRootGameObjects().Sum(g => g.GetComponentsInChildren<Renderer>(true).Length);
             int lights = scene.GetRootGameObjects().Sum(g => g.GetComponentsInChildren<Light>(true).Length);
             return SceneName(floor) + ": renderers " + renderers + ", lights " + lights + " | " + string.Join(" | ", log);
+        }
+
+        /// <summary>
+        /// 시작 지점(1인 테스트 대원 + 로비에서 바로 시작할 때의 Player Spawns)을 A 계단실 안 계단참으로 옮긴다.
+        /// 층 이동 도착 지점(FloorTransition.PlaceArrivalPoints)과 같은 자리: |x| 43.4~44.4, z ±1, 문(x −42) 쪽을 봄.
+        /// </summary>
+        public static string PlaceStartInStairA(GameObject test, GameObject multi, float Y)
+        {
+            var rot = Quaternion.LookRotation(Vector3.right);   // A 계단은 x −쪽 → 문은 +x 쪽
+            var pts = new[] { new Vector3(-43.4f, Y + 0.03f, -1f), new Vector3(-43.4f, Y + 0.03f, 1f), new Vector3(-44.4f, Y + 0.03f, -1f), new Vector3(-44.4f, Y + 0.03f, 1f) };
+            int moved = 0;
+            var solo = test != null ? test.transform.Find("VOID_LAST_FPS") : null;
+            if (solo != null) { solo.SetPositionAndRotation(pts[0], rot); moved++; }
+            var spawns = multi != null ? multi.transform.Find("Player Spawns") : null;
+            if (spawns != null)
+            {
+                int i = 0;
+                foreach (Transform sp in spawns) { sp.SetPositionAndRotation(pts[i % pts.Length], rot); i++; moved++; }
+            }
+            return "start in stair A (" + moved + ")";
         }
 
         const string StairwellMeshDir = "Assets/Map/Stage2_Ship/FloorStairwell";

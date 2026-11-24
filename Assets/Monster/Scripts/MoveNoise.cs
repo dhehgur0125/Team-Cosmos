@@ -38,7 +38,7 @@ namespace VoidLast.Monster
 
             foreach (var motor in FindObjectsByType<FpsMotor>(FindObjectsInactive.Exclude))
             {
-                if (motor == null || motor.IsDead || motor.IsCrouching || !motor.IsGrounded) continue;
+                if (motor == null || motor.IsDead || motor.IsCrouching || !motor.IsGrounded || StairSafeZone.Contains(motor.transform.position)) continue;   // 계단실 안은 발소리 없음
                 float speed = motor.LocalVelocity.magnitude;
                 if (speed < motor.WalkSpeed * 0.6f) continue;   // 서 있거나 거의 안 움직임
                 bool running = speed > (motor.WalkSpeed + motor.RunSpeed) * 0.5f;

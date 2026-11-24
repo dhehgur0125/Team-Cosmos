@@ -145,7 +145,7 @@ namespace VoidLast.Monster
             foreach (var collider in found)
             {
                 var player = collider.GetComponentInParent<FpsHealth>();
-                if (player == null || player.IsDead || !player.isActiveAndEnabled || struck.Contains(player)) continue;
+                if (player == null || player.IsDead || !player.isActiveAndEnabled || struck.Contains(player) || StairSafeZone.Contains(player)) continue;
                 Vector3 toPlayer = Vector3.ProjectOnPlane(player.transform.position - transform.position, Vector3.up);
                 if (arc && toPlayer.sqrMagnitude > 0.01f && Vector3.Angle(forward, toPlayer) > attackAngle * 0.5f) continue;
                 if (!vision.ClearLine(transform.position + Vector3.up * 1.3f, collider.bounds.center, player.transform)) continue;

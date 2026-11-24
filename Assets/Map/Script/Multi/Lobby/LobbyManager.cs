@@ -823,13 +823,16 @@ public class LobbyManager : MonoBehaviour
         SaveNickname(null);
         await RunBusy("진행 중인 게임에 다시 들어가는 중...", async () =>
         {
+            // MyPlayerProperties가 고유 아이템 선택을 비우므로, 먼저 만들고 나서 표의 값(고유 아이템 등)을 넣는다
+            var properties = MyPlayerProperties(false);
             Rejoin.ApplyTicket(ticket);
+            properties[KeyUnique] = new PlayerProperty(UniqueItems.Code(UniqueItems.LocalChoice), VisibilityPropertyOptions.Member);
             ISession session;
             try
             {
                 _gameStarting = true;   // 들어가자마자 게임 씬으로 넘어가므로 대기방 연결 끊김 처리는 하지 않음
                 session = await MultiplayerService.Instance.JoinSessionByCodeAsync(ticket.code,
-                    new JoinSessionOptions { PlayerProperties = MyPlayerProperties(false) });
+                    new JoinSessionOptions { PlayerProperties = properties });
             }
             catch (Exception e)
             {

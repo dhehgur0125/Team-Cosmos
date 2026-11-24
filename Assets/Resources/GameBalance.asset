@@ -13,26 +13,52 @@ MonoBehaviour:
   m_Name: GameBalance
   m_EditorClassIdentifier: Assembly-CSharp::GameBalance
   small:
-    health: 50
+    health: 300
     chaseSpeed: 4.8
-    damage: 12
-  frog:
-    health: 115
-    chaseSpeed: 3.5
     damage: 15
-  frogLandDamage: 30
+    hitSlowTo: 0.4
+    hitSlowSeconds: 0.4
+    flinchHits: 3
+    flinchSeconds: 1
+  frog:
+    health: 450
+    chaseSpeed: 3.5
+    damage: 20
+    hitSlowTo: 0.4
+    hitSlowSeconds: 0.4
+    flinchHits: 4
+    flinchSeconds: 1
+  frogLandDamage: 40
   tentacle:
-    health: 150
+    health: 900
     chaseSpeed: 3.6
-    damage: 18
+    damage: 25
+    hitSlowTo: 0.5
+    hitSlowSeconds: 0.3
+    flinchHits: 5
+    flinchSeconds: 0.8
   eyedLarge:
-    health: 375
+    health: 1200
     chaseSpeed: 4.1
-    damage: 30
+    damage: 40
+    hitSlowTo: 0.6
+    hitSlowSeconds: 0.25
+    flinchHits: 6
+    flinchSeconds: 0.8
   blindLarge:
-    health: 600
+    health: 1800
     chaseSpeed: 1.8
-    damage: 45
+    damage: 60
+    hitSlowTo: 0.7
+    hitSlowSeconds: 0.2
+    flinchHits: 8
+    flinchSeconds: 0.6
+  flinchWindow: 3
+  flinchCooldown: 3
+  monsterRegen: 1
+  regenDelay: 30
+  regenSeconds: 20
+  monstersRevive: 0
   groggyMinSeconds: 120
   groggyMaxSeconds: 180
   wakeWarningSeconds: 10
@@ -41,16 +67,16 @@ MonoBehaviour:
   walkRecoverPerSecond: 0.15
   restRecoverPerSecond: 0.25
   jumpCost: 0.1
-  holdoutNoiseRadius: 45
-  holdoutNoiseInterval: 25
+  holdoutNoiseRadius: 30
+  holdoutNoiseInterval: 35
   holdoutFinalSeconds: 30
   holdoutFinalInterval: 10
   monsterHealthByPlayers:
+  - 0.4
   - 0.7
-  - 0.85
   - 1
-  - 1.15
-  ammoPacksByPlayers: 03000000040000000500000006000000
+  - 1.3
+  ammoPacksByPlayers: 02000000030000000400000005000000
   syringesByPlayers: 02000000030000000300000004000000
   holdoutByPlayers:
   - 0.7

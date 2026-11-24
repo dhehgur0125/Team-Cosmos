@@ -254,7 +254,7 @@ namespace VoidLast.Monster
             Vector3 chest = transform.position + Vector3.up * senseHeight;
             foreach (var player in FindObjectsByType<FpsHealth>(FindObjectsInactive.Exclude))
             {
-                if (player == null || player.IsDead) continue;
+                if (player == null || player.IsDead || StairSafeZone.Contains(player)) continue;
                 Vector3 closest = BoundsOf(player).ClosestPoint(chest);
                 Vector3 flat = Vector3.ProjectOnPlane(closest - chest, Vector3.up);
                 if (Vector3.Distance(chest, closest) > strikeReach) continue;
@@ -274,7 +274,7 @@ namespace VoidLast.Monster
             float bestDistance = radius;
             foreach (var candidate in FindObjectsByType<FpsHealth>(FindObjectsInactive.Exclude))
             {
-                if (candidate == null || candidate.IsDead) continue;
+                if (candidate == null || candidate.IsDead || StairSafeZone.Contains(candidate)) continue;
                 Vector3 closest = BoundsOf(candidate).ClosestPoint(chest);
                 if (Mathf.Abs(closest.y - chest.y) > 2.5f) continue;
                 float distance = Vector3.ProjectOnPlane(closest - chest, Vector3.up).magnitude;

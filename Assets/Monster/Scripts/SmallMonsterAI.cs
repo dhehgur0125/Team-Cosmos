@@ -177,7 +177,7 @@ namespace VoidLast.Monster
             if (Time.time < nextSense) return;
             nextSense = Time.time + senseInterval;
 
-            if (Target != null && (Target.IsDead || !Target.isActiveAndEnabled)) { Target = null; knowsLocation = false; aggro = false; }
+            if (Target != null && (Target.IsDead || !Target.isActiveAndEnabled || StairSafeZone.Contains(Target))) { Target = null; knowsLocation = false; aggro = false; }
             var seen = vision.FindVisible(Target);
             targetVisible = seen != null;
             if (seen != null) { Target = seen; LastKnownPosition = seen.transform.position; knowsLocation = true; }

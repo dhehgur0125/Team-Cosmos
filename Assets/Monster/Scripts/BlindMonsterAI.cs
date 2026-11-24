@@ -310,7 +310,7 @@ namespace VoidLast.Monster
 
         void DoStrike()
         {
-            if (strikeVictim == null || strikeVictim.IsDead) return;
+            if (strikeVictim == null || strikeVictim.IsDead || StairSafeZone.Contains(strikeVictim)) return;
 
             Vector3 chest = transform.position + Vector3.up * tentacleHeight;
             Vector3 closest = BoundsOf(strikeVictim).ClosestPoint(chest);
@@ -332,7 +332,7 @@ namespace VoidLast.Monster
             float bestDistance = tentacleReach;
             foreach (var candidate in FindObjectsByType<FpsHealth>())
             {
-                if (candidate == null || candidate.IsDead || !candidate.isActiveAndEnabled) continue;
+                if (candidate == null || candidate.IsDead || !candidate.isActiveAndEnabled || StairSafeZone.Contains(candidate)) continue;
                 Vector3 closest = BoundsOf(candidate).ClosestPoint(chest);
                 float distance = Vector3.Distance(chest, closest);
                 if (distance < bestDistance && ClearTouch(chest, closest, candidate.transform)) { best = candidate; bestDistance = distance; }
@@ -346,7 +346,7 @@ namespace VoidLast.Monster
             float bestDistance = radius;
             foreach (var candidate in FindObjectsByType<FpsHealth>())
             {
-                if (candidate == null || candidate.IsDead || !candidate.isActiveAndEnabled) continue;
+                if (candidate == null || candidate.IsDead || !candidate.isActiveAndEnabled || StairSafeZone.Contains(candidate)) continue;
                 Vector3 delta = candidate.transform.position - transform.position;
                 if (Mathf.Abs(delta.y) > 3f) continue;
                 float distance = Vector3.ProjectOnPlane(delta, Vector3.up).magnitude;

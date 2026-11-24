@@ -175,7 +175,7 @@ namespace VoidLast.Monster
             float bestDistance = detectRadius;
             foreach (var candidate in FindObjectsByType<FpsHealth>(FindObjectsInactive.Exclude))
             {
-                if (candidate == null || candidate.IsDead) continue;
+                if (candidate == null || candidate.IsDead || StairSafeZone.Contains(candidate)) continue;
                 var motor = candidate.GetComponent<FpsMotor>();
                 if (motor != null && (motor.IsCrouching || motor.CrouchFraction > 0.5f)) continue;   // 앉은 대원은 알아보지 못한다
                 var controller = candidate.GetComponent<CharacterController>();
@@ -209,7 +209,7 @@ namespace VoidLast.Monster
 
         void TickWarn()
         {
-            if (target == null || target.IsDead || !target.isActiveAndEnabled) { Set(Mode.Ambush); armedAt = Time.time + 1f; return; }
+            if (target == null || target.IsDead || !target.isActiveAndEnabled || StairSafeZone.Contains(target)) { Set(Mode.Ambush); armedAt = Time.time + 1f; return; }
             FaceTowards(target.transform.position, 720);
             if (Time.time >= warnEnds) BeginJump();
         }
@@ -242,7 +242,7 @@ namespace VoidLast.Monster
             agent.Warp(jumpTo);
             foreach (var player in FindObjectsByType<FpsHealth>(FindObjectsInactive.Exclude))
             {
-                if (player == null || player.IsDead) continue;
+                if (player == null || player.IsDead || StairSafeZone.Contains(player)) continue;
                 Vector3 delta = player.transform.position - jumpTo;
                 if (Mathf.Abs(delta.y) > 2f || Vector3.ProjectOnPlane(delta, Vector3.up).magnitude > landRadius) continue;
                 player.TakeDamage(landDamage); PlayLog.MonsterHit(gameObject, landDamage);
@@ -260,7 +260,7 @@ namespace VoidLast.Monster
             if (melee.IsBusy) { if (State != Mode.Attack) Set(Mode.Attack); agent.updateRotation = false; return; }   // 공격 중에는 MonsterMelee가 몸을 움직인다
             agent.updateRotation = true;
             if (State == Mode.Attack) Set(Mode.Chase);
-            if (!NavigationReady || target == null || target.IsDead || !target.isActiveAndEnabled || Time.time >= chaseEnds
+            if (!NavigationReady || target == null || target.IsDead || !target.isActiveAndEnabled || StairSafeZone.Contains(target) || Time.time >= chaseEnds
                 || FlatDistance(target.transform.position) > loseDistance) { BeginReturn(); return; }
 
             if (FlatDistance(target.transform.position) <= melee.AttackDistance && melee.TryStart(target)) { Stop(); Set(Mode.Attack); agent.updateRotation = false; return; }
@@ -393,7 +393,7 @@ namespace VoidLast.Monster
         void OnHit(GameObject attacker, Vector3 position)
         {
             var shooter = attacker != null ? attacker.GetComponentInParent<FpsHealth>() : null;
-            if (shooter == null || shooter.IsDead) return;
+            if (shooter == null || shooter.IsDead || StairSafeZone.Contains(shooter)) return;
             switch (State)
             {
                 case Mode.Ambush: BeginWarn(shooter, hitWarnTime); break;   // 앉아 있어도 쏜 대원에게 바로 뛰어내린다

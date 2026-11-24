@@ -1,6 +1,8 @@
 /* [ 코드 설명 ] 몬스터 HP와 실제 명중 피해를 관리하고 피격자·피격 시점의 공격자 위치를 AI에 전달합니다.
-   체력이 0이 되면 사라지지 않고 그 자리에서 그로기(쓰러짐)에 걸리고, 밸런스 설정(GameBalance)의 2~3분 사이 무작위 시간 뒤 체력 100%로 다시 일어납니다.
-   일어나기 몇 초 전(기본 10초)에 WakingSoon 이벤트가 나서 MonsterWakeWarning이 꿈틀거림·소리를 냅니다.
+   체력이 0이 되면 그 자리에 쓰러집니다. 밸런스 설정(GameBalance.monstersRevive)이 꺼져 있으면(기본) 다시 일어나지 않습니다.
+   켜져 있으면 무작위 시간 뒤 체력 100%로 일어나고, 일어나기 몇 초 전에 WakingSoon 이벤트가 나서 MonsterWakeWarning이 꿈틀거림·소리를 냅니다.
+   한동안(regenDelay) 맞지 않으면 체력이 서서히 가득 찹니다 (방장·혼자 실행에서만 계산, 복제본은 서버 HP를 받음).
+   맞을 때 느려짐·움찔은 MonsterHitReaction(Awake에서 자동으로 붙임)이 맡습니다.
    HP·속도·피해는 Awake에서 GameBalance 값(인원별 HP 배율 포함)으로 바뀝니다. useBalance를 끄면 프리팹 값을 그대로 씁니다.
    쓰러질 때 Died, 다시 일어날 때 Revived 이벤트가 납니다. 그로기 중에는 IsDead가 true라서 AI·공격·스턴이 모두 멈춥니다. */
 using System;
@@ -16,6 +18,7 @@ namespace VoidLast.Monster
         [SerializeField, Tooltip("HP·속도·피해·그로기 시간을 밸런스 설정(Resources/GameBalance)에서 가져온다")] bool useBalance = true;
         float reviveAt;
         bool warned;
+        float lastHitTime = float.NegativeInfinity;
         public float Maximum => maximumHealth;
         public float Current { get; private set; }
         public bool IsDead => Current <= 0;
@@ -38,14 +41,25 @@ namespace VoidLast.Monster
             if (useBalance) maximumHealth = GameBalance.ApplyToMonster(gameObject, maximumHealth);
             Current = maximumHealth;
             if (GetComponent<MonsterWakeWarning>() == null) gameObject.AddComponent<MonsterWakeWarning>();
+            if (GetComponent<MonsterHitReaction>() == null) gameObject.AddComponent<MonsterHitReaction>();
         }
 
         void Update()
         {
+            TickRegen();
             // 그로기 시간은 방장(또는 혼자 실행)에서만 잰다. 복제본은 서버의 HP가 돌아오면 일어난다.
             if (reviveAt <= 0 || !IsDead || NetworkHitRedirect != null) return;
             if (!warned && Time.time >= reviveAt - GameBalance.Current.wakeWarningSeconds) { warned = true; WakingSoon?.Invoke(); }
             if (Time.time >= reviveAt) Revive();
+        }
+
+        /// <summary>안 맞은 지 regenDelay초가 지나면 regenSeconds에 걸쳐 가득 찬다 (방장·혼자 실행에서만)</summary>
+        void TickRegen()
+        {
+            if (!useBalance || IsDead || NetworkHitRedirect != null || Current >= maximumHealth) return;
+            var b = GameBalance.Current;
+            if (!b.monsterRegen || Time.time - lastHitTime < b.regenDelay) return;
+            Current = Mathf.Min(maximumHealth, Current + maximumHealth / Mathf.Max(0.1f, b.regenSeconds) * Time.deltaTime);
         }
 
         /// <summary>복제본 전용: 서버가 "곧 일어난다"고 알려 왔을 때</summary>
@@ -64,6 +78,7 @@ namespace VoidLast.Monster
             if (IsDead || damage <= 0 || float.IsNaN(damage)) return;
             if (NetworkHitRedirect != null) { NetworkHitRedirect(damage, attacker, hitPoint); return; }
             Current = Mathf.Max(0, Current - damage);
+            lastHitTime = Time.time;
             Vector3 outward = attacker != null ? (attacker.transform.position + Vector3.up - hitPoint).normalized : -transform.forward;
             HitConfirmed?.Invoke(hitPoint, outward);
             if (IsDead)

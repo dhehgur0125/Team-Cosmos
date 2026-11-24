@@ -14,7 +14,7 @@ namespace VoidLast.Monster
         public float SightDistance => sightDistance;
         public bool CanSee(FpsHealth target, bool turnTowardHit = false)
         {
-            if (target == null || target.IsDead || !target.isActiveAndEnabled) return false;
+            if (target == null || target.IsDead || !target.isActiveAndEnabled || StairSafeZone.Contains(target)) return false;   // 계단실 안 대원은 보지 못함
             var capsule = target.GetComponent<CharacterController>();
             if (capsule == null || !capsule.enabled) return false;
             Vector3 delta = capsule.bounds.center - Eye;

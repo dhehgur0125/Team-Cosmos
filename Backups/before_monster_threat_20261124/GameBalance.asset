@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c06a38c98466d7440911f880e9d2612c, type: 3}
+  m_Name: GameBalance
+  m_EditorClassIdentifier: Assembly-CSharp::GameBalance
+  small:
+    health: 50
+    chaseSpeed: 4.8
+    damage: 12
+  frog:
+    health: 115
+    chaseSpeed: 3.5
+    damage: 15
+  frogLandDamage: 30
+  tentacle:
+    health: 150
+    chaseSpeed: 3.6
+    damage: 18
+  eyedLarge:
+    health: 375
+    chaseSpeed: 4.1
+    damage: 30
+  blindLarge:
+    health: 600
+    chaseSpeed: 1.8
+    damage: 45
+  groggyMinSeconds: 120
+  groggyMaxSeconds: 180
+  wakeWarningSeconds: 10
+  runSeconds: 7
+  exhaustedResume: 0.4
+  walkRecoverPerSecond: 0.15
+  restRecoverPerSecond: 0.25
+  jumpCost: 0.1
+  holdoutNoiseRadius: 45
+  holdoutNoiseInterval: 25
+  holdoutFinalSeconds: 30
+  holdoutFinalInterval: 10
+  monsterHealthByPlayers:
+  - 0.7
+  - 0.85
+  - 1
+  - 1.15
+  ammoPacksByPlayers: 03000000040000000500000006000000
+  syringesByPlayers: 02000000030000000300000004000000
+  holdoutByPlayers:
+  - 0.7
+  - 0.9
+  - 1
+  - 1
+  syncWindowByPlayers:
+  - 10
+  - 10
+  - 10
+  - 8
+  offlinePlayers: 1
+  writePlayLogs: 1
