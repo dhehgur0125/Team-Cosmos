@@ -20,6 +20,8 @@ public class ShipHullVisibility : MonoBehaviour
     public GameObject[] hangarToggles;
     [Tooltip("발사 격납고 소품 렌더러 (콜라이더는 유지하고 그리기만 끔)")]
     public Renderer[] hangarPropRenderers;
+    [Tooltip("발사 격납고 소품의 장식용 스크립트 (깜빡이는 글자·회전 등). 격납고를 안 그릴 때는 같이 멈춘다")]
+    public Behaviour[] hangarPropBehaviours;
 
     [Tooltip("선체 내부 공간 (월드 좌표)")]
     public Bounds interiorBounds = new Bounds(new Vector3(0.25f, 18f, -3.5f), new Vector3(146f, 37.4f, 125.6f));
@@ -73,6 +75,7 @@ public class ShipHullVisibility : MonoBehaviour
         SetActive(exterior, true);
         if (hangarToggles != null) foreach (var g in hangarToggles) SetActive(g, true);
         SetRenderers(hangarPropRenderers, true);
+        SetBehaviours(hangarPropBehaviours, true);
         if (cockpitToggles != null) foreach (var g in cockpitToggles) SetActive(g, true);
         SetRenderers(cockpitPropRenderers, true);
     }
@@ -104,6 +107,7 @@ public class ShipHullVisibility : MonoBehaviour
             if (exteriorLights != null) foreach (var l in exteriorLights) if (l != null && l.enabled != exteriorOn) l.enabled = exteriorOn;
             if (hangarToggles != null) foreach (var g in hangarToggles) SetActive(g, hangarOn);
             SetRenderers(hangarPropRenderers, hangarOn);
+            SetBehaviours(hangarPropBehaviours, hangarOn);
             if (cockpitToggles != null) foreach (var g in cockpitToggles) SetActive(g, cockpitOn);
             SetRenderers(cockpitPropRenderers, cockpitOn);
         }
@@ -139,6 +143,16 @@ public class ShipHullVisibility : MonoBehaviour
         {
             Renderer r = list[i];
             if (r != null && r.enabled != on) r.enabled = on;
+        }
+    }
+
+    static void SetBehaviours(Behaviour[] list, bool on)
+    {
+        if (list == null) return;
+        for (int i = 0; i < list.Length; i++)
+        {
+            Behaviour b = list[i];
+            if (b != null && b.enabled != on) b.enabled = on;
         }
     }
 

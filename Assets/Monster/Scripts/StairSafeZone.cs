@@ -57,6 +57,28 @@ namespace VoidLast.Monster
         /// <summary>이 대원이 계단실 안에 있어 몬스터가 노리거나 다치게 할 수 없는지</summary>
         public static bool Contains(FpsHealth player) => player != null && Contains(player.transform.position);
 
+        public const float DoorClearRadius = 14f;
+
+        /// <summary>
+        /// 계단실 안이거나 계단 문 앞(문에서 DoorClearRadius m 안)인지. 대원이 층에 도착하는 자리라
+        /// 몬스터의 순찰·수색 지점으로 쓰지 않는다 (몬스터가 문 앞에 서 있다가 도착한 대원과 바로 마주치지 않게).
+        /// </summary>
+        public static bool NearDoor(Vector3 position)
+        {
+            if (!Active) return false;
+            float dx = Mathf.Abs(position.x) - DoorU, dz = position.z;
+            return Contains(position) || dx * dx + dz * dz < DoorClearRadius * DoorClearRadius;
+        }
+
+        /// <summary>계단 문 앞 지점을 뺀 목록 (다 빠지면 원래 목록을 그대로 돌려줌)</summary>
+        public static Transform[] AwayFromDoors(Transform[] points)
+        {
+            if (!Active || points == null) return points;
+            var kept = new System.Collections.Generic.List<Transform>(points.Length);
+            foreach (var p in points) if (p != null && !NearDoor(p.position)) kept.Add(p);
+            return kept.Count > 0 ? kept.ToArray() : points;
+        }
+
         /// <summary>계단 문마다 길 찾기를 끊는 막이 (몬스터만 막음. 대원·총알은 그대로 지나감)</summary>
         static void PlaceDoorBlockers(Scene scene, int floor)
         {

@@ -234,44 +234,6 @@ namespace VoidLast.MapTools
             return splats.Count + growths;
         }
 
-        /// <summary>배치표 그룹 이름(#Blockers / #Burst / #Hazard)에 따라 반응하는 바이오매스로 만든다.</summary>
-        static void AttachGrowth(GameObject go, string group, Bounds b, int id)
-        {
-            BioGrowthKind kind;
-            if (group.StartsWith("Blockers")) kind = BioGrowthKind.Blocker;
-            else if (group.StartsWith("Burst")) kind = BioGrowthKind.Burst;
-            else if (group.StartsWith("Hazard")) kind = BioGrowthKind.Hazard;
-            else return;
-            var g = go.AddComponent<BioGrowth>();
-            g.id = id; g.kind = kind;
-            if (kind == BioGrowthKind.Hazard) g.radius = Mathf.Max(b.extents.x, b.extents.z) + 1f;
-            if (kind != BioGrowthKind.Blocker) return;
-            // 부서지면 몬스터 길도 열려야 하므로 길찾기 굽기에서는 빼고, 살아 있는 동안만 길을 깎는 장애물을 붙인다
-            go.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
-            var block = new GameObject("NavBlock");
-            block.transform.SetParent(go.transform, false);
-            block.transform.position = b.center;
-            block.transform.rotation = Quaternion.identity;   // 부모가 돌아가 있어도 상자는 세계 축에 맞춘다
-            Vector3 ls = block.transform.lossyScale;
-            var ob = block.AddComponent<UnityEngine.AI.NavMeshObstacle>();
-            ob.shape = UnityEngine.AI.NavMeshObstacleShape.Box;
-            ob.size = new Vector3(b.size.x / ls.x, b.size.y / ls.y, b.size.z / ls.z);
-            ob.carving = true;
-        }
-
-        /// <summary>원본 씬의 멀티플레이 루트에 BioGrowthSystem이 없으면 만든다 (층 씬으로 나눌 때 같이 복사된다).</summary>
-        static void EnsureGrowthSystem(UnityEngine.SceneManagement.Scene sc)
-        {
-            foreach (var r in sc.GetRootGameObjects())
-            {
-                if (r.name != MultiplayerSetup.MultiRootName || r.transform.Find("Bio Growth System") != null) continue;
-                var go = new GameObject("Bio Growth System");
-                go.transform.SetParent(r.transform, false);
-                go.AddComponent<Unity.Netcode.NetworkObject>();
-                go.AddComponent<BioGrowthSystem>();
-            }
-        }
-
         const string InfestedDir = "Assets/Map/Stage2_Ship/Interior/Materials/Infested";
 
         /// <summary>
@@ -370,7 +332,7 @@ namespace VoidLast.MapTools
             // 이 층의 예전 얼룩 메시 에셋을 지우고 새로 만든다
             if (!AssetDatabase.IsValidFolder(BakedDir)) AssetDatabase.CreateFolder("Assets/Map/Stage2_Ship/Interior", "Baked");
             foreach (var g in AssetDatabase.FindAssets("F" + floor + "_Splats_", new[] { BakedDir })) AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(g));
-            int splatIndex = 0, growthIndex = 0;
+            int splatIndex = 0;
             var ci = CultureInfo.InvariantCulture;
             Transform grp = interior;
             int placed = 0;
@@ -436,14 +398,10 @@ namespace VoidLast.MapTools
                 var b = rs[0].bounds;
                 foreach (var r in rs) b.Encapsulate(r.bounds);
                 float dy = top ? floorY + RoomHeight - 0.05f - b.max.y : floorY + yoff - b.min.y;
-                Vector3 shift = new Vector3(x - b.center.x, dy, z - b.center.z);
-                go.transform.position += shift;
+                go.transform.position += new Vector3(x - b.center.x, dy, z - b.center.z);
                 placed++;
-                b.center += shift;
-                AttachGrowth(go, grp.name, b, floor * 10000 + (growthIndex++));
             }
             Physics.SyncTransforms();
-            EnsureGrowthSystem(sc);
 
             string nav = "";
             if (bakeNav)

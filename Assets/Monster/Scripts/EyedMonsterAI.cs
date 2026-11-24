@@ -57,7 +57,13 @@ namespace VoidLast.Monster
         }
         void OnEnable() { health.Damaged += OnHit; health.Died += Die; health.Revived += GetUp; }
         void OnDisable() { health.Damaged -= OnHit; health.Died -= Die; health.Revived -= GetUp; if (NavigationReady) agent.isStopped = true; }
-        void Start() { if (!NetworkProxy && !NavigationReady) Debug.LogError("Monster requires a baked NavMesh at its spawn position.", this); }
+        void Start()
+        {
+            if (!NetworkProxy && !NavigationReady) Debug.LogError("Monster requires a baked NavMesh at its spawn position.", this);
+            // 층 씬에서는 계단 문 앞 지점을 빼서, 대원이 도착하는 계단 앞을 순찰·수색하지 않게 한다 (sceneLoaded 뒤라 Active가 정해져 있음)
+            patrolPoints = StairSafeZone.AwayFromDoors(patrolPoints);
+            searchPoints = StairSafeZone.AwayFromDoors(searchPoints);
+        }
         void Update()
         {
             if (NetworkProxy || health.IsDead || !NavigationReady) return;

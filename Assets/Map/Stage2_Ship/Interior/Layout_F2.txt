@@ -3,11 +3,6 @@
 // 장비 작업실은 봉쇄 문으로 닫혀 있던 방이라 깨끗하게 둔다.
 // 임무 장치·연료 커플러·웨이포인트 자리는 비워 둠. 해골·사람 모양 변이체·고어는 쓰지 않는다(곤충형 괴물의 벌집 컨셉).
 //
-// 나중에 스크립트를 붙일 종류 (그룹 이름으로 구분):
-//   #Blockers_*  막는 촉수 — 총으로 부술 수 있게 할 대상. 지금은 반드시 우회로가 있게 놓았다.
-//   #Burst_*     터지는 덩어리 — 밟거나 밑을 지나가면 터질 대상.
-//   #Hazard_*    둥지 중심부 — 가까이 가면 피해를 줄 대상.
-//   그 밖의 그룹과 @Bio 줄은 장식.
 #NW_MaintStorage
 SM_Wall_2m|0|-37.5|90
 SM_Wall_2m|2.1|-37.5|90
@@ -45,7 +40,6 @@ SM_Crate1|-27.5|-20.5|0
 SM_Crate6|-26.4|-20.7|10
 SM_CornerPile_5|-38.9|-19.3|0
 SM_BioMassSet_04_01|-25|-19.2|0
-SM_OctoStick_5|-38.8|-33.2|40
 SM_ShroomSet_2|-31|-37.3|0
 #C_CargoHold
 SM_Wall_2m|-2|16.6|0
@@ -53,9 +47,7 @@ SM_Wall_2m|8|19.4|0
 SM_MessyPileSet_2|-10|26.5|0
 SM_CornerPile_2|17.9|8.2|180
 SM_BioMassSet_06_01|3|13.8|0|2.8
-SM_OctoStick_3|-3.7|22.2|0|2.8
 SM_BioMassSet_06_02|9.7|22.2|60|2.8
-SM_OctoStick_6|3|11.65|270|0|1|90
 SM_CableChaos|3|18|0|^
 #E_CargoSorting
 SM_Table|34|21.5|90
@@ -68,15 +60,12 @@ SM_Wall_2m|-57|24|0
 SM_Wall_2m|-57|26.1|0
 SM_Vent_Tube_Main|-55|20|0
 SM_Coolers|-70.5|27|90
-SM_OctoStick_5|-70.6|22|0
 SM_BioMassSet_04_01|-53.5|32.8|0
 #S_ContainerStorage
 SM_CornerPile_3|-42|38|90
-SM_OctoStick_4|-24.5|38|0
 SM_BioMassSet_06_02|-37|33.5|0|2.8
 SM_BioMassSet_06_03|-27.5|26.4|30|2.8
 #SE_QuarantineStorage
-SM_OctoStick_7|10.5|40.3|0
 SM_Wall_Small5|2.5|42.5|0
 SM_Wall_Small5|9.5|51.5|90
 SM_CableChaos|6|46|90|^
@@ -89,7 +78,6 @@ SM_Crate4|25.6|28|0
 SM_CrateCyl1|25.7|29|0
 SM_BioMassSet_02_02|22.6|35|0
 SM_BioMassSet_06_02|44.3|46|0
-SM_OctoStick_2|-48.9|36|0
 SM_Crate2|-35|44.4|0
 SM_Crate5|-33.9|44.5|8
 SM_Crate2|-60.4|-10|0
@@ -104,116 +92,34 @@ SM_Wall_2m|22.6|31|90
 SM_Wall_2m|63.4|-10|90
 SM_Wall_2m|-60.6|5|90
 SM_Wall_2m|-30|44.4|0
-// 막는 촉수 (지금은 옆으로 지나갈 틈이나 다른 길이 있다)
-#Blockers_Tentacles
-SM_OctoStick_1|33|47.95|90
-SM_OctoStick_4|23|24|0
-SM_OctoStick_5|-25|42.2|0
-SM_OctoStick_2|-4|-12|90
-SM_OctoStick_2|12.8|-21.5|0
 // 둥지 중심부 (화물 리프트 옆, 알 더미, 검역 보관실 기둥)
-#Hazard_NestCore
-SM_BigPile_Tenta|-2.5|27.3|0|0|0.6
-SM_BigPile_TentaEgg|14.5|10.5|30
+#NestCore
 SM_BioMassSet_03_01|12|52|0
 SM_BioMassSet_03_02|0|40.5|120
 // 벽을 타고 퍼진 바이오매스 (기울임 90 = 벽에 붙임. 회전 0:+x벽, 90:-z벽, 180:-x벽, 270:+z벽)
 #Walls
-SM_OctoStick_3|-13.7|-43|180|0|1|90
 SM_MessyPileSet_4|5.65|-47|0|1.0|1|90
 SM_BioMassSet_06_01|-10|-49.6|90|1.4|1|90
-SM_OctoStick_3|21.3|-34|180|0|1|90
 SM_BioMassSet_06_03|36.55|-34|0|1.4|1|90
 SM_MessyPileSet_1|25|-47.55|90|0.8|1|90
 SM_BioMassSet_01_03|-39.85|-33|180|1.6|1|90
 SM_MessyPileSet_1|-39.55|-24|180|0.8|1|90
-SM_OctoStick_6|-33|-37.75|90|0|1|90
-SM_OctoStick_6|4|7.25|90|0|1|90
 SM_MessyPileSet_2|10.5|7.35|90|0.2|1|90
-SM_OctoStick_3|-3|28.7|270|0|1|90
 SM_BioMassSet_06_01|18.6|23|0|1.4|1|90
 SM_MessyPileSet_4|-12.65|17|180|1.0|1|90
-SM_OctoStick_3|47.7|31|0|0|1|90
 SM_MessyPileSet_1|28.45|26|180|0.8|1|90
-SM_OctoStick_6|-71.75|24|180|0|1|90
 SM_MessyPileSet_2|-61|33.65|270|0.2|1|90
 SM_BioMassSet_06_03|-57|18.45|90|1.4|1|90
-SM_OctoStick_3|-34|38.7|270|0|1|90
 SM_MessyPileSet_4|-28|23.35|90|1.0|1|90
 SM_BioMassSet_06_01|-42.6|34|180|1.4|1|90
-SM_OctoStick_6|6|38.25|90|0|1|90
-SM_OctoStick_3|7|53.7|270|0|1|90
 SM_MessyPileSet_2|15.65|43|0|0.2|1|90
 SM_MessyPileSet_1|-3.55|41.5|180|0.8|1|90
 SM_BioMassSet_01_04|-17.75|-8|0|1.3|1|90
 SM_MessyPileSet_4|-11.15|-4|180|1.0|1|90
 SM_BioMassSet_06_03|26.05|33|0|1.4|1|90
-SM_OctoStick_3|32|51.2|270|0|1|90
 SM_MessyPileSet_1|-40|40.95|90|0.8|1|90
-SM_OctoStick_6|-64.25|-15|180|0|1|90
 SM_BioMassSet_01_03|-59.65|8|0|1.5|1|90
 SM_MessyPileSet_2|64.15|-28|0|0.2|1|90
-// 천장에 매달린 덩어리 (터지는 덩어리 후보)
-#Burst_Drops
-SM_HanginDropSet_3|-8|-44|0|^
-SM_HanginDropSet_8|2.5|-44|0|^
-SM_HanginDropSet_1|-2|-38|0|^
-SM_HanginDropSet_2|4|-41|0|^
-SM_HanginDropSet_1|25|-39|0|^
-SM_HanginDropSet_6|33|-44|0|^
-SM_HanginDropSet_5|30|-32|0|^
-SM_HanginDropSet_6|28|-45|0|^
-SM_HanginDropSet_7|-28|-31|0|^
-SM_HanginDropSet_7|-36|-24|0|^
-SM_HanginDropSet_3|-33|-21|0|^
-SM_HanginDropSet_9|-30|-35|0|^
-SM_HanginDropSet_1|-37|-28|0|^
-SM_HanginDropSet_1|0|18|0|^
-SM_HanginDropSet_4|6.5|18|0|^
-SM_HanginDropSet_2|-7|12|0|^
-SM_HanginDropSet_9|12|24|0|^
-SM_HanginDropSet_8|-10|20|0|^
-SM_HanginDropSet_9|15|14|0|^
-SM_HanginDropSet_10|3|10|0|^
-SM_HanginDropSet_1|3|26|0|^
-SM_HanginDropSet_5|10|27.5|0|^
-SM_HanginDropSet_6|-6|18|0|^
-SM_HanginDropSet_2|34|24|0|^
-SM_HanginDropSet_9|42|28|0|^
-SM_HanginDropSet_3|38|22|0|^
-SM_HanginDropSet_5|45|31|0|^
-SM_HanginDropSet_6|31|31|0|^
-SM_HanginDropSet_4|-60|30|0|^
-SM_HanginDropSet_3|-66|25|0|^
-SM_HanginDropSet_7|-55|22|0|^
-SM_HanginDropSet_8|-68|31|0|^
-SM_HanginDropSet_5|-33|27|0|^
-SM_HanginDropSet_8|-36|36.5|0|^
-SM_HanginDropSet_2|-27|31|0|^
-SM_HanginDropSet_10|-40|31|0|^
-SM_HanginDropSet_1|3|44|0|^
-SM_HanginDropSet_6|9|49|0|^
-SM_HanginDropSet_10|6|52|0|^
-SM_HanginDropSet_4|0|47|0|^
-SM_HanginDropSet_9|12|43|0|^
-SM_HanginDropSet_3|6|41|0|^
-SM_HanginDropSet_3|-9|-8|0|^
-SM_HanginDropSet_5|36|49|0|^
-SM_HanginDropSet_7|22|49|0|^
-SM_HanginDropSet_2|-28|43|0|^
-SM_HanginDropSet_6|-62|-20|0|^
-SM_HanginDropSet_9|-62|10|0|^
-SM_HanginDropSet_4|62|0|0|^
-SM_HanginDropSet_1|-20|-5|0|^
-SM_HanginDropSet_5|-20|8|0|^
-SM_HanginDropSet_6|-9|2|0|^
-SM_HanginDropSet_8|24|25|0|^
-SM_HanginDropSet_2|43|42|0|^
-SM_HanginDropSet_7|-47|38|0|^
-SM_HanginDropSet_9|62|-30|0|^
-SM_HanginDropSet_10|-62|-5|0|^
-SM_HanginDropSet_4|-35|0|0|^
-SM_HanginDropSet_8|-30|-9|0|^
 // 바닥·벽에 바른 바이오매스. 검역 보관실만 방 전체를 덮고, 나머지는 얼룩을 흩뿌린다.
 // 얼룩은 앞에서 놓은 물체에도 묻어야 하므로 맨 끝에 둔다.
 #BioPaint

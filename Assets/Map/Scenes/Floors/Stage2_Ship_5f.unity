@@ -84093,7 +84093,6 @@ Transform:
   - {fileID: 293392003}
   - {fileID: 1926022518}
   - {fileID: 1777666765}
-  - {fileID: 1260470731}
   - {fileID: 912068077}
   - {fileID: 2015763246}
   - {fileID: 609128663}
@@ -140908,7 +140907,7 @@ MonoBehaviour:
   tunnelBounds:
     m_Center: {x: -136.35, y: 34, z: -3.5}
     m_Extent: {x: 63.550003, y: 3, z: 2.6}
-  cockpitVisibleY: {x: 28, y: 42}
+  cockpitVisibleY: {x: 0, y: 0}
   cockpitFogBlend: 0.85
   controlFog: 1
   exteriorFogDensity: 0.0015
@@ -191512,85 +191511,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.4, y: 4, z: 5.5}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!1 &1260470730
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1260470731}
-  - component: {fileID: 1260470732}
-  - component: {fileID: 1260470733}
-  m_Layer: 0
-  m_Name: Bio Growth System
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1260470731
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1260470730}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 596118276}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1260470732
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1260470730}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4041449679
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  m_InScenePlacedDisabledByDefault: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  m_InScenePlaced: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 0
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
---- !u!114 &1260470733
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1260470730}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 07a8e0fc740d09947af76c1af8a51b1a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BioGrowthSystem
-  ShowTopMostFoldoutHeaderGroup: 1
-  burstDamage: 10
-  burstDamageRadius: 2.5
-  burstNoiseRadius: 18
-  hazardDamagePerSecond: 8
-  burstClip: {fileID: 0}
-  breakClip: {fileID: 0}
 --- !u!1 &1260689988
 GameObject:
   m_ObjectHideFlags: 0
