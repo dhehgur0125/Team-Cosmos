@@ -166,6 +166,15 @@ namespace VoidLast.MapTools
                         UnityEngine.SceneManagement.SceneManager.LoadScene(arg);
                         Note("load " + arg);
                         break;
+                    case "click":   // click 버튼글자  (화면에 보이는 버튼 중 글자가 같은 것을 누름)
+                    {
+                        var hit = UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None)
+                            .FirstOrDefault(b => b.isActiveAndEnabled && b.GetComponentInChildren<TMPro.TMP_Text>()?.text == arg);
+                        if (hit == null) { Note("click: 버튼 없음 '" + arg + "'"); break; }
+                        hit.onClick.Invoke();
+                        Note("click " + arg);
+                        break;
+                    }
                     case "stop": EditorApplication.isPlaying = false; Note("stop"); break;
                     case "play": EditorApplication.isPlaying = true; Note("play"); break;
                     case "clearlog": File.WriteAllText(LogPath, ""); break;
@@ -202,7 +211,8 @@ namespace VoidLast.MapTools
                 var status = lm.GetType().GetField("statusText", All).GetValue(lm) as TMPro.TMP_Text;
                 var rj = lm.GetType().GetField("_rejoinButton", All)?.GetValue(lm) as GameObject;
                 var hint = lm.GetType().GetField("startHintText", All).GetValue(lm) as TMPro.TMP_Text;
-                sb.AppendLine($"lobby room {(room != null && room.activeInHierarchy)} rejoinBtn {(rj != null && rj.activeInHierarchy)} status '{status?.text}' hint '{hint?.text}'");
+                var ongoing = lm.GetType().GetField("_ongoingRoom", All)?.GetValue(lm) as GameObject;
+                sb.AppendLine($"lobby room {(room != null && room.activeInHierarchy)} rejoinBtn {(rj != null && rj.activeInHierarchy)} ongoingRoom {(ongoing != null)} status '{status?.text}' hint '{hint?.text}'");
             }
             sb.AppendLine("loading " + LoadingScreen.IsShowing);
             var ft = FloorTransition.Instance;

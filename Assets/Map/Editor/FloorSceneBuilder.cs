@@ -151,6 +151,8 @@ namespace VoidLast.MapTools
             log.Add(BalanceMonstersSetup.BuildInOpenScene(floor));
             // 6g) 계단실 맨 위 천장 판 (보기용, 뚫려 보이지 않게)
             log.Add(StairCeilingSetup.BuildInOpenScene(floor));
+            // 6h) 소품 충돌 정리 (벽·천장 살덩이 충돌 끄기 등, 메뉴 Optimize/Fix Prop Colliders And Faces와 같음)
+            log.Add(PropCollisionFix.FixOpenScene());
 
             // 7) 고치 (그 층에서 걸어갈 수 있는 자리를 골라 저장)
             log.Add(CocoonSetup.BuildInOpenScene(floor));

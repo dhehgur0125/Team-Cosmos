@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// 게임 중 ESC 메뉴: 계속하기 / 설정 / 게임 종료.
+/// 게임 중 ESC 메뉴: 계속하기 / 설정 / 게임 종료(확인 창 → 대기실로, 프로그램은 끄지 않음 — ExitToRoom).
 ///  - 층 씬(대원이 있는 씬)에서만 열린다. Start·로비 씬, 로딩 화면 중에는 열리지 않는다.
 ///  - 열려 있는 동안 대원 조작(FpsInput)은 막히고 마우스 커서가 풀린다. 멀티플레이라 게임은 멈추지 않는다.
 ///  - 닫으면 열기 전에 커서가 잠겨 있었을 때만 다시 잠근다 (게임 오버 화면 등은 그대로).
@@ -81,13 +81,20 @@ public sealed class PauseMenu : MonoBehaviour
         var note = UiKit.NewText(list, "멀티플레이 중에는 메뉴를 열어도 게임이 멈추지 않아요.", 19, LobbyStyle.TextDim, TextAlignmentOptions.Center);
         Size(note.rectTransform, 40);
 
-        _confirm = BuildPanel("Confirm Exit", 600, out var c);
-        var q = UiKit.NewText(c, "게임을 끝낼까요?", 34, LobbyStyle.Text, TextAlignmentOptions.Center);
+        // 게임 종료 = 프로그램을 끄지 않고 대기실로 (참가자는 나중에 다시 참가할 수 있음)
+        var nm = Unity.Netcode.NetworkManager.Singleton;
+        bool online = Stage2NetworkBootstrap.IsOnline;
+        bool host = online && nm.IsServer;
+        _confirm = BuildPanel("Confirm Exit", 640, out var c);
+        var q = UiKit.NewText(c, host || !online ? "게임을 끝낼까요?" : "게임에서 나갈까요?", 34, LobbyStyle.Text, TextAlignmentOptions.Center);
         q.fontStyle = FontStyles.Bold;
         Size(q.rectTransform, 60);
-        var warn = UiKit.NewText(c, "방장이 게임을 끝내면 함께하던 대원들도\n게임에서 나가게 돼요.", 22, LobbyStyle.TextDim, TextAlignmentOptions.Center);
-        Size(warn.rectTransform, 76);
-        var quit = UiKit.NewButton(c, "끝내기", 28, UiKit.QuitGame);
+        string message = !online ? "대기실로 돌아가요."
+            : host ? "방장이 게임을 끝내면 모든 대원이\n함께 대기실로 돌아가요."
+            : "대기실로 이동해요. 대기실에서 게임에\n다시 참가하거나 방에서 나갈 수 있어요.\n가지고 있던 물건은 그 자리에 떨어져요.";
+        var warn = UiKit.NewText(c, message, 22, LobbyStyle.TextDim, TextAlignmentOptions.Center);
+        Size(warn.rectTransform, online && !host ? 110 : 76);
+        var quit = UiKit.NewButton(c, host || !online ? "끝내기" : "나가기", 28, () => ExitToRoom(online, host));
         UiKit.SetColor(quit, LobbyStyle.Accent);
         Size(quit.transform, 76);
         Size(UiKit.NewButton(c, "취소", 28, () => { _confirm.SetActive(false); _panel.SetActive(true); }).transform, 76);
@@ -114,6 +121,38 @@ public sealed class PauseMenu : MonoBehaviour
     }
 
     static void Size(Transform t, float height) => t.gameObject.AddComponent<UnityEngine.UI.LayoutElement>().preferredHeight = height;
+
+    bool _exiting;
+
+    /// <summary>
+    /// 게임 종료 확인 뒤: 프로그램을 끄지 않고 대기실로 간다.
+    ///  - 참가자: 방에서 나와 로비로 → 로비가 "진행 중인 게임" 대기실 창을 띄워 다시 참가 / 방에서 나가기를 고르게 한다.
+    ///  - 방장: 게임 오버 때처럼 모든 대원을 같은 방의 대기실로 데려간다.
+    ///  - 혼자(오프라인) 시험: 로비 씬으로.
+    /// </summary>
+    void ExitToRoom(bool online, bool host)
+    {
+        if (_exiting) return;
+        _exiting = true;
+        Close(false);
+        GameSettings.Save();
+        var boot = FindAnyObjectByType<Stage2NetworkBootstrap>();
+        if (!online) { SceneManager.LoadScene("Lobby"); _exiting = false; return; }
+        if (host)
+        {
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            var status = nm.SceneManager != null ? nm.SceneManager.LoadScene("Lobby", LoadSceneMode.Single) : Unity.Netcode.SceneEventProgressStatus.SceneManagementNotEnabled;
+            Debug.Log("[PauseMenu] 방장이 게임을 끝냄 → 모든 대원을 대기실로: " + status);
+            if (status != Unity.Netcode.SceneEventProgressStatus.Started && boot != null)
+                _ = boot.ReturnToLobbyAsync("게임을 끝냈어요. 대원들을 대기실로 옮기지 못해 방을 닫았어요.");
+            _exiting = false;
+            return;
+        }
+        Rejoin.RefreshTicketTime();   // 로비에 가면 이 표로 "진행 중인 게임" 대기실 창이 뜬다
+        if (boot != null) _ = boot.ReturnToLobbyAsync("게임에서 나와 대기실로 왔어요.");
+        else SceneManager.LoadScene("Lobby");
+        _exiting = false;
+    }
 
     void OpenSettings()
     {

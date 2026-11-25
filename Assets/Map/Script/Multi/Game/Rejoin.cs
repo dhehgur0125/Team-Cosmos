@@ -69,6 +69,14 @@ public static class Rejoin
         return true;
     }
 
+    /// <summary>게임에서 나올 때: 표의 저장 시각을 지금으로 (3시간은 나온 때부터 셈)</summary>
+    public static void RefreshTicketTime()
+    {
+        if (!TryLoadTicket(out var t)) return;
+        t.savedUtcTicks = DateTime.UtcNow.Ticks;
+        try { PlayerPrefs.SetString(PrefKey, JsonUtility.ToJson(t)); PlayerPrefs.Save(); } catch { }
+    }
+
     public static void ClearTicket()
     {
         try { PlayerPrefs.DeleteKey(PrefKey); PlayerPrefs.Save(); } catch { }

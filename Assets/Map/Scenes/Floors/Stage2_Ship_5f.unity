@@ -138002,6 +138002,7 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
+  hangarPropBehaviours: []
   interiorBounds:
     m_Center: {x: 0.25, y: 18.15, z: -3.500002}
     m_Extent: {x: 73.05, y: 18.949999, z: 62.800003}
@@ -168639,6 +168640,7 @@ MonoBehaviour:
   reviveHealthFraction: 0.5
   minSpacing: 3
   size: {x: 0.72, y: 2.22, z: 0.72}
+  eggWidth: 1.7
   material: {fileID: 2100000, guid: 995146bb8b73b2a4097a3463ca94a200, type: 2}
   cocoonPrefab: {fileID: 8656794163663006276, guid: 8e2947ba770ae5248b465c5d7aa232c4, type: 3}
   font: {fileID: 11400000, guid: df85765197922b6488702f4706bc6b6a, type: 2}

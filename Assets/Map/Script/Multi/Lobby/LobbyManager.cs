@@ -181,7 +181,7 @@ public class LobbyManager : MonoBehaviour
             SetStatus(string.IsNullOrEmpty(Stage2NetworkBootstrap.LobbyReturnMessage) ? "준비 완료. 방을 만들거나 목록에서 들어가세요." : Stage2NetworkBootstrap.LobbyReturnMessage);
             Stage2NetworkBootstrap.LobbyReturnMessage = null;
             RefreshRejoinTicket();
-            if (_hasTicket) SetStatus("진행 중이던 게임이 있어요. 오른쪽 위 '다시 참가'를 누르면 이어서 할 수 있어요.");
+            if (_hasTicket) SetStatus("진행 중이던 게임이 있어요. 다시 참가하거나 방에서 나갈 수 있어요.");
         }
         catch (Exception e)
         {
@@ -196,6 +196,8 @@ public class LobbyManager : MonoBehaviour
             NetworkManager.Singleton.OnClientDisconnectCallback += OnNetworkDisconnected;
 
         if (TryResumeRoom()) return;   // 게임이 끝나 같은 방으로 돌아온 경우
+        // 게임 도중 나왔거나(ESC → 게임 종료, 연결 끊김) 게임을 껐다 켠 경우: 그 방의 "진행 중인 게임" 대기실 창
+        if (_hasTicket) ShowOngoingRoom();
         await RefreshRoomListAsync(false);
     }
 
@@ -218,7 +220,7 @@ public class LobbyManager : MonoBehaviour
         Rejoin.ClearTicket();   // 게임이 끝났으므로 다시 참가 표는 필요 없음
         EnterRoom(session);
         AddSystemLine("게임이 끝나 대기방으로 돌아왔어요.");
-        SetStatus(session.IsHost ? "게임 오버 · 대기방으로 돌아왔어요. 대원이 모두 준비하면 다시 시작할 수 있어요." : "게임 오버 · 대기방으로 돌아왔어요. 준비를 눌러 주세요.");
+        SetStatus(session.IsHost ? "게임이 끝나 대기방으로 돌아왔어요. 대원이 모두 준비하면 다시 시작할 수 있어요." : "게임이 끝나 대기방으로 돌아왔어요. 준비를 눌러 주세요.");
         _ = ResetRoomAfterGameAsync(session);
         return true;
     }
@@ -804,18 +806,83 @@ public class LobbyManager : MonoBehaviour
         image.sprite = readyButton.image.sprite; image.type = readyButton.image.type; image.color = LobbyStyle.Accent;
         var button = go.GetComponent<Button>();
         button.colors = readyButton.colors; button.targetGraphic = image;
-        button.onClick.AddListener(() => { _ = RejoinAsync(); });
+        button.onClick.AddListener(ShowOngoingRoom);
         var labelGo = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer));
         labelGo.transform.SetParent(go.transform, false);
         var label = labelGo.AddComponent<TextMeshProUGUI>();
         if (startHintText != null) label.font = startHintText.font;
-        label.text = "진행 중인 게임 다시 참가";
+        label.text = "진행 중인 게임 대기실";
         label.fontSize = 22; label.alignment = TextAlignmentOptions.Center; label.raycastTarget = false;
         var lr = label.rectTransform; lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.offsetMin = lr.offsetMax = Vector2.zero;
         go.SetActive(false);
     }
 
     void RefreshRejoinTicket() { _hasTicket = Rejoin.TryLoadTicket(out _); }
+
+    // ------------------------------------------------------------------ 진행 중인 게임 대기실 창
+    GameObject _ongoingRoom;
+
+    /// <summary>
+    /// 다시 참가 표가 있을 때 그 방의 대기실 창을 띄운다 (방 코드·시작 인원·내 고유 아이템).
+    /// 게임이 진행 중인 방은 들어가는 순간 그 게임에 연결되므로, 진짜 대기방 대신 이 창에서 다시 참가 / 방에서 나가기를 고른다.
+    /// 게임 도중 ESC → 게임 종료로 나왔을 때, 연결이 끊겼을 때, 게임을 껐다 켰을 때(표는 3시간 보관) 뜬다.
+    /// </summary>
+    void ShowOngoingRoom()
+    {
+        if (_busy || _session != null) return;
+        if (!Rejoin.TryLoadTicket(out var t)) { _hasTicket = false; HideOngoingRoom(); return; }
+        HideOngoingRoom();
+
+        var canvas = UiKit.NewCanvas("Ongoing Game Room", 50);
+        _ongoingRoom = canvas.gameObject;
+        UiKit.NewImage(canvas, "Dim", UiKit.Backdrop).rectTransform.Fill();
+        var win = UiKit.NewImage(canvas, "Window", UiKit.Window);
+        win.rectTransform.Place(new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 0));
+        var accent = UiKit.NewImage(win.transform, "Accent", LobbyStyle.Accent);
+        accent.rectTransform.anchorMin = new Vector2(0, 1); accent.rectTransform.anchorMax = Vector2.one;
+        accent.rectTransform.pivot = new Vector2(0.5f, 1); accent.rectTransform.sizeDelta = new Vector2(0, 4);
+        accent.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+        var v = win.gameObject.AddComponent<VerticalLayoutGroup>();
+        v.padding = new RectOffset(52, 52, 44, 44); v.spacing = 16;
+        v.childControlWidth = v.childControlHeight = true; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
+        win.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        void Line(Component c, float h) => c.gameObject.AddComponent<LayoutElement>().preferredHeight = h;
+        var title = UiKit.NewText(win.transform, "대기실 · 진행 중인 게임", 38, LobbyStyle.Text, TextAlignmentOptions.Center);
+        title.fontStyle = FontStyles.Bold;
+        Line(title, 60);
+        var kind = (UniqueItemKind)t.unique;
+        string item = kind != UniqueItemKind.None ? UniqueItems.DisplayName(kind) : "없음";
+        var info = UiKit.NewText(win.transform, $"방 코드 <b>{t.code}</b>    ·    시작 인원 {Mathf.Max(1, t.players)}명\n내 고유 아이템 <b>{item}</b>", 26, LobbyStyle.Text, TextAlignmentOptions.Center);
+        Line(info, 80);
+        var desc = UiKit.NewText(win.transform, "이 방의 게임이 아직 진행 중이에요.\n다시 참가하면 대원들이 있는 층의 A 계단에서 이어서 해요.\nHP는 나올 때 그대로, 가지고 있던 물건은 나온 자리에 떨어져 있어요.", 21, LobbyStyle.TextDim, TextAlignmentOptions.Center);
+        Line(desc, 96);
+        var rejoin = UiKit.NewButton(win.transform, "게임에 다시 참가", 28, () =>
+        {
+            if (_busy) return;
+            HideOngoingRoom();
+            _ = RejoinAsync();
+        });
+        UiKit.SetColor(rejoin, LobbyStyle.Accent);
+        Line(rejoin, 76);
+        var leave = UiKit.NewButton(win.transform, "방에서 나가기", 26, () =>
+        {
+            if (_busy) return;
+            Rejoin.ClearTicket();
+            _hasTicket = false;
+            HideOngoingRoom();
+            SetStatus("방에서 나왔어요. 다른 방을 만들거나 목록에서 들어갈 수 있어요.");
+        });
+        Line(leave, 64);
+        var note = UiKit.NewText(win.transform, "방에서 나가면 이 게임에는 다시 들어갈 수 없어요.\n게임을 껐다 켜도 나온 뒤 3시간 안에는 이 창에서 다시 참가할 수 있어요.", 18, LobbyStyle.TextDim, TextAlignmentOptions.Center);
+        Line(note, 56);
+    }
+
+    void HideOngoingRoom()
+    {
+        if (_ongoingRoom != null) Destroy(_ongoingRoom);
+        _ongoingRoom = null;
+    }
 
     /// <summary>다시 참가 표의 방 코드로 들어간다. 게임이 진행 중이면 그 층으로, 이미 끝나 대기방이면 대기방으로</summary>
     async Task RejoinAsync()
