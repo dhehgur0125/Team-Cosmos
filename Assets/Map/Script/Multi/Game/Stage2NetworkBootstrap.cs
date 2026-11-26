@@ -50,6 +50,7 @@ public sealed class Stage2NetworkBootstrap : MonoBehaviour
             var nm = NetworkManager.Singleton;
             nm.OnClientDisconnectCallback += OnClientDisconnect;
             nm.OnServerStopped += OnServerStopped;
+            nm.OnClientStopped += OnClientStopped;
         }
     }
 
@@ -60,6 +61,7 @@ public sealed class Stage2NetworkBootstrap : MonoBehaviour
         {
             nm.OnClientDisconnectCallback -= OnClientDisconnect;
             nm.OnServerStopped -= OnServerStopped;
+            nm.OnClientStopped -= OnClientStopped;
         }
     }
 
@@ -68,11 +70,55 @@ public sealed class Stage2NetworkBootstrap : MonoBehaviour
         var nm = NetworkManager.Singleton;
         if (nm == null) return;
         if (nm.IsServer) { Rejoin.ServerClientLeft(clientId); return; }   // 방장: 나간 대원을 기억해 다시 들어올 수 있게
-        if (clientId == nm.LocalClientId || clientId == NetworkManager.ServerClientId)
-            _ = ReturnToLobbyAsync(!string.IsNullOrEmpty(nm.DisconnectReason) ? nm.DisconnectReason : "방장과의 연결이 끊어졌어요.");
+        if (clientId == nm.LocalClientId || clientId == NetworkManager.ServerClientId) LostHost(nm.DisconnectReason);
     }
 
-    void OnServerStopped(bool wasHost) { }
+    /// <summary>참가자: 방장과의 연결이 끊겼다 → 끊긴 이유에 따라 다시 참가 표를 남기거나 지우고 로비로</summary>
+    void LostHost(string reason)
+    {
+        if (_leaving || _quitting) return;
+        if (reason == Rejoin.RoomClosedReason || reason == Rejoin.GameInProgressReason)
+            Rejoin.ClearTicket();         // 방장이 방을 닫음 / 이미 다른 게임이 진행 중 → 다시 들어갈 곳이 없다
+        else Rejoin.RefreshTicketTime();  // 연결이 끊김 → 대기실 창에서 다시 참가할 수 있게
+        _ = ReturnToLobbyAsync(!string.IsNullOrEmpty(reason) ? reason : "방장과의 연결이 끊어졌어요. 대기실에서 다시 참가할 수 있어요.");
+    }
+
+    /// <summary>참가자: 끊김 알림 없이 네트워크가 멈춘 경우에도 로비로 (화면이 게임 안에 멈춰 있지 않게)</summary>
+    void OnClientStopped(bool wasHost)
+    {
+        if (wasHost) return;   // 방장은 OnServerStopped에서
+        var nm = NetworkManager.Singleton;
+        LostHost(nm != null ? nm.DisconnectReason : "");
+    }
+
+    /// <summary>
+    /// 방장: 서버가 멈췄다. 직접 나가는 중(_leaving)이나 게임을 끄는 중이 아니면 방장 PC의 인터넷이 끊긴 것 →
+    /// 게임을 이어 갈 수 없으므로 방을 닫고 로비로 간다 (예전엔 아무것도 안 해서 방장 화면이 멈춰 있었음)
+    /// </summary>
+    void OnServerStopped(bool wasHost)
+    {
+        if (_leaving || _quitting) return;
+        Debug.LogWarning("[Stage2] 방장 네트워크가 멈춤 → 로비로");
+        _ = ReturnToLobbyAsync("인터넷 연결이 끊어져 게임이 끝났어요.");
+    }
+
+    /// <summary>방장: 방을 닫기 전에 참가자들에게 "방이 닫혔다"고 알리고 끊는다 (참가자 PC의 다시 참가 표가 지워지도록)</summary>
+    static void NotifyRoomClosed(NetworkManager nm)
+    {
+        if (nm == null || !nm.IsServer || !nm.IsListening) return;
+        foreach (var id in new List<ulong>(nm.ConnectedClientsIds))
+            if (id != NetworkManager.ServerClientId)
+                try { nm.DisconnectClient(id, Rejoin.RoomClosedReason); } catch (Exception) { }
+    }
+
+    bool _quitting;
+
+    void OnApplicationQuit()
+    {
+        _quitting = true;
+        // 방장이 게임 창을 닫음: 참가자들이 닫힌 방에 다시 참가하려 하지 않게 알린다
+        if (_online) NotifyRoomClosed(NetworkManager.Singleton);
+    }
 
     /// <summary>세션·네트워크·음성을 정리하고 로비 씬으로 돌아간다.</summary>
     public async Task ReturnToLobbyAsync(string reason)
@@ -81,6 +127,7 @@ public sealed class Stage2NetworkBootstrap : MonoBehaviour
         _leaving = true;
         Debug.Log("[Stage2] 로비로 돌아갑니다: " + reason);
         LobbyReturnMessage = reason;
+        NotifyRoomClosed(NetworkManager.Singleton);   // 방장이 방을 닫는 경우
 
         if (VoiceChatService.Exists) await VoiceChatService.Instance.LeaveAllAsync();
         try

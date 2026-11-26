@@ -156,7 +156,7 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
     float _fuelAccum;   // 판정 쪽에서만 쓰는 정밀 진행률 (네트워크로는 반올림 값만 보냄)
     float _valveBreakAt;
     bool _valveBrokeOnce;
-    float _liftT, _nextSnapshot;
+    float _liftT;
     Vector3 _liftTop;
     MissionInteractable _target;
     string _lastStatusKey;
@@ -195,15 +195,6 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
         ApplyVisuals(State, true);
     }
 
-    public override void OnNetworkSpawn()
-    {
-        if (IsServer && NetworkManager != null) NetworkManager.OnClientDisconnectCallback += OnClientLeft;
-    }
-
-    public override void OnNetworkDespawn()
-    {
-        if (NetworkManager != null) NetworkManager.OnClientDisconnectCallback -= OnClientLeft;
-    }
 
     void SetState(MissionState s)
     {
@@ -251,8 +242,6 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
 
         // 실패: 대원이 있었는데 모두 사망
         if (_players.Count > 0 && alive == 0) { s.phase = (byte)Phase.Failed; SetState(s); return; }
-
-        SnapshotPlayers();
 
         // 연료 커플러가 나타날 곳을 판마다 하나 고른다
         if (s.couplerSpot == 0 && couplerSpots != null && couplerSpots.Length > 0)
@@ -307,37 +296,6 @@ public sealed partial class F2MissionDirector : NetworkBehaviour, IFloorMission
             if (Mathf.Abs(d.y) > 3.5f || d.sqrMagnitude > radius * radius) continue;
             m.HearNoise(at);
         }
-    }
-
-    // ================================================================== 게임을 나간 대원의 물건
-    struct PlayerSnapshot { public Vector3 position; public FarmingItemKind a, b, c; }
-    readonly Dictionary<ulong, PlayerSnapshot> _snapshots = new Dictionary<ulong, PlayerSnapshot>();
-
-    void SnapshotPlayers()
-    {
-        if (!IsSpawned || Time.unscaledTime < _nextSnapshot) return;
-        _nextSnapshot = Time.unscaledTime + 0.25f;
-        foreach (var p in FpsNetworkPlayer.All)
-        {
-            if (p == null || p.Inventory == null) continue;
-            _snapshots[p.OwnerClientId] = new PlayerSnapshot { position = p.transform.position, a = p.Inventory.ItemAt(0), b = p.Inventory.ItemAt(1), c = p.Inventory.ItemAt(2) };
-        }
-    }
-
-    void OnClientLeft(ulong clientId)
-    {
-        if (!_snapshots.TryGetValue(clientId, out var last)) return;
-        _snapshots.Remove(clientId);
-        var registry = FindFirstObjectByType<NetworkPickupRegistry>();
-        if (registry == null) return;
-        DropLeft(registry, last.a, last.position + new Vector3(0.4f, 0.6f, 0f));
-        DropLeft(registry, last.b, last.position + new Vector3(-0.2f, 0.6f, 0.35f));
-        DropLeft(registry, last.c, last.position + new Vector3(-0.2f, 0.6f, -0.35f));
-    }
-
-    static void DropLeft(NetworkPickupRegistry registry, FarmingItemKind kind, Vector3 at)
-    {
-        if (kind != FarmingItemKind.None) registry.ServerSpawnDrop(kind, at);
     }
 
     // ================================================================== 상호작용 요청

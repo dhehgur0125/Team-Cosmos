@@ -91,7 +91,6 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
     public static F4MissionDirector Instance { get; private set; }
 
     readonly NetworkVariable<MissionState> _net = new NetworkVariable<MissionState>();
-    readonly MissionLeaverDrops _leaverDrops = new MissionLeaverDrops();
     readonly List<FpsHealth> _players = new List<FpsHealth>();
     MissionState _offline, _shown;
     bool _shownInit, _brokeOnce;
@@ -141,12 +140,10 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
 
     public override void OnNetworkSpawn()
     {
-        if (IsServer && NetworkManager != null) NetworkManager.OnClientDisconnectCallback += _leaverDrops.OnClientLeft;
     }
 
     public override void OnNetworkDespawn()
     {
-        if (NetworkManager != null) NetworkManager.OnClientDisconnectCallback -= _leaverDrops.OnClientLeft;
     }
 
     void SetState(MissionState s)
@@ -192,7 +189,6 @@ public sealed class F4MissionDirector : NetworkBehaviour, IFloorMission
         // 실패: 대원이 있었는데 모두 사망
         if (_players.Count > 0 && alive == 0) { s.phase = (byte)Phase.Failed; SetState(s); return; }
 
-        if (IsSpawned) _leaverDrops.Tick();
 
         if (s.phase == (byte)Phase.Objectives)
         {

@@ -52,7 +52,9 @@ public sealed class PauseMenu : MonoBehaviour
 
     static bool CanOpen()
     {
-        if (LoadingScreen.IsShowing) return false;
+        if (LoadingScreen.IsShowing || GameOverScreen.IsShowing) return false;   // 게임 오버·탈출 화면 중에는 이미 대기실로 가는 중
+        // 층 이동 중: 방장이 이때 끝내면 씬 불러오기가 겹쳐 대기실 이동이 실패하고 방이 닫혀 버렸다
+        if (FloorTransition.InCutscene) return false;
         string scene = SceneManager.GetActiveScene().name;
         if (scene == StartMenu.SceneName || scene == "Lobby") return false;
         return FindAnyObjectByType<VoidLast.Player.FpsInput>() != null;
@@ -140,17 +142,38 @@ public sealed class PauseMenu : MonoBehaviour
         if (!online) { SceneManager.LoadScene("Lobby"); _exiting = false; return; }
         if (host)
         {
-            var nm = Unity.Netcode.NetworkManager.Singleton;
-            var status = nm.SceneManager != null ? nm.SceneManager.LoadScene("Lobby", LoadSceneMode.Single) : Unity.Netcode.SceneEventProgressStatus.SceneManagementNotEnabled;
-            Debug.Log("[PauseMenu] 방장이 게임을 끝냄 → 모든 대원을 대기실로: " + status);
-            if (status != Unity.Netcode.SceneEventProgressStatus.Started && boot != null)
-                _ = boot.ReturnToLobbyAsync("게임을 끝냈어요. 대원들을 대기실로 옮기지 못해 방을 닫았어요.");
-            _exiting = false;
+            StartCoroutine(HostEndGame(boot));
             return;
         }
+        if (FpsNetworkPlayer.Local != null) Rejoin.SaveCarry(FpsNetworkPlayer.Local.gameObject);   // 탄약·손전등
         Rejoin.RefreshTicketTime();   // 로비에 가면 이 표로 "진행 중인 게임" 대기실 창이 뜬다
         if (boot != null) _ = boot.ReturnToLobbyAsync("게임에서 나와 대기실로 왔어요.");
         else SceneManager.LoadScene("Lobby");
+        _exiting = false;
+    }
+
+    /// <summary>
+    /// 방장이 끝내기: 모든 대원을 같은 방 대기실로 옮긴다.
+    /// 층을 옮기는 중(씬 불러오기 진행 중)이면 끝날 때까지 잠깐 기다렸다가 옮긴다 (예전엔 바로 실패해 방이 닫혔음).
+    /// </summary>
+    System.Collections.IEnumerator HostEndGame(Stage2NetworkBootstrap boot)
+    {
+        var status = Unity.Netcode.SceneEventProgressStatus.None;
+        float giveUp = Time.unscaledTime + 30f;
+        while (true)
+        {
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            if (nm == null || !nm.IsListening) break;
+            status = nm.SceneManager != null ? nm.SceneManager.LoadScene("Lobby", LoadSceneMode.Single) : Unity.Netcode.SceneEventProgressStatus.SceneManagementNotEnabled;
+            if (status != Unity.Netcode.SceneEventProgressStatus.SceneEventInProgress || Time.unscaledTime > giveUp) break;
+            yield return new WaitForSecondsRealtime(0.5f);
+        }
+        Debug.Log("[PauseMenu] 방장이 게임을 끝냄 → 모든 대원을 대기실로: " + status);
+        if (status != Unity.Netcode.SceneEventProgressStatus.Started)
+        {
+            if (boot == null) boot = FindAnyObjectByType<Stage2NetworkBootstrap>();
+            if (boot != null) _ = boot.ReturnToLobbyAsync("게임을 끝냈어요. 대원들을 대기실로 옮기지 못해 방을 닫았어요.");
+        }
         _exiting = false;
     }
 

@@ -44,7 +44,20 @@ public class LobbyPlayerSpawner : MonoBehaviour
         _nm = GetComponent<NetworkManager>();
         _nm.OnServerStarted += OnServerStarted;
         _nm.OnServerStopped += OnServerStopped;
+        _nm.OnClientDisconnectCallback += OnClientLeft;
         SceneManager.sceneLoaded += OnUnitySceneLoaded;
+    }
+
+    /// <summary>
+    /// 방장: 게임 중 대원이 나가면 다시 참가 명단에 기록한다. 층 씬의 Stage2NetworkBootstrap도 같은 일을 하지만,
+    /// 층을 옮기는 사이(예전 층 씬은 내려가고 새 층은 아직)에 나가면 아무도 기록하지 않아 HP·세션 자리 정리가 빠졌다.
+    /// (Rejoin.ServerClientLeft는 두 번 불려도 한 번만 처리)
+    /// </summary>
+    void OnClientLeft(ulong clientId)
+    {
+        if (_nm == null || !_nm.IsServer || clientId == NetworkManager.ServerClientId) return;
+        if (SceneManager.GetActiveScene().name == lobbySceneName) return;
+        Rejoin.ServerClientLeft(clientId);
     }
 
     void OnDestroy()
@@ -53,6 +66,7 @@ public class LobbyPlayerSpawner : MonoBehaviour
         {
             _nm.OnServerStarted -= OnServerStarted;
             _nm.OnServerStopped -= OnServerStopped;
+            _nm.OnClientDisconnectCallback -= OnClientLeft;
             if (_hooked && _nm.SceneManager != null) { _nm.SceneManager.OnLoadEventCompleted -= OnLoadEventCompleted; _nm.SceneManager.OnSynchronizeComplete -= OnSynchronizeComplete; }
         }
         SceneManager.sceneLoaded -= OnUnitySceneLoaded;

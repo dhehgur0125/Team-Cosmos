@@ -90,7 +90,6 @@ public sealed class F1MissionDirector : NetworkBehaviour, IFloorMission
     public static F1MissionDirector Instance { get; private set; }
 
     readonly NetworkVariable<MissionState> _net = new NetworkVariable<MissionState>();
-    readonly MissionLeaverDrops _leaverDrops = new MissionLeaverDrops();
     readonly List<FpsHealth> _players = new List<FpsHealth>();
     MissionState _offline, _shown;
     bool _shownInit, _endingShown;
@@ -142,12 +141,10 @@ public sealed class F1MissionDirector : NetworkBehaviour, IFloorMission
 
     public override void OnNetworkSpawn()
     {
-        if (IsServer && NetworkManager != null) NetworkManager.OnClientDisconnectCallback += _leaverDrops.OnClientLeft;
     }
 
     public override void OnNetworkDespawn()
     {
-        if (NetworkManager != null) NetworkManager.OnClientDisconnectCallback -= _leaverDrops.OnClientLeft;
     }
 
     void SetState(MissionState s)
@@ -194,7 +191,6 @@ public sealed class F1MissionDirector : NetworkBehaviour, IFloorMission
         // 실패: 대원이 있었는데 모두 사망
         if (_players.Count > 0 && alive == 0) { s.phase = (byte)Phase.Failed; SetState(s); return; }
 
-        if (IsSpawned) _leaverDrops.Tick();
 
         // 고정 장치: 한쪽만 풀린 상태로 시간이 지나면 다시 잠긴다 (대원이 한 명뿐이면 시간 제한 없음)
         int mask = AllClampsMask;

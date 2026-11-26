@@ -23,6 +23,8 @@ namespace VoidLast.Player
         public float UseProgress => kit != null && started.Value >= 0 ? Mathf.Clamp01((float)(NetworkManager.ServerTime.Time - started.Value) / kit.UseDuration) : 0;
         void Awake() { kit = GetComponent<FpsMedicalKit>(); health = GetComponent<FpsHealth>(); }
         public override void OnNetworkSpawn() { if (IsServer) { uses.Value = kit != null ? kit.StartingUses : 0; started.Value = -1; } }
+        /// <summary>방장 전용: 층을 옮기거나 다시 참가한 대원의 남은 횟수를 되돌린다 (Rejoin 명단에 기억해 둔 값)</summary>
+        public void ServerRestoreUses(int remaining) { if (IsServer && IsSpawned) uses.Value = Mathf.Clamp(remaining, 0, kit != null ? kit.MaximumUses : remaining); }
         public override void OnNetworkDespawn() { pending = awaitingResult = false; recipient = null; lastApplied.Clear(); }
         public bool RequestUse(FpsHealth target)
         {

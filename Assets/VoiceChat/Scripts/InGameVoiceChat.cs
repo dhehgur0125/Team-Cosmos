@@ -70,29 +70,55 @@ public sealed class InGameVoiceChat : MonoBehaviour
         BuildSounds();
         SetHud("음성 연결 중...", "Vivox에 로그인하는 중", new Color(0.99f, 0.88f, 0.28f));
 
-        string key = _voice.SessionKey;
-        if (string.IsNullOrEmpty(key)) key = FindSessionId();
+        string key = FindSessionId(_voice.SessionKey);
+        // 앞 층에서 무전 채널에 들어가 있었으면 그 상태로 시작한다 (무전기를 잃었으면 UpdateRadioChannel이 나간다)
+        _radioJoined = _wantRadio = _voice.IsWanted(_voice.RadioChannel);
         // 죽은 채로 다음 층에 내려왔으면 근거리 채널에 다시 들어가지 않고 사망자 채널로 바로
         if (FloorCarryOver.Pending && FloorCarryOver.HasPlayerState && FloorCarryOver.Dead && !string.IsNullOrEmpty(_voice.SessionKey))
         {
             _dead = true;
+            _radioJoined = _wantRadio = false;   // 사망자는 무전 채널에서 나간다 → 구출되면 무전기가 있을 때 다시 들어감
             await _voice.EnterDeadAsync(NearProperties());
             _entered = true;
             return;
         }
         await _voice.EnterGameAsync(key, NearProperties());
+        if (_radioJoined && !_voice.IsWanted(_voice.RadioChannel)) _radioJoined = false;   // 방이 바뀌어 채널을 모두 나왔으면 다시 들어간다
         _entered = true;
     }
 
     Channel3DProperties NearProperties() => new Channel3DProperties(audibleDistance, Mathf.Min(conversationalDistance, audibleDistance - 1), fadeIntensity, fadeModel);
 
-    static string FindSessionId()
+    /// <summary>
+    /// 음성 채널 이름에 쓸 방 ID: 지금 들어가 있는 방(세션)을 우선한다. 음성 쪽에 기억된 방이 실제로 들어가 있는 방이면 그대로.
+    /// (기억된 값이 예전 방이면 방장·참가자가 서로 다른 채널에 들어가 아무 소리도 안 들린다)
+    /// 주의: MultiplayerService.Sessions의 키는 방 ID가 아니라 PC마다 다른 '세션 종류' 이름이다 → 반드시 값의 Id를 쓴다.
+    /// (예전엔 키를 써서, 기억된 방이 없을 때(다시 참가·게임 재시작) 혼자 다른 채널에 들어가 근거리·무전이 모두 안 들렸다)
+    /// </summary>
+    static string FindSessionId(string remembered)
     {
+        string first = null, seen = "";
         try
         {
-            foreach (var kv in MultiplayerService.Instance.Sessions) return kv.Key;
+            foreach (var kv in MultiplayerService.Instance.Sessions)
+            {
+                string id = kv.Value?.Id;
+                seen += kv.Key + "→" + (id ?? "null") + "(" + kv.Value?.State + ") ";
+                if (string.IsNullOrEmpty(id)) continue;
+                if (id == remembered) return id;
+                if (first == null) first = id;
+            }
         }
-        catch (System.Exception) { }
+        catch (System.Exception e) { seen += "오류 " + e.Message; }
+        if (first != null) return first;
+        if (!string.IsNullOrEmpty(remembered)) return remembered;
+        // 다시 참가 표에 적힌 방 ID (게임을 껐다 켜서 다시 참가했을 때)
+        if (Rejoin.TryLoadTicket(out var ticket) && !string.IsNullOrEmpty(ticket.sessionId))
+        {
+            Debug.Log("[Voice] 들어가 있는 방 정보가 없어 다시 참가 표의 방 ID를 씀: " + ticket.sessionId + " (보인 방: " + seen + ")");
+            return ticket.sessionId;
+        }
+        Debug.LogWarning("[Voice] 음성 채널에 쓸 방 ID를 찾지 못함: " + seen);
         return "";
     }
 
@@ -156,10 +182,13 @@ public sealed class InGameVoiceChat : MonoBehaviour
             bool hasRadio = inv != null && (inv.HasItem(FarmingItemKind.Radio) || unique != null && unique.Has(UniqueItemKind.Radio));
             bool radioInHand = alive && (inv.ItemAt(inv.SelectedIndex) == FarmingItemKind.Radio || unique != null && unique.InHand(UniqueItemKind.Radio));
 
-            UpdateRadioChannel(hasRadio);
+            // 층에 막 도착해 아이템을 되돌리는 중에는 무전기가 잠깐 없는 것처럼 보이므로 채널을 건드리지 않는다
+            if (!FloorCarryOver.Pending) UpdateRadioChannel(hasRadio);
 
             bool pttHeld = CursorLocked() && (KeyHeld(KeyV) || (radioInHand && _player.PlayerInput != null && _player.PlayerInput.AttackHeld));
-            bool wantTx = alive && hasRadio && _radioJoined && pttHeld;
+            // 무전 채널에 실제로 들어가 있을 때만 무전으로 말한다
+            // (예전엔 '들어가려고 함'만 보고 송신을 바꿔서, 채널에 못 들어갔으면 V를 누르는 동안 아무 데도 말이 안 나갔다)
+            bool wantTx = alive && hasRadio && _radioJoined && pttHeld && _voice.IsInChannel(_voice.RadioChannel);
             if (wantTx != _transmitting) SetTransmitting(wantTx);
             // 무전 신호가 다른 대원에게 도착했을 시간이 지나면 육성도 함께 내보낸다
             if (_transmitting && _nearPending && Time.unscaledTime >= _nearOnAt)
@@ -235,8 +264,13 @@ public sealed class InGameVoiceChat : MonoBehaviour
     /// 듣는 쪽 처리: 무전으로 말하고 있는 대원이 바로 옆(radioVoiceNearDistance)보다 멀리 있으면
     /// 근거리 채널의 그 사람 목소리를 내 쪽에서 끈다 → 무전기가 없으면 무전 내용이 들리지 않는다 (무전기가 있으면 무전 채널로 들림).
     /// </summary>
+    float _nextMuteRefresh;
+
     void UpdateRadioVoiceMutes(Vector3 me)
     {
+        // 1초마다 꺼 둔 목소리를 다시 끈다: 상대가 채널에 다시 들어오면(다시 참가 등) Vivox 참가자가 새로 생겨 꺼 둔 게 풀린다
+        bool refresh = Time.unscaledTime >= _nextMuteRefresh;
+        if (refresh) _nextMuteRefresh = Time.unscaledTime + 1f;
         foreach (var p in FpsNetworkPlayer.All)
         {
             if (p == null || p == _player) continue;
@@ -244,6 +278,7 @@ public sealed class InGameVoiceChat : MonoBehaviour
             if (string.IsNullOrEmpty(id)) continue;
             Vector3 head = HeadOf(p);
             bool mute = p.IsRadioTalking && Vector3.Distance(me, head) > radioVoiceNearDistance;
+            if (mute && refresh && _nearMuted.Contains(id)) { _voice.SetLocalMute(_voice.NearChannel, id, true); continue; }
             if (mute == _nearMuted.Contains(id)) continue;
             if (!_voice.SetLocalMute(_voice.NearChannel, id, mute) && mute) continue;   // 아직 채널에 없으면 다음에 다시 시도
             if (mute) _nearMuted.Add(id); else _nearMuted.Remove(id);
@@ -452,13 +487,13 @@ public sealed class InGameVoiceChat : MonoBehaviour
             return;
         }
         if (_voice.State == VoiceChatService.Status.Error && !_voice.IsInChannel(_voice.NearChannel))
-            SetHud("음성 연결 실패", string.IsNullOrEmpty(_voice.LastError) ? "콘솔 로그를 확인해 주세요" : _voice.LastError, new Color(0.94f, 0.27f, 0.27f));
+            SetHud("음성 다시 연결 중...", string.IsNullOrEmpty(_voice.LastError) ? "연결이 끊겨 잠시 뒤 자동으로 다시 들어가요" : "연결 실패: " + _voice.LastError, new Color(0.94f, 0.27f, 0.27f));
         else if (!_voice.IsInChannel(_voice.NearChannel))
             SetHud("음성 연결 중...", "Vivox 채널에 들어가는 중", new Color(0.99f, 0.88f, 0.28f));
         else if (_transmitting)
             SetHud("무전 송신 중", "무전기를 가진 대원 + 바로 옆(" + radioVoiceNearDistance.ToString("0.#") + "m) 대원에게 들려요", new Color(0.99f, 0.65f, 0.65f));
         else if (hasRadio)
-            SetHud("근거리 대화", _radioJoined ? "무전기 보유 · V를 누르는 동안 무전 (무전기를 가진 대원 + 바로 옆 대원에게 들림)" : "무전 채널에 연결하는 중...", new Color(0.43f, 0.91f, 0.72f));
+            SetHud("근거리 대화", _voice.IsInChannel(_voice.RadioChannel) ? "무전기 보유 · V를 누르는 동안 무전 (무전기를 가진 대원 + 바로 옆 대원에게 들림)" : "무전 채널에 연결하는 중...", new Color(0.43f, 0.91f, 0.72f));
         else
             SetHud("근거리 대화", "가까이 있는 대원에게만 들려요 · 무전기를 받으면 멀리서도 대화", new Color(0.43f, 0.91f, 0.72f));
 

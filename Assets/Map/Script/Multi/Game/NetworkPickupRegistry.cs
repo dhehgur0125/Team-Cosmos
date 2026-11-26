@@ -11,6 +11,8 @@ using VoidLast.Player;
 ///  - 게임 도중 들어온 대원(재접속): 방장이 지금 남아 있는 아이템 목록을 보내 줘서, 그새 주운 것은 지우고 떨어진 것은 만든다.
 /// 아이템 자체는 NetworkObject가 아니어서 기존 FpsWorldPickup/FpsItemInteractor 동작을 그대로 쓴다.
 /// 씬 아이템 번호는 위치·이름으로 정한다 (예전에 주워서 없어진 아이템이 화면마다 달라도 번호가 밀리지 않게). 떨어뜨린 아이템 번호는 10억 미만.
+///  - 층을 불러온 뒤: 방장이 남아 있는 씬 아이템 목록을 모두에게 한 번 더 보낸다 (다시 참가한 대원은 예전 층에서 주운 아이템 기억이 없으므로)
+///  - 게임을 나간 대원이 들고 있던 물건은 마지막 위치에 떨어뜨린다 (모든 층, MissionLeaverDrops)
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class NetworkPickupRegistry : NetworkBehaviour
@@ -23,20 +25,56 @@ public sealed class NetworkPickupRegistry : NetworkBehaviour
     readonly Dictionary<FpsWorldPickup, int> _ids = new Dictionary<FpsWorldPickup, int>();
     readonly HashSet<int> _claimed = new HashSet<int>();   // 서버 전용
     int _dropCounter;
+    readonly MissionLeaverDrops _leaverDrops = new MissionLeaverDrops();   // 서버 전용
 
     public override void OnNetworkSpawn()
     {
         RegisterScenePickups();
         FpsWorldPickup.Collected += OnCollected;
         FpsItemInteractor.Dropped += OnDropped;
-        if (IsServer && NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnSynchronizeComplete += OnLateJoin;
+        if (IsServer)
+        {
+            if (NetworkManager.SceneManager != null)
+            {
+                NetworkManager.SceneManager.OnSynchronizeComplete += OnLateJoin;
+                NetworkManager.SceneManager.OnLoadEventCompleted += OnFloorLoaded;
+            }
+            NetworkManager.OnClientDisconnectCallback += OnClientLeft;
+        }
     }
 
     public override void OnNetworkDespawn()
     {
         FpsWorldPickup.Collected -= OnCollected;
         FpsItemInteractor.Dropped -= OnDropped;
-        if (NetworkManager != null && NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnSynchronizeComplete -= OnLateJoin;
+        if (NetworkManager != null)
+        {
+            if (NetworkManager.SceneManager != null)
+            {
+                NetworkManager.SceneManager.OnSynchronizeComplete -= OnLateJoin;
+                NetworkManager.SceneManager.OnLoadEventCompleted -= OnFloorLoaded;
+            }
+            NetworkManager.OnClientDisconnectCallback -= OnClientLeft;
+        }
+    }
+
+    void Update()
+    {
+        if (IsSpawned && IsServer) _leaverDrops.Tick();
+    }
+
+    void OnClientLeft(ulong clientId)
+    {
+        if (IsSpawned && IsServer && clientId != NetworkManager.ServerClientId) _leaverDrops.OnClientLeft(clientId);
+    }
+
+    // ------------------------------------------------------------------ 층을 불러온 뒤 모두의 씬 아이템 맞추기
+    void OnFloorLoaded(string sceneName, UnityEngine.SceneManagement.LoadSceneMode mode, List<ulong> completed, List<ulong> timedOut)
+    {
+        if (!IsSpawned || !IsServer || sceneName != gameObject.scene.name) return;
+        var scene = new List<int>();
+        foreach (var kv in _byId) if (kv.Value != null && kv.Key >= SceneIdBase) scene.Add(kv.Key);
+        LateJoinRpc(scene.ToArray(), new int[0], new byte[0], new Vector3[0], RpcTarget.NotServer);
     }
 
     const int SceneIdBase = 1000000000;

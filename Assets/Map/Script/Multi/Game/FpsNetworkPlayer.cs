@@ -96,7 +96,8 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     FpsWeaponFlashlight _flashlight;
     FpsUniqueItem _unique;
     bool _radioTalking;
-    float _nextWrite;
+    float _nextWrite, _nextCarrySave, _nextUniqueTrack;
+    bool _uniqueRestorePending, _uniqueTracked;   // 방장 전용: 고유 아이템 횟수 되돌리기·기억
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { Local = null; All.Clear(); LocalSpawned = null; }
@@ -162,8 +163,11 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
         _uniqueItem.Value = (byte)unique;
         _unique.Assign(unique);
         // 무전을 고르면 4번 칸에 동료에게 줄 무전기 하나를 더 들고 시작한다 (게임 첫 층에서만. 아래층에는 핫바가 그대로 이어짐)
-        if (unique == UniqueItemKind.Radio && !FloorCarryOver.HasPlayerState)
+        // 다시 참가한 대원은 받지 않는다 (예전 무전기는 나간 자리에 떨어져 있음)
+        if (unique == UniqueItemKind.Radio && !FloorCarryOver.HasPlayerState && !Rejoin.IsRejoining)
             _inventory.GiveStartingItem(0, FarmingItemKind.Radio);
+        // 다시 참가: 표에 적어 둔 탄약·손전등을 되돌린다 (HP는 방장이 RestoreRejoinRpc로)
+        if (Rejoin.IsRejoining) Rejoin.ApplyPendingCarry(gameObject);
 
         _healthComp.Changed += PushHealth;
         // 재접속: 이번 게임의 내 표식을 방장에게 알린다 (방장은 명단과 비교해 다시 들어온 대원이면 HP를 되돌려 줌)
@@ -207,7 +211,17 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     void Update()
     {
         if (!IsSpawned) return;
-        if (IsOwner) WriteState();
+        if (IsServer) ServerUniqueCounts();
+        if (IsOwner)
+        {
+            WriteState();
+            // 참가자: 몇 초마다 탄약·손전등을 다시 참가 표에 적어 둔다 (강제 종료돼도 이어받게)
+            if (!IsServer && Time.unscaledTime >= _nextCarrySave)
+            {
+                _nextCarrySave = Time.unscaledTime + 5f;
+                Rejoin.SaveCarry(gameObject);
+            }
+        }
         else ApplyState(_state.Value);
     }
 
@@ -274,8 +288,29 @@ public sealed class FpsNetworkPlayer : NetworkBehaviour
     [Rpc(SendTo.Server)]
     void RegisterRejoinRpc(FixedString64Bytes token, FixedString64Bytes authId)
     {
-        Rejoin.ServerRegister(this, token.ToString(), authId.ToString());
-        if (!IsOwner) Rejoin.ServerTrackHealth(OwnerClientId, _health.Value);
+        bool returning = Rejoin.ServerRegister(this, token.ToString(), authId.ToString());
+        // 다시 들어온 대원은 기억해 둔 HP를 되돌리는 중이므로 지금 값(새 대원의 100)으로 덮어쓰지 않는다
+        if (!IsOwner && !returning) Rejoin.ServerTrackHealth(OwnerClientId, _health.Value);
+        _uniqueRestorePending = true;   // 다음 Update에서 (모든 부품의 스폰 처리가 끝난 뒤) 고유 아이템 횟수를 되돌린다
+    }
+
+    /// <summary>
+    /// 방장: 이 대원이 명단에 등록되면 기억해 둔 고유 아이템 횟수(구급상자·빛 방출기)를 되돌리고, 그 뒤로는 0.5초마다 기억한다.
+    /// 되돌리기 전에 기억하면 새 대원의 처음 값(가득)으로 덮어쓰므로 순서를 지킨다.
+    /// </summary>
+    void ServerUniqueCounts()
+    {
+        if (_uniqueRestorePending)
+        {
+            _uniqueRestorePending = false;
+            Rejoin.ServerRestoreUnique(this);
+            _uniqueTracked = true;
+            _nextUniqueTrack = Time.unscaledTime + 0.5f;
+            return;
+        }
+        if (!_uniqueTracked || Time.unscaledTime < _nextUniqueTrack) return;
+        _nextUniqueTrack = Time.unscaledTime + 0.5f;
+        Rejoin.ServerTrackUnique(this);
     }
 
     /// <summary>방장 전용: 다시 들어온 대원에게 나가기 전 HP를 되돌려 준다 (0이면 죽은 상태 그대로 → 관전)</summary>

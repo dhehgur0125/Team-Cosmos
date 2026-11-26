@@ -172,6 +172,7 @@ public sealed class GameOverScreen : MonoBehaviour
     void Fallback()
     {
         _stepStart = Time.unscaledTime;   // 한 번만
+        Rejoin.ClearTicket();   // 게임은 끝났다 → 로비에 "진행 중인 게임" 창이 뜨지 않게
         var boot = FindFirstObjectByType<Stage2NetworkBootstrap>();
         if (boot != null) _ = boot.ReturnToLobbyAsync("게임 오버 · 대기실로 돌아가지 못해 방에서 나왔어요.");
         else SceneManager.LoadScene(lobbySceneName);

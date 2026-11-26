@@ -1,0 +1,375 @@
+using System;
+using System.Collections.Generic;
+using Unity.Collections;
+using Unity.Netcode;
+using Unity.Netcode.Components;
+using Unity.Services.Authentication;
+using Unity.Services.Core;
+using UnityEngine;
+using VoidLast.Monster;
+using VoidLast.Player;
+
+/// <summary>
+/// Stage2 멀티플레이 대원 (VOID_LAST_FPS_Network 프리팹 루트).
+///  - 내 캐릭터(Owner): 카메라·입력·HUD·사격·아이템 줍기를 켜고, 이동/장비/핫바/HP 상태를 다른 대원에게 보낸다.
+///    위치·회전은 NetworkTransform(Owner 권한)이 동기화한다.
+///  - 다른 대원의 복제본: 입력·카메라·HUD를 끄고, 받은 상태로 기존 애니메이션/손 IK/장비 표시 스크립트를 그대로 돌린다.
+///    몬스터(서버)가 복제본을 때리거나 다른 대원이 주사기로 회복하면 실제 HP를 가진 주인에게 RPC로 전달한다.
+/// </summary>
+[DisallowMultipleComponent]
+[DefaultExecutionOrder(-500)]
+public sealed class FpsNetworkPlayer : NetworkBehaviour
+{
+    public struct NetState : INetworkSerializable, IEquatable<NetState>
+    {
+        public Vector2 velocity;
+        public float verticalSpeed;
+        public float crouch;
+        public float pitch;
+        public float useProgress;
+        public byte slot;
+        public byte flags;
+        public byte item0, item1, item2;
+        public sbyte usingIndex;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
+        {
+            s.SerializeValue(ref velocity);
+            s.SerializeValue(ref verticalSpeed);
+            s.SerializeValue(ref crouch);
+            s.SerializeValue(ref pitch);
+            s.SerializeValue(ref useProgress);
+            s.SerializeValue(ref slot);
+            s.SerializeValue(ref flags);
+            s.SerializeValue(ref item0);
+            s.SerializeValue(ref item1);
+            s.SerializeValue(ref item2);
+            s.SerializeValue(ref usingIndex);
+        }
+
+        public bool Equals(NetState o) =>
+            velocity == o.velocity && Mathf.Approximately(verticalSpeed, o.verticalSpeed) && Mathf.Approximately(crouch, o.crouch) &&
+            Mathf.Approximately(pitch, o.pitch) && Mathf.Approximately(useProgress, o.useProgress) && slot == o.slot && flags == o.flags &&
+            item0 == o.item0 && item1 == o.item1 && item2 == o.item2 && usingIndex == o.usingIndex;
+    }
+
+    const byte FlagCrouch = 1, FlagGrounded = 2, FlagAim = 4, FlagUsingOther = 8, FlagRadioTalk = 16, FlagFlashlight = 32;
+
+    [Header("내 캐릭터에서만 켜는 컴포넌트 (프리팹에서는 꺼 둠)")]
+    [Tooltip("FpsInput, FpsLook, FpsHud, FpsItemInteractor, FpsPistol, ItemDetector, 카메라, AudioListener 등")]
+    public Behaviour[] ownerOnlyBehaviours;
+    [Tooltip("FPS HUD 캔버스 등")]
+    public GameObject[] ownerOnlyObjects;
+    [Tooltip("시점 상하 회전 기준 (CameraPivot)")]
+    public Transform cameraPivot;
+    public Camera viewCamera;
+
+    readonly NetworkVariable<NetState> _state = new NetworkVariable<NetState>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    readonly NetworkVariable<float> _health = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    readonly NetworkVariable<FixedString64Bytes> _nickname = new NetworkVariable<FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    readonly NetworkVariable<FixedString64Bytes> _authId = new NetworkVariable<FixedString64Bytes>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    /// <summary>대기실에서 고른 고유 아이템 (UniqueItemKind 번호). 다른 대원 화면에서도 3번 칸에 같은 아이템이 보이도록</summary>
+    readonly NetworkVariable<byte> _uniqueItem = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    /// <summary>로비 칸 번호 (0 = 1P). 우주복 색을 정한다 (PlayerSuitColor)</summary>
+    readonly NetworkVariable<byte> _suitSlot = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+    public static FpsNetworkPlayer Local { get; private set; }
+    public static readonly List<FpsNetworkPlayer> All = new List<FpsNetworkPlayer>();
+    public static event Action<FpsNetworkPlayer> LocalSpawned;
+
+    public string Nickname => _nickname.Value.ToString();
+    public string AuthPlayerId => _authId.Value.ToString();
+    public bool IsRadioTalking => (_state.Value.flags & FlagRadioTalk) != 0;
+    public FpsHealth Health => _healthComp;
+    public FpsInventory Inventory => _inventory;
+    public FpsInput PlayerInput => _input;
+    public FpsUniqueItem UniqueItem => _unique;
+    public Camera ViewCamera => viewCamera;
+
+    FpsMotor _motor;
+    FpsEquipment _equipment;
+    FpsInventory _inventory;
+    FpsHealth _healthComp;
+    FpsPistol _pistol;
+    FpsInput _input;
+    FpsRadioView _radio;
+    FpsWeaponFlashlight _flashlight;
+    FpsUniqueItem _unique;
+    bool _radioTalking;
+    float _nextWrite, _nextCarrySave;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() { Local = null; All.Clear(); LocalSpawned = null; }
+
+    void Awake()
+    {
+        _motor = GetComponent<FpsMotor>();
+        _equipment = GetComponent<FpsEquipment>();
+        _inventory = GetComponent<FpsInventory>();
+        _healthComp = GetComponent<FpsHealth>();
+        _pistol = GetComponent<FpsPistol>();
+        _input = GetComponent<FpsInput>();
+        _radio = GetComponent<FpsRadioView>();
+        _flashlight = GetComponent<FpsWeaponFlashlight>();
+        _unique = FpsUniqueItem.For(gameObject);
+        if (cameraPivot == null) cameraPivot = transform.Find("CameraPivot");
+        if (viewCamera == null) viewCamera = GetComponentInChildren<Camera>(true);
+    }
+
+    // ------------------------------------------------------------------ spawn / despawn
+    public override void OnNetworkSpawn()
+    {
+        All.Add(this);
+        if (IsOwner) SetupOwner();
+        else SetupProxy();
+        name = (IsOwner ? "LocalPlayer_" : "RemotePlayer_") + OwnerClientId;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        All.Remove(this);
+        if (Local == this) Local = null;
+        if (_healthComp != null) { _healthComp.Changed -= PushHealth; _healthComp.NetworkDamageRedirect = null; _healthComp.NetworkHealRedirect = null; }
+        if (_pistol != null) _pistol.Shot -= OnLocalShot;
+        if (_equipment != null) _equipment.MeleeRequested -= OnLocalMelee;
+        ScanNoise.Emitted -= OnLocalScan;
+        GunNoise.Emitted -= OnLocalGunNoise;
+        _health.OnValueChanged -= OnHealthChanged;
+        _uniqueItem.OnValueChanged -= OnUniqueItemChanged;
+        _suitSlot.OnValueChanged -= OnSuitSlotChanged;
+    }
+
+    void SetupOwner()
+    {
+        Local = this;
+        foreach (var b in ownerOnlyBehaviours) if (b != null) b.enabled = true;
+        foreach (var g in ownerOnlyObjects) if (g != null) g.SetActive(true);
+
+        _nickname.Value = new FixedString64Bytes(Truncate(PlayerPrefs.GetString("VL_Nickname", "대원"), 20));
+        string auth = "";
+        try { if (UnityServices.State == ServicesInitializationState.Initialized && AuthenticationService.Instance.IsSignedIn) auth = AuthenticationService.Instance.PlayerId; }
+        catch (Exception) { }
+        _authId.Value = new FixedString64Bytes(Truncate(auth, 60));
+        _health.Value = _healthComp.Current;
+
+        // 우주복 색: 로비에서 내 칸 번호 (로비를 거치지 않은 테스트면 접속 번호로)
+        int suit = PlayerSuitColor.LocalSlot >= 0 ? PlayerSuitColor.LocalSlot : (int)(OwnerClientId % PlayerSuitColor.SlotCount);
+        _suitSlot.Value = (byte)suit;
+        PlayerSuitColor.Apply(gameObject, suit);
+
+        // 고유 아이템: 대기실에서 고른 것을 3번 칸에 넣고 다른 대원에게 알린다
+        var unique = UniqueItems.LocalChoice;
+        _uniqueItem.Value = (byte)unique;
+        _unique.Assign(unique);
+        // 무전을 고르면 4번 칸에 동료에게 줄 무전기 하나를 더 들고 시작한다 (게임 첫 층에서만. 아래층에는 핫바가 그대로 이어짐)
+        // 다시 참가한 대원은 받지 않는다 (예전 무전기는 나간 자리에 떨어져 있음)
+        if (unique == UniqueItemKind.Radio && !FloorCarryOver.HasPlayerState && !Rejoin.IsRejoining)
+            _inventory.GiveStartingItem(0, FarmingItemKind.Radio);
+        // 다시 참가: 표에 적어 둔 탄약·손전등을 되돌린다 (HP는 방장이 RestoreRejoinRpc로)
+        if (Rejoin.IsRejoining) Rejoin.ApplyPendingCarry(gameObject);
+
+        _healthComp.Changed += PushHealth;
+        // 재접속: 이번 게임의 내 표식을 방장에게 알린다 (방장은 명단과 비교해 다시 들어온 대원이면 HP를 되돌려 줌)
+        if (string.IsNullOrEmpty(Rejoin.Token)) Rejoin.NewToken();
+        RegisterRejoinRpc(new FixedString64Bytes(Rejoin.Token), new FixedString64Bytes(Truncate(auth, 60)));
+        _pistol.Shot += OnLocalShot;
+        _equipment.MeleeRequested += OnLocalMelee;
+        if (!IsServer)
+        {
+            ScanNoise.Emitted += OnLocalScan;   // 방장은 자기 화면의 몬스터가 바로 듣는다
+            GunNoise.Emitted += OnLocalGunNoise;
+        }
+        LocalSpawned?.Invoke(this);
+    }
+
+    void SetupProxy()
+    {
+        foreach (var b in ownerOnlyBehaviours) if (b != null) b.enabled = false;
+        foreach (var g in ownerOnlyObjects) if (g != null) g.SetActive(false);
+        _motor.SetNetworkProxy(true);
+        _equipment.IsNetworkProxy = true;
+        _inventory.IsNetworkProxy = true;
+        if (_flashlight != null) _flashlight.SetNetworkProxy(true);
+        _healthComp.NetworkDamageRedirect = amount => DamageRpc(amount);
+        _healthComp.NetworkHealRedirect = amount => { HealRpc(amount); return true; };
+        _health.OnValueChanged += OnHealthChanged;
+        _healthComp.ApplyNetworkHealth(_health.Value);
+        _uniqueItem.OnValueChanged += OnUniqueItemChanged;
+        _unique.Assign((UniqueItemKind)_uniqueItem.Value);
+        _suitSlot.OnValueChanged += OnSuitSlotChanged;
+        PlayerSuitColor.Apply(gameObject, _suitSlot.Value);
+        ApplyState(_state.Value);
+    }
+
+    void OnUniqueItemChanged(byte previous, byte current) => _unique.Assign((UniqueItemKind)current);
+    void OnSuitSlotChanged(byte previous, byte current) => PlayerSuitColor.Apply(gameObject, current);
+
+    static string Truncate(string s, int max) => string.IsNullOrEmpty(s) ? "" : s.Length > max ? s.Substring(0, max) : s;
+
+    // ------------------------------------------------------------------ per frame
+    void Update()
+    {
+        if (!IsSpawned) return;
+        if (IsOwner)
+        {
+            WriteState();
+            // 참가자: 몇 초마다 탄약·손전등을 다시 참가 표에 적어 둔다 (강제 종료돼도 이어받게)
+            if (!IsServer && Time.unscaledTime >= _nextCarrySave)
+            {
+                _nextCarrySave = Time.unscaledTime + 5f;
+                Rejoin.SaveCarry(gameObject);
+            }
+        }
+        else ApplyState(_state.Value);
+    }
+
+    void WriteState()
+    {
+        if (Time.unscaledTime < _nextWrite) return;
+        _nextWrite = Time.unscaledTime + 1f / 30f;
+        float pitch = cameraPivot != null ? Mathf.DeltaAngle(0, cameraPivot.localEulerAngles.x) : 0;
+        var s = new NetState
+        {
+            velocity = Quantize(_motor.LocalVelocity, 50f),
+            verticalSpeed = Mathf.Round(_motor.VerticalSpeed * 20f) / 20f,
+            crouch = Mathf.Round(_motor.CrouchFraction * 50f) / 50f,
+            pitch = Mathf.Round(pitch * 2f) / 2f,
+            useProgress = Mathf.Round(_inventory.UseProgress * 50f) / 50f,
+            slot = (byte)_equipment.SelectedSlot,
+            item0 = (byte)_inventory.ItemAt(0),
+            item1 = (byte)_inventory.ItemAt(1),
+            item2 = (byte)_inventory.ItemAt(2),
+            usingIndex = (sbyte)(_inventory.IsUsing ? _inventory.SelectedIndex : -1),
+        };
+        if (_motor.IsCrouching) s.flags |= FlagCrouch;
+        if (_motor.IsGrounded) s.flags |= FlagGrounded;
+        if (_equipment.IsAiming) s.flags |= FlagAim;
+        if (_inventory.IsUsingOnOther) s.flags |= FlagUsingOther;
+        if (_radioTalking) s.flags |= FlagRadioTalk;
+        if (_flashlight != null && _flashlight.On) s.flags |= FlagFlashlight;
+        if (!s.Equals(_state.Value)) _state.Value = s;
+    }
+
+    static Vector2 Quantize(Vector2 v, float steps) => new Vector2(Mathf.Round(v.x * steps) / steps, Mathf.Round(v.y * steps) / steps);
+
+    void ApplyState(NetState s)
+    {
+        _motor.ApplyNetworkState(s.velocity, s.verticalSpeed, (s.flags & FlagCrouch) != 0, (s.flags & FlagGrounded) != 0, s.crouch);
+        _equipment.ApplyNetworkState(s.slot, (s.flags & FlagAim) != 0);
+        _inventory.ApplyNetworkState((FarmingItemKind)s.item0, (FarmingItemKind)s.item1, (FarmingItemKind)s.item2, s.usingIndex, s.useProgress, (s.flags & FlagUsingOther) != 0);
+        if (cameraPivot != null) cameraPivot.localRotation = Quaternion.Slerp(cameraPivot.localRotation, Quaternion.Euler(s.pitch, 0, 0), 1f - Mathf.Exp(-20f * Time.deltaTime));
+        if (_radio != null) _radio.Talking = (s.flags & FlagRadioTalk) != 0;
+        if (_flashlight != null) _flashlight.ApplyNetworkState((s.flags & FlagFlashlight) != 0);
+    }
+
+    /// <summary>내 캐릭터: 무전기로 말하는 중인지 (다른 대원 화면에서 무전기를 입에 대는 연출)</summary>
+    public void SetRadioTalking(bool talking)
+    {
+        if (talking != _radioTalking) _nextWrite = 0f;   // 다른 대원이 바로 알 수 있게 다음 프레임에 즉시 전송
+        _radioTalking = talking;
+        if (_radio != null) _radio.Talking = talking;
+    }
+
+    // ------------------------------------------------------------------ health
+    void PushHealth()
+    {
+        if (IsOwner && IsSpawned) _health.Value = _healthComp.Current;
+    }
+
+    void OnHealthChanged(float previous, float current)
+    {
+        _healthComp.ApplyNetworkHealth(current);
+        if (IsServer) Rejoin.ServerTrackHealth(OwnerClientId, current);
+    }
+
+    // ------------------------------------------------------------------ 재접속
+    [Rpc(SendTo.Server)]
+    void RegisterRejoinRpc(FixedString64Bytes token, FixedString64Bytes authId)
+    {
+        bool returning = Rejoin.ServerRegister(this, token.ToString(), authId.ToString());
+        // 다시 들어온 대원은 기억해 둔 HP를 되돌리는 중이므로 지금 값(새 대원의 100)으로 덮어쓰지 않는다
+        if (!IsOwner && !returning) Rejoin.ServerTrackHealth(OwnerClientId, _health.Value);
+    }
+
+    /// <summary>방장 전용: 다시 들어온 대원에게 나가기 전 HP를 되돌려 준다 (0이면 죽은 상태 그대로 → 관전)</summary>
+    public void RestoreAfterRejoin(float health)
+    {
+        if (IsServer) RestoreRejoinRpc(health);
+    }
+
+    [Rpc(SendTo.Owner)]
+    void RestoreRejoinRpc(float health)
+    {
+        if (_healthComp == null) return;
+        FloorCarryOver.ArrivedDead = health <= 0f;
+        _healthComp.RestoreFromCarryOver(health <= 0f ? 0f : Mathf.Max(1f, health));
+    }
+
+    [Rpc(SendTo.Owner)]
+    void DamageRpc(float amount)
+    {
+        if (_healthComp != null) _healthComp.TakeDamage(amount);
+    }
+
+    [Rpc(SendTo.Owner)]
+    void HealRpc(float amount)
+    {
+        if (_healthComp != null) _healthComp.Heal(amount);
+    }
+
+    // ------------------------------------------------------------------ effects
+    void OnLocalShot() => ShotRpc();
+    void OnLocalMelee() => MeleeRpc();
+
+    [Rpc(SendTo.NotMe)]
+    void ShotRpc()
+    {
+        if (!IsOwner && _pistol != null) _pistol.PlayNetworkShot();
+    }
+
+    [Rpc(SendTo.NotMe)]
+    void MeleeRpc()
+    {
+        if (!IsOwner && _equipment != null) _equipment.RaiseNetworkMelee();
+    }
+
+    // ------------------------------------------------------------------ 탐지기 스캔 소리 → 서버 몬스터
+    void OnLocalScan(Vector3 origin, float radius, float waveSpeed) => ScanRpc(origin, radius, waveSpeed);
+
+    [Rpc(SendTo.Server)]
+    void ScanRpc(Vector3 origin, float radius, float waveSpeed)
+    {
+        ScanNoise.Emit(origin, radius, waveSpeed);
+    }
+
+    // ------------------------------------------------------------------ 사격 소리 → 서버 몬스터
+    void OnLocalGunNoise(Vector3 origin, float radius) => GunNoiseRpc(origin, radius);
+
+    [Rpc(SendTo.Server)]
+    void GunNoiseRpc(Vector3 origin, float radius)
+    {
+        GunNoise.Emit(origin, radius);
+    }
+
+    // ------------------------------------------------------------------ 고치에서 구출
+    /// <summary>내 대원 전용: 고치 자리에서 되살아난다. HP는 네트워크로 다른 대원 화면에도 전달된다.</summary>
+    public void ReviveFromCocoon(Vector3 position, float healthFraction)
+    {
+        if (!IsOwner || _healthComp == null || !_healthComp.IsDead) return;
+        var controller = GetComponent<CharacterController>();
+        if (controller != null) controller.enabled = false;
+        transform.position = position;
+        var networkTransform = GetComponent<NetworkTransform>();
+        if (networkTransform != null) networkTransform.Teleport(position, transform.rotation, transform.localScale);   // 다른 대원 화면에서 미끄러지지 않게
+        if (controller != null) controller.enabled = true;
+        FloorCarryOver.ArrivedDead = false;
+        _healthComp.Revive(_healthComp.Maximum * healthFraction);
+    }
+
+    /// <summary>클라이언트 ID로 대원 찾기 (몬스터 피격자 확인 등)</summary>
+    public static FpsNetworkPlayer FindByClient(ulong clientId)
+    {
+        foreach (var p in All) if (p != null && p.OwnerClientId == clientId) return p;
+        return null;
+    }
+}

@@ -59,6 +59,16 @@ public sealed class FloorTransition : NetworkBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { Instance = null; InCutscene = false; }
 
+    /// <summary>
+    /// 로비로 돌아왔을 때: 층 이동 연출 도중 연결이 끊기거나 나간 경우 '연출 중' 상태가 남아 있지 않게 끈다.
+    /// (남아 있으면 다음 게임·다시 참가에서 임무 장치·계단 F가 안 눌리고, 방장이면 고치가 안 생기고 계단 문이 안 열린다)
+    /// </summary>
+    public static void ResetForLobby()
+    {
+        InCutscene = false;
+        StairDoorController.SuppressAuto = false;
+    }
+
     public static string FloorName(int f)
     {
         switch (f)
@@ -90,7 +100,7 @@ public sealed class FloorTransition : NetworkBehaviour
         if (floor == 5)
         {
             var intro = new GameObject("Floor5 Intro").AddComponent<Floor5Intro>();
-            intro.Init(font, !FloorCarryOver.Pending);
+            intro.Init(font, !FloorCarryOver.Pending && !Rejoin.IsRejoining);   // 다시 참가한 대원에게는 시작 경보·방송을 다시 틀지 않는다
         }
         if (FloorCarryOver.Pending)
         {
@@ -100,6 +110,7 @@ public sealed class FloorTransition : NetworkBehaviour
             SetCutscene(true);
             ScreenFader.Set(1f);
         }
+        else ResetForLobby();   // 다른 층에서 온 게 아니면(게임 시작·다시 참가) 예전 연출 상태를 지운다
     }
 
     // ------------------------------------------------------------------ 깬 층 (게임 도중 들어온 대원도 같은 기준으로 내려갈 수 있게 방장 값을 받는다)
@@ -402,14 +413,39 @@ public sealed class FloorTransition : NetworkBehaviour
         {
             yield return new WaitForSecondsRealtime(0.3f);   // 다른 대원 화면도 다 어두워지도록
             LobbyPlayerSpawner.KeywordOverride = new[] { "Arrival_" + side };
-            var status = NetworkManager.SceneManager.LoadScene(scene, LoadSceneMode.Single);
+            // 다른 씬 불러오기가 진행 중이면(예: 다시 참가한 대원이 층을 받는 중) 잠깐씩 기다렸다 다시 시도한다
+            var status = SceneEventProgressStatus.None;
+            float giveUp = Time.unscaledTime + 20f;
+            while (IsSpawned && NetworkManager != null && NetworkManager.SceneManager != null)
+            {
+                status = NetworkManager.SceneManager.LoadScene(scene, LoadSceneMode.Single);
+                if (status != SceneEventProgressStatus.SceneEventInProgress || Time.unscaledTime > giveUp) break;
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
             Debug.Log($"[Floor] {floor}층 → {scene} (계단 {side}, {(up ? "올라감" : "내려감")}) : {status}");
+            // 끝내 불러오지 못하면 모두 이 층에 남는다 (예전엔 모든 대원의 화면이 검은 채로 멈춰 있었음)
+            if (status != SceneEventProgressStatus.Started && IsSpawned) CancelMoveRpc();
         }
         else
         {
             // 참가자: 네트워크 씬 불러오기 신호는 방장이 다음 층을 다 불러온 뒤에 오므로, 그동안 검은 화면 대신 로딩 화면을 보여 준다
             LoadingScreen.Show();
         }
+    }
+
+    /// <summary>방장이 다음 층을 불러오지 못함: 이동을 취소하고 이 층에서 계속한다</summary>
+    [Rpc(SendTo.ClientsAndHost)]
+    void CancelMoveRpc()
+    {
+        Debug.LogWarning("[Floor] 층 이동 취소 (다음 층을 불러오지 못함)");
+        _moving = false;
+        _myReady = false; _myZone = -1;
+        FloorCarryOver.Pending = false;
+        FloorCarryOver.Transitioning = false;
+        LobbyPlayerSpawner.KeywordOverride = null;
+        LoadingScreen.Cancel();
+        ScreenFader.FadeTo(0f, 0.3f);
+        SetCutscene(false);
     }
 
     // ------------------------------------------------------------------ 매 프레임

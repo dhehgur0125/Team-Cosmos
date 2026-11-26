@@ -50,6 +50,8 @@ public sealed class RadioVoiceEffect : MonoBehaviour
         {
             if (participant == null || participant.IsSelf || string.IsNullOrEmpty(participant.PlayerId)) continue;
             seen.Add(participant.PlayerId);
+            // 같은 대원이 채널에 다시 들어오면(다시 참가 등) Vivox 참가자가 새로 생기고 예전 탭은 사라진다 → 새 참가자에 다시 만든다
+            if (taps.TryGetValue(participant.PlayerId, out var old) && old != participant) RemoveTap(participant.PlayerId);
             if (!taps.ContainsKey(participant.PlayerId) && !failed.Contains(participant.PlayerId)) CreateTap(participant);
         }
 

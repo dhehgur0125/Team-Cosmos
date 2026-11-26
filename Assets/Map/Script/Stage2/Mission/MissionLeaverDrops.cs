@@ -4,7 +4,8 @@ using VoidLast.Player;
 
 /// <summary>
 /// 게임을 나간 대원이 들고 있던 물건을 마지막 위치에 떨어뜨린다 (방장 전용).
-/// 임무 물건을 든 대원이 나가도 임무가 막히지 않게 한다. 임무 진행자가 Tick과 OnClientLeft를 불러 준다.
+/// 임무 물건을 든 대원이 나가도 임무가 막히지 않게 하고, 다시 참가하면 주울 수 있게 한다.
+/// 모든 층에 있는 NetworkPickupRegistry가 Tick과 OnClientLeft를 불러 준다 (5층처럼 임무가 없는 층 포함).
 /// </summary>
 public sealed class MissionLeaverDrops
 {

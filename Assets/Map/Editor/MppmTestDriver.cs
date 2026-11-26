@@ -175,6 +175,16 @@ namespace VoidLast.MapTools
                         Note("click " + arg);
                         break;
                     }
+                    case "netdrop":   // 강제 종료 흉내: 신호 없이 네트워크가 끊긴 것처럼 (방장 쪽엔 30초 동안 유령 대원이 남음)
+                    {
+                        var nm = NetworkManager.Singleton;
+                        var simType = FindType("Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulator");
+                        if (nm == null || simType == null) { Note("netdrop: NetworkManager 또는 NetworkSimulator 없음"); break; }
+                        var sim = nm.GetComponent(simType) ?? nm.gameObject.AddComponent(simType);
+                        simType.GetMethod("Disconnect", All).Invoke(sim, null);
+                        Note("netdrop");
+                        break;
+                    }
                     case "stop": EditorApplication.isPlaying = false; Note("stop"); break;
                     case "play": EditorApplication.isPlaying = true; Note("play"); break;
                     case "clearlog": File.WriteAllText(LogPath, ""); break;
@@ -215,6 +225,18 @@ namespace VoidLast.MapTools
                 sb.AppendLine($"lobby room {(room != null && room.activeInHierarchy)} rejoinBtn {(rj != null && rj.activeInHierarchy)} ongoingRoom {(ongoing != null)} status '{status?.text}' hint '{hint?.text}'");
             }
             sb.AppendLine("loading " + LoadingScreen.IsShowing);
+            try
+            {
+                var vx = Unity.Services.Vivox.VivoxService.Instance;
+                if (vx != null && vx.IsLoggedIn)
+                {
+                    var vlist = new System.Collections.Generic.List<string>();
+                    foreach (var kv in vx.ActiveChannels) vlist.Add(kv.Key + "(" + kv.Value.Count + ")");
+                    sb.AppendLine("voice key " + (VoiceChatService.Exists ? VoiceChatService.Instance.SessionKey : "-") + " channels " + string.Join(",", vlist) + " tx " + string.Join(",", vx.TransmittingChannels) + " mic " + (VoiceChatService.Exists && VoiceChatService.Instance.MicMuted ? "off" : "on"));
+                }
+                else sb.AppendLine("voice loggedOut");
+            }
+            catch (Exception e) { sb.AppendLine("voice error " + e.Message); }
             var ft = FloorTransition.Instance;
             if (ft != null)
             {

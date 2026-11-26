@@ -153,6 +153,8 @@ public class LobbyManager : MonoBehaviour
         LobbyPlayerSpawner.KeywordOverride = null;
         VoidLast.Player.FpsInput.Blocked = false;
         VoidLast.Player.FpsHealth.DamageBlocked = false;
+        FloorTransition.ResetForLobby();   // 층 이동 연출 도중 나온 경우
+        Rejoin.ResetLocalFlags();
         ScreenFader.Clear();
         LoadingScreen.Subtitle = null;
 
@@ -166,7 +168,7 @@ public class LobbyManager : MonoBehaviour
             if (UnityServices.State == ServicesInitializationState.Uninitialized)
             {
                 var options = new InitializationOptions();
-                options.SetProfile(LocalProfile());
+                options.SetProfile(Rejoin.LocalProfile());   // 껐다 켜도 같은 플레이어 ID (강제 종료 후 다시 참가)
                 await UnityServices.InitializeAsync(options);
             }
             else
@@ -196,6 +198,8 @@ public class LobbyManager : MonoBehaviour
             NetworkManager.Singleton.OnClientDisconnectCallback += OnNetworkDisconnected;
 
         if (TryResumeRoom()) return;   // 게임이 끝나 같은 방으로 돌아온 경우
+        await LeaveStaleSessionsAsync(); // 게임 도중 끊겨 나온 경우 등: 제대로 나가지 못한 예전 방 정보를 정리
+        if (this == null) return;
         // 게임 도중 나왔거나(ESC → 게임 종료, 연결 끊김) 게임을 껐다 켠 경우: 그 방의 "진행 중인 게임" 대기실 창
         if (_hasTicket) ShowOngoingRoom();
         await RefreshRoomListAsync(false);
@@ -212,12 +216,18 @@ public class LobbyManager : MonoBehaviour
         ISession session = null;
         try
         {
-            foreach (var kv in MultiplayerService.Instance.Sessions) { session = kv.Value; break; }
+            foreach (var kv in MultiplayerService.Instance.Sessions)
+            {
+                if (kv.Value == null || kv.Value.State == SessionState.Deleted) continue;
+                if (session == null || kv.Value.State == SessionState.Connected) session = kv.Value;
+            }
         }
         catch (Exception) { }
         if (session == null) return false;
 
         Rejoin.ClearTicket();   // 게임이 끝났으므로 다시 참가 표는 필요 없음
+        _hasTicket = false;
+        LoadingScreen.Cancel();  // 게임이 끝나는 순간 다시 참가한 경우: 내 대원을 기다리던 로딩 화면을 닫는다
         EnterRoom(session);
         AddSystemLine("게임이 끝나 대기방으로 돌아왔어요.");
         SetStatus(session.IsHost ? "게임이 끝나 대기방으로 돌아왔어요. 대원이 모두 준비하면 다시 시작할 수 있어요." : "게임이 끝나 대기방으로 돌아왔어요. 준비를 눌러 주세요.");
@@ -277,17 +287,6 @@ public class LobbyManager : MonoBehaviour
         }
     }
 
-    /// <summary>같은 PC에서 여러 개를 띄워도(에디터+빌드, Multiplayer Play Mode) 다른 플레이어로 로그인되도록 프로필을 분리한다.</summary>
-    static string LocalProfile()
-    {
-        string seed = Application.isEditor ? Application.dataPath : Guid.NewGuid().ToString("N");
-        unchecked
-        {
-            int h = 23;
-            foreach (char ch in seed) h = h * 31 + ch;
-            return "vl" + (h & 0x7fffffff).ToString("x");
-        }
-    }
 
     // ------------------------------------------------------------------ main panel
     string Nickname
@@ -407,6 +406,7 @@ public class LobbyManager : MonoBehaviour
                 },
             }.WithRelayNetwork();
 
+            PrepareNet();
             var session = await MultiplayerService.Instance.CreateSessionAsync(options);
             EnterRoom(session);
             AddSystemLine($"방을 만들었어요. 참가 코드: <b>{session.Code}</b>");
@@ -416,11 +416,18 @@ public class LobbyManager : MonoBehaviour
     async Task JoinByIdAsync(string sessionId)
     {
         if (_busy) return;
+        if (Rejoin.TryLoadTicket(out var ticket) && ticket.sessionId == sessionId) { await RejoinAsync(); return; }
         SaveNickname(null);
         await RunBusy("방에 들어가는 중...", async () =>
         {
-            var session = await MultiplayerService.Instance.JoinSessionByIdAsync(sessionId,
-                new JoinSessionOptions { PlayerProperties = MyPlayerProperties(false) });
+            PrepareNet();
+            ISession session;
+            try
+            {
+                session = await MultiplayerService.Instance.JoinSessionByIdAsync(sessionId,
+                    new JoinSessionOptions { PlayerProperties = MyPlayerProperties(false) });
+            }
+            catch (Exception) { await LeaveStaleSessionsAsync(); throw; }   // 방장이 접속을 거절한 경우 등: 반쯤 들어간 방 정보를 정리
             if (await HandleInGameSessionAsync(session)) return;
             EnterRoom(session);
         });
@@ -435,11 +442,18 @@ public class LobbyManager : MonoBehaviour
             SetStatus("참가 코드를 입력해 주세요.", true);
             return;
         }
+        if (Rejoin.TryLoadTicket(out var ticket) && string.Equals(ticket.code, code, StringComparison.OrdinalIgnoreCase)) { await RejoinAsync(); return; }
         SaveNickname(null);
         await RunBusy("코드로 방을 찾는 중...", async () =>
         {
-            var session = await MultiplayerService.Instance.JoinSessionByCodeAsync(code,
-                new JoinSessionOptions { PlayerProperties = MyPlayerProperties(false) });
+            PrepareNet();
+            ISession session;
+            try
+            {
+                session = await MultiplayerService.Instance.JoinSessionByCodeAsync(code,
+                    new JoinSessionOptions { PlayerProperties = MyPlayerProperties(false) });
+            }
+            catch (Exception) { await LeaveStaleSessionsAsync(); throw; }   // 방장이 접속을 거절한 경우 등: 반쯤 들어간 방 정보를 정리
             if (await HandleInGameSessionAsync(session)) return;
             EnterRoom(session);
         });
@@ -461,8 +475,10 @@ public class LobbyManager : MonoBehaviour
                 if (info.IsLocked || info.HasPassword) continue;
                 try
                 {
+                    PrepareNet();
                     var session = await MultiplayerService.Instance.JoinSessionByIdAsync(info.Id,
                         new JoinSessionOptions { PlayerProperties = MyPlayerProperties(false) });
+                    if (await HandleInGameSessionAsync(session)) { if (_gameStarting) return; continue; }   // 그새 게임이 시작된 방이면 다음 방
                     EnterRoom(session);
                     return;
                 }
@@ -485,6 +501,7 @@ public class LobbyManager : MonoBehaviour
                     { KeyState, new SessionProperty("lobby", VisibilityPropertyOptions.Public) },
                 },
             }.WithRelayNetwork();
+            PrepareNet();
             var created = await MultiplayerService.Instance.CreateSessionAsync(options);
             EnterRoom(created);
             AddSystemLine("열린 방이 없어서 새 방을 만들었어요.");
@@ -884,7 +901,12 @@ public class LobbyManager : MonoBehaviour
         _ongoingRoom = null;
     }
 
-    /// <summary>다시 참가 표의 방 코드로 들어간다. 게임이 진행 중이면 그 층으로, 이미 끝나 대기방이면 대기방으로</summary>
+    /// <summary>
+    /// 다시 참가 표의 방 코드로 들어간다. 게임이 진행 중이면 그 층으로, 이미 끝나 대기방이면 대기방으로.
+    ///  - 강제 종료로 방에 내 예전 자리가 남아 있으면 먼저 비운다 (같은 플레이어 ID라 그대로 두면 들어가지 못함)
+    ///  - 방이 가득 찼다는 등 일시적인 실패는 45초 동안 다시 시도하고, 그래도 안 되면 표는 남겨 두어 나중에 다시 누를 수 있다
+    ///  - 방이 없어졌을 때만 표를 지운다
+    /// </summary>
     async Task RejoinAsync()
     {
         if (_busy) return;
@@ -892,31 +914,70 @@ public class LobbyManager : MonoBehaviour
         SaveNickname(null);
         await RunBusy("진행 중인 게임에 다시 들어가는 중...", async () =>
         {
+            await LeaveStaleSessionsAsync();
+            await ClearStaleMembershipAsync(ticket.sessionId);
+            if (this == null) return;
+
             // MyPlayerProperties가 고유 아이템 선택을 비우므로, 먼저 만들고 나서 표의 값(고유 아이템 등)을 넣는다
             var properties = MyPlayerProperties(false);
             Rejoin.ApplyTicket(ticket);
             properties[KeyUnique] = new PlayerProperty(UniqueItems.Code(UniqueItems.LocalChoice), VisibilityPropertyOptions.Member);
-            ISession session;
-            try
+
+            ISession session = null;
+            Exception last = null;
+            float giveUpAt = Time.realtimeSinceStartup + 45f;
+            for (int attempt = 1; ; attempt++)
             {
-                _gameStarting = true;   // 들어가자마자 게임 씬으로 넘어가므로 대기방 연결 끊김 처리는 하지 않음
-                session = await MultiplayerService.Instance.JoinSessionByCodeAsync(ticket.code,
-                    new JoinSessionOptions { PlayerProperties = properties });
+                try
+                {
+                    _gameStarting = true;   // 들어가자마자 게임 씬으로 넘어가므로 대기방 연결 끊김 처리는 하지 않음
+                    Rejoin.PrepareNetwork(ticket.token);   // 방장이 이번 게임 명단과 맞춰 보고 들여보낸다
+                    session = await MultiplayerService.Instance.JoinSessionByCodeAsync(ticket.code,
+                        new JoinSessionOptions { PlayerProperties = properties });
+                    break;
+                }
+                catch (Exception e)
+                {
+                    last = e;
+                    _gameStarting = false;
+                    Debug.LogWarning($"[Lobby] 다시 참가 실패 ({attempt}번째): {e.Message}");
+                    await LeaveStaleSessionsAsync();   // 실패한 참가가 남긴 방 정보 정리
+                    if (this == null) return;
+                    if (RefusedByHost())
+                    {
+                        // 방장이 들이지 않음 = 내가 나가 있는 동안 게임이 끝나고 새 게임이 시작됨 → 이 표로는 들어갈 수 없다
+                        Rejoin.ClearTicket(); _hasTicket = false; Rejoin.ResetLocalFlags();
+                        SetStatus(Rejoin.GameInProgressReason, true);
+                        return;
+                    }
+                    if (RoomGone(e))
+                    {
+                        Rejoin.ClearTicket(); _hasTicket = false; Rejoin.ResetLocalFlags();
+                        if (this != null) SetStatus("다시 들어가지 못했어요. 게임이 이미 끝났거나 방이 닫혔어요.", true);
+                        return;
+                    }
+                    if (this == null) return;
+                    if (Time.realtimeSinceStartup > giveUpAt) break;
+                    SetLoadingText($"진행 중인 게임에 다시 들어가는 중... ({attempt + 1}번째 시도)\n방장 컴퓨터가 예전 연결을 정리하는 중일 수 있어요.");
+                    await Task.Delay(4000);
+                    if (this == null) return;
+                    await ClearStaleMembershipAsync(ticket.sessionId);
+                }
             }
-            catch (Exception e)
+            if (session == null)
             {
-                _gameStarting = false;
-                Rejoin.ClearTicket(); _hasTicket = false;
-                Debug.LogWarning("[Lobby] 다시 참가 실패: " + e.Message);
-                SetStatus("다시 들어가지 못했어요. 게임이 이미 끝났거나 방이 닫혔어요.", true);
+                // 표는 지우지 않는다 → "진행 중인 게임 대기실"에서 다시 누를 수 있다
+                Rejoin.ResetLocalFlags();
+                SetStatus("지금은 다시 들어가지 못했어요. 잠시 후 오른쪽 위 '진행 중인 게임 대기실'에서 다시 눌러 주세요. (" + FriendlyError(last) + ")", true);
                 return;
             }
+
             string state = session.Properties.TryGetValue(KeyState, out var sp) ? sp.Value : "";
             if (state != "ingame")
             {
                 // 그새 게임이 끝나 대기방이 됐다 → 그냥 방에 들어간다
                 _gameStarting = false;
-                Rejoin.ClearTicket(); _hasTicket = false;
+                Rejoin.ClearTicket(); _hasTicket = false; Rejoin.ResetLocalFlags();
                 EnterRoom(session);
                 AddSystemLine("게임이 이미 끝나 대기방으로 들어왔어요.");
                 return;
@@ -924,7 +985,111 @@ public class LobbyManager : MonoBehaviour
             LoadingScreen.Subtitle = "진행 중인 게임에 다시 참가";
             LoadingScreen.BeginRejoin();
             Debug.Log("[Lobby] 진행 중인 게임에 다시 참가: 방장 화면의 층을 받는 중");
+            _ = WatchRejoinAsync(session);
         });
+    }
+
+    /// <summary>방을 만들거나 들어가기 직전: 접속 허가 설정 + 내 다시 참가 표식 (Rejoin.PrepareNetwork)</summary>
+    static void PrepareNet() => Rejoin.PrepareNetwork(Rejoin.TryLoadTicket(out var t) ? t.token : "");
+
+    /// <summary>방금 방장이 진행 중인 게임이라며 접속을 거절했는지</summary>
+    static bool RefusedByHost()
+    {
+        var nm = NetworkManager.Singleton;
+        return nm != null && !nm.IsListening && nm.DisconnectReason == Rejoin.GameInProgressReason;
+    }
+
+    static bool RoomGone(Exception e)
+    {
+        if (e is SessionException se && (se.Error == SessionError.SessionNotFound || se.Error == SessionError.SessionDeleted)) return true;
+        string m = e.Message ?? "";
+        return m.IndexOf("not found", StringComparison.OrdinalIgnoreCase) >= 0 && m.IndexOf("allocation", StringComparison.OrdinalIgnoreCase) < 0;
+    }
+
+    /// <summary>
+    /// 다시 참가한 뒤 게임 씬으로 넘어갈 때까지 지켜본다 (넘어가면 이 로비가 사라지므로 끝).
+    ///  - 그새 게임이 끝나 방이 대기방이 됐으면 로딩 화면을 닫고 대기방을 보여준다
+    ///  - 방장 컴퓨터에 연결하지 못했으면 방에서 나오고 표는 남겨 둔다
+    /// </summary>
+    async Task WatchRejoinAsync(ISession session)
+    {
+        float until = Time.realtimeSinceStartup + 150f;
+        while (Time.realtimeSinceStartup < until)
+        {
+            await Task.Delay(500);
+            if (this == null || FpsNetworkPlayer.Local != null) return;   // 게임 씬으로 넘어감 = 정상
+            var nm = NetworkManager.Singleton;
+            string state = "";
+            try { state = session.Properties.TryGetValue(KeyState, out var sp) ? sp.Value : ""; } catch (Exception) { }
+            if (state == "lobby" && nm != null && nm.IsListening)
+            {
+                LoadingScreen.Cancel();
+                _gameStarting = false;
+                Rejoin.ClearTicket(); _hasTicket = false; Rejoin.ResetLocalFlags();
+                EnterRoom(session);
+                AddSystemLine("게임이 끝나 대기방으로 들어왔어요.");
+                return;
+            }
+            if (nm == null || !nm.IsListening)
+            {
+                string reason = nm != null ? nm.DisconnectReason : "";
+                Debug.LogWarning("[Lobby] 다시 참가: 방장 컴퓨터에 연결하지 못함 " + reason);
+                LoadingScreen.Cancel();
+                _gameStarting = false;
+                Rejoin.ResetLocalFlags();
+                // 방이 닫혔거나 새 게임이 이미 시작됨 → 이 표로는 다시 들어갈 수 없다
+                bool gone = reason == Rejoin.RoomClosedReason || reason == Rejoin.GameInProgressReason;
+                if (gone) { Rejoin.ClearTicket(); _hasTicket = false; }
+                try { await session.LeaveAsync(); } catch (Exception) { }
+                if (this == null) return;
+                ReturnToMain(gone ? reason : "방장 컴퓨터에 연결하지 못했어요. 잠시 후 다시 참가해 주세요.");
+                RefreshRejoinTicket();
+                return;
+            }
+        }
+    }
+
+    /// <summary>제대로 나가지 못하고 남아 있는 예전 방 정보(이 PC 안)를 정리한다. 지금 대기방은 건드리지 않는다</summary>
+    async Task LeaveStaleSessionsAsync()
+    {
+        List<ISession> stale;
+        try { stale = new List<ISession>(MultiplayerService.Instance.Sessions.Values); }
+        catch (Exception) { return; }
+        foreach (var s in stale)
+        {
+            if (s == null || s == _session) continue;
+            try
+            {
+                if (s.IsHost) await s.AsHost().DeleteAsync();
+                else await s.LeaveAsync();
+                Debug.Log("[Lobby] 남아 있던 예전 방 정보를 정리함: " + s.Id);
+            }
+            catch (Exception e) { Debug.LogWarning("[Lobby] 예전 방 정보 정리 경고: " + e.Message); }
+        }
+    }
+
+    /// <summary>
+    /// 강제 종료 등으로 서버에 내 예전 자리가 남아 있으면 비운다 (같은 플레이어 ID라 그대로는 다시 들어가지 못하거나 방이 가득 참).
+    /// 방에 다시 연결만 하고(네트워크 없이) 바로 나온다.
+    /// </summary>
+    static async Task ClearStaleMembershipAsync(string sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId)) return;
+        try
+        {
+            var joined = await MultiplayerService.Instance.GetJoinedSessionIdsAsync();
+            if (joined == null || !joined.Contains(sessionId)) return;
+            Debug.Log("[Lobby] 서버에 내 예전 자리가 남아 있음 → 비우고 다시 들어감");
+            ISession old = null;
+            foreach (var s in MultiplayerService.Instance.Sessions.Values) if (s != null && s.Id == sessionId) old = s;
+            if (old == null)
+            {
+                Rejoin.PrepareNetwork(Rejoin.TryLoadTicket(out var t) ? t.token : "");
+                old = await MultiplayerService.Instance.ReconnectToSessionAsync(sessionId);
+            }
+            await old.LeaveAsync();
+        }
+        catch (Exception e) { Debug.LogWarning("[Lobby] 예전 자리 비우기 경고: " + e.Message); }
     }
 
     /// <summary>코드·목록으로 들어간 방이 이미 게임 중이면: 다시 참가 표가 그 방 것이면 다시 참가, 아니면 나온다. true면 처리 끝</summary>
@@ -936,6 +1101,13 @@ public class LobbyManager : MonoBehaviour
         {
             Rejoin.ApplyTicket(ticket);
             _gameStarting = true;
+            try
+            {
+                // 방 정보의 고유 아이템도 표의 값으로 (게임이 끝나고 대기방에서 다시 고르지 않게)
+                session.CurrentPlayer.SetProperty(KeyUnique, new PlayerProperty(UniqueItems.Code(UniqueItems.LocalChoice), VisibilityPropertyOptions.Member));
+                await session.SaveCurrentPlayerDataAsync();
+            }
+            catch (Exception e) { Debug.LogWarning("[Lobby] 다시 참가: 고유 아이템 저장 경고 " + e.Message); }
             LoadingScreen.Subtitle = "진행 중인 게임에 다시 참가";
             LoadingScreen.BeginRejoin();
             return true;
@@ -1146,6 +1318,7 @@ public class LobbyManager : MonoBehaviour
         }
         var hostPlayer = _session.GetPlayer(AuthenticationService.Instance.PlayerId);
         if (hostPlayer != null) UniqueItems.LocalChoice = PlayerUnique(hostPlayer);
+        Rejoin.ResetLocalFlags();
 
         await RunBusy("게임을 시작하는 중...", async () =>
         {
@@ -1301,6 +1474,7 @@ public class LobbyManager : MonoBehaviour
         if (starting)
         {
             _gameStarting = true;
+            Rejoin.ResetLocalFlags();
             Rejoin.NewToken();
             Rejoin.SaveTicket(_session, GameBalance.StartPlayers);   // 연결이 끊겨도 다시 들어올 수 있게
             LoadingScreen.Show();
@@ -1376,6 +1550,7 @@ public class LobbyManager : MonoBehaviour
 
     static string FriendlyError(Exception e)
     {
+        if (RefusedByHost()) return "이미 게임이 진행 중인 방이에요. 게임이 끝나면 들어갈 수 있어요.";
         if (e is SessionException se)
         {
             switch (se.Error)

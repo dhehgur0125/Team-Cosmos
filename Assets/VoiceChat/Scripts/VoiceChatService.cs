@@ -51,7 +51,16 @@ public sealed class VoiceChatService : MonoBehaviour
     public string DeadChannel => "vl_dead_" + Sanitize(SessionKey);
 
     Task _loginTask;
-    readonly HashSet<string> _wanted = new HashSet<string>();   // 들어가려는(들어간) 채널
+    // 들어가 있어야 하는 채널 → 3D 채널이면 그 설정 (그룹 채널은 null)
+    // 실제로 들어가 있는지는 Vivox(ActiveChannels)가 기준이고, 다르면 SyncAsync가 맞춘다.
+    // 예전엔 '들어가려는 채널' 목록에만 있으면 다시 들어가지 않아서, 입장이 한 번 실패하거나 Vivox 연결이 잠깐 끊기거나
+    // 나가는 중에 다시 들어가려 하면 그 층이 끝날 때까지 근거리·무전이 조용히 끊겨 있었다.
+    readonly Dictionary<string, Channel3DProperties> _wanted = new Dictionary<string, Channel3DProperties>();
+    readonly HashSet<string> _syncing = new HashSet<string>();   // 입장·퇴장 작업 중인 채널 (한 채널에 작업은 하나씩)
+    readonly HashSet<string> _resync = new HashSet<string>();    // 작업 중에 원하는 상태가 바뀜 → 끝나면 한 번 더 맞춘다
+    readonly Dictionary<string, float> _retryAt = new Dictionary<string, float>();   // 실패한 채널을 다시 시도할 시각
+    readonly Dictionary<string, int> _failCount = new Dictionary<string, int>();
+    float _nextWatch;
     TransmissionMode _txMode = TransmissionMode.None;
     string _txChannel;
     bool _txApplying, _txDirty;
@@ -162,52 +171,81 @@ public sealed class VoiceChatService : MonoBehaviour
         catch (Exception) { return false; }
     }
 
-    public async Task JoinGroupAsync(string channel)
+    public bool IsWanted(string channel) => _wanted.ContainsKey(channel);
+
+    public Task JoinGroupAsync(string channel) => WantAsync(channel, null);
+
+    public Task JoinPositionalAsync(string channel, Channel3DProperties props) => WantAsync(channel, props ?? new Channel3DProperties());
+
+    Task WantAsync(string channel, Channel3DProperties props)
     {
-        if (_wanted.Contains(channel)) return;
-        _wanted.Add(channel);
-        if (!await EnsureLoggedInAsync()) { _wanted.Remove(channel); return; }
-        if (!_wanted.Contains(channel) || IsInChannel(channel)) return;   // 그 사이에 나가기로 했으면 들어가지 않음
+        if (string.IsNullOrEmpty(channel)) return Task.CompletedTask;
+        _wanted[channel] = props;
+        _retryAt.Remove(channel); _failCount.Remove(channel);   // 새로 들어가려는 것이면 기다리지 않고 바로
+        return SyncAsync(channel);
+    }
+
+    public Task LeaveAsync(string channel)
+    {
+        if (string.IsNullOrEmpty(channel) || !_wanted.Remove(channel)) return Task.CompletedTask;
+        _retryAt.Remove(channel); _failCount.Remove(channel);
+        return SyncAsync(channel);
+    }
+
+    /// <summary>
+    /// 그 채널의 실제 상태(들어가 있는지)를 원하는 상태(_wanted)에 맞춘다. 한 채널에 작업은 하나씩만 하고,
+    /// 작업 중에 원하는 상태가 바뀌면(예: 나가는 중에 다시 들어가기) 끝난 뒤 다시 맞춘다.
+    /// 실패하면 잠시 뒤 Update의 점검이 다시 시도한다.
+    /// </summary>
+    async Task SyncAsync(string channel)
+    {
+        if (_syncing.Contains(channel)) { _resync.Add(channel); return; }
+        _syncing.Add(channel);
         try
         {
-            await VivoxService.Instance.JoinGroupChannelAsync(channel, ChatCapability.AudioOnly);
-            Debug.Log($"[Voice] 채널 입장: {channel}");
-            if (!_wanted.Contains(channel)) await LeaveNowAsync(channel);
-            else ReapplyTransmission();
+            do
+            {
+                _resync.Remove(channel);
+                bool want = _wanted.TryGetValue(channel, out var props);
+                if (want)
+                {
+                    if (!await EnsureLoggedInAsync()) { Backoff(channel); break; }
+                    if (!_wanted.ContainsKey(channel) || IsInChannel(channel)) continue;
+                    try
+                    {
+                        if (props != null) await VivoxService.Instance.JoinPositionalChannelAsync(channel, ChatCapability.AudioOnly, props);
+                        else await VivoxService.Instance.JoinGroupChannelAsync(channel, ChatCapability.AudioOnly);
+                        Debug.Log($"[Voice] {(props != null ? "3D 채널" : "채널")} 입장: {channel}");
+                        _retryAt.Remove(channel); _failCount.Remove(channel);
+                        if (State != Status.Ready) SetState(Status.Ready);
+                        ReapplyTransmission();
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[Voice] 채널 입장 실패 ({channel}): {e.Message} → 잠시 뒤 다시 시도");
+                        SetState(Status.Error, Short(e.Message));
+                        Backoff(channel);
+                        break;
+                    }
+                }
+                else if (IsInChannel(channel))
+                {
+                    await LeaveNowAsync(channel);
+                }
+            } while (_resync.Contains(channel));
         }
-        catch (Exception e)
+        finally
         {
-            _wanted.Remove(channel);
-            Debug.LogWarning($"[Voice] 채널 입장 실패 ({channel}): {e.Message}");
-            SetState(Status.Error, Short(e.Message));
+            _syncing.Remove(channel);
+            _resync.Remove(channel);
         }
     }
 
-    public async Task JoinPositionalAsync(string channel, Channel3DProperties props)
+    void Backoff(string channel)
     {
-        if (_wanted.Contains(channel)) return;
-        _wanted.Add(channel);
-        if (!await EnsureLoggedInAsync()) { _wanted.Remove(channel); return; }
-        if (!_wanted.Contains(channel) || IsInChannel(channel)) return;
-        try
-        {
-            await VivoxService.Instance.JoinPositionalChannelAsync(channel, ChatCapability.AudioOnly, props);
-            Debug.Log($"[Voice] 3D 채널 입장: {channel}");
-            if (!_wanted.Contains(channel)) await LeaveNowAsync(channel);
-            else ReapplyTransmission();
-        }
-        catch (Exception e)
-        {
-            _wanted.Remove(channel);
-            Debug.LogWarning($"[Voice] 3D 채널 입장 실패 ({channel}): {e.Message}");
-            SetState(Status.Error, Short(e.Message));
-        }
-    }
-
-    public async Task LeaveAsync(string channel)
-    {
-        if (!_wanted.Remove(channel)) return;
-        await LeaveNowAsync(channel);
+        _failCount.TryGetValue(channel, out int n);
+        _failCount[channel] = ++n;
+        _retryAt[channel] = Time.unscaledTime + Mathf.Min(2f * n, 10f);   // 2, 4, 6 … 10초 간격
     }
 
     async Task LeaveNowAsync(string channel)
@@ -223,6 +261,7 @@ public sealed class VoiceChatService : MonoBehaviour
                     _appliedMode = TransmissionMode.None; _appliedChannel = null;
                 }
                 await VivoxService.Instance.LeaveChannelAsync(channel);
+                Debug.Log($"[Voice] 채널 나감: {channel}");
                 ReapplyTransmission();
             }
         }
@@ -231,19 +270,85 @@ public sealed class VoiceChatService : MonoBehaviour
 
     public async Task LeaveAllAsync()
     {
-        var list = new List<string>(_wanted);
+        var list = new List<string>(_wanted.Keys);
+        try { if (IsLoggedIn) foreach (var ch in VivoxService.Instance.ActiveChannels.Keys) if (!list.Contains(ch)) list.Add(ch); }
+        catch (Exception) { }
         _wanted.Clear();
+        _retryAt.Clear(); _failCount.Clear();
         _txMode = TransmissionMode.None; _txChannel = null;
-        foreach (var ch in list) await LeaveNowAsync(ch);
+        foreach (var ch in list) await SyncAsync(ch);
         if (list.Count > 0 || _appliedMode != TransmissionMode.None) { _appliedMode = TransmissionMode.None; _appliedChannel = null; }
+    }
+
+    /// <summary>
+    /// 1.5초마다 점검: 들어가 있어야 하는 채널에 없으면 다시 들어가고(입장 실패·Vivox 연결 끊김·로그아웃 뒤 복구),
+    /// 나와야 하는 채널에 남아 있으면 나오고, 실제 송신 채널이 정해 둔 것과 다르면 다시 맞춘다.
+    /// </summary>
+    void Update()
+    {
+        if (Time.unscaledTime < _nextWatch) return;
+        _nextWatch = Time.unscaledTime + 1.5f;
+        if (_wanted.Count == 0 && !InAnyChannel()) return;
+
+        foreach (var ch in new List<string>(_wanted.Keys))
+        {
+            if (_syncing.Contains(ch) || IsInChannel(ch)) continue;
+            if (_retryAt.TryGetValue(ch, out float at) && Time.unscaledTime < at) continue;
+            if (_failCount.ContainsKey(ch) || !IsLoggedIn) Debug.Log($"[Voice] 채널 다시 연결 시도: {ch}");
+            else Debug.LogWarning($"[Voice] 들어가 있어야 하는 채널에 없음 → 다시 입장: {ch}");
+            _ = SyncAsync(ch);
+        }
+        try
+        {
+            if (IsLoggedIn)
+                foreach (var ch in new List<string>(VivoxService.Instance.ActiveChannels.Keys))
+                    if (!_wanted.ContainsKey(ch) && !_syncing.Contains(ch) && ch.StartsWith("vl_")) _ = SyncAsync(ch);
+        }
+        catch (Exception) { }
+
+        if (!_txApplying && IsLoggedIn && !TransmissionMatches()) ReapplyTransmission();
+    }
+
+    /// <summary>Vivox가 실제로 말하고 있는 채널이 정해 둔 송신 대상과 같은지 (채널 재입장·연결 복구 뒤 어긋날 수 있음)</summary>
+    bool TransmissionMatches()
+    {
+        try
+        {
+            var tx = VivoxService.Instance.TransmittingChannels;
+            if (tx == null) return true;
+            var mode = _txMode; var ch = _txChannel;
+            if (mode == TransmissionMode.Single && (string.IsNullOrEmpty(ch) || !IsInChannel(ch))) mode = TransmissionMode.None;
+            switch (mode)
+            {
+                case TransmissionMode.None: return tx.Count == 0;
+                case TransmissionMode.Single: return tx.Count == 1 && tx[0] == ch;
+                default: return tx.Count == VivoxService.Instance.ActiveChannels.Count;
+            }
+        }
+        catch (Exception) { return true; }
     }
 
     // ------------------------------------------------------------------ lobby / game
     /// <summary>로비 대기방에 들어갔을 때: 방 전체 음성 채널에 입장</summary>
     public async void EnterLobby(string sessionId)
     {
-        if (SessionKey != sessionId) await LeaveAllAsync();
-        SessionKey = sessionId ?? "";
+        sessionId = sessionId ?? "";
+        if (SessionKey != sessionId)
+        {
+            // 방 이름(SessionKey)은 기다리기 전에 바꾼다: 나가는 동안 게임 씬이 먼저 시작되면 바뀐 이름으로 채널에 들어가야 한다
+            var leaving = LeaveAllAsync();
+            SessionKey = sessionId;
+            await leaving;
+        }
+        else
+        {
+            // 같은 방의 게임이 끝나 대기방으로 돌아옴: 게임 중 채널(근거리·무전·사망자)이 남아 있으면 나간다
+            // (층 이동 도중 게임이 끝나면 게임 음성 쪽에서 채널을 그대로 두고 넘어가서 대기방에서도 계속 들렸다)
+            _ = LeaveAsync(NearChannel);
+            _ = LeaveAsync(RadioChannel);
+            _ = LeaveAsync(DeadChannel);
+        }
+        if (SessionKey != sessionId) return;   // 그사이 다른 방으로 바뀜
         SetTransmission(TransmissionMode.Single, LobbyChannel);
         await JoinGroupAsync(LobbyChannel);
     }
@@ -251,8 +356,11 @@ public sealed class VoiceChatService : MonoBehaviour
     /// <summary>로비 대기방에서 나갔을 때</summary>
     public async void LeaveLobby()
     {
-        await LeaveAllAsync();
+        // 이름을 먼저 비운다: 예전엔 나가기가 끝난 뒤에 비워서, 그사이 다시 참가해 게임에 들어가면
+        // 게임 채널 이름이 'solo'로 바뀌어 위치·무전이 엉뚱한 채널을 가리켰다
+        var leaving = LeaveAllAsync();
         SessionKey = "";
+        await leaving;
     }
 
     /// <summary>게임 씬에 들어왔을 때: 로비 채널을 나가고 근거리 3D 채널에 입장 (무전 채널은 무전기를 가졌을 때만)</summary>
@@ -260,10 +368,11 @@ public sealed class VoiceChatService : MonoBehaviour
     {
         if (!string.IsNullOrEmpty(sessionKeyOverride) && sessionKeyOverride != SessionKey)
         {
-            await LeaveAllAsync();
+            var leaving = LeaveAllAsync();
             SessionKey = sessionKeyOverride;
+            await leaving;
         }
-        await LeaveAsync(LobbyChannel);
+        _ = LeaveAsync(LobbyChannel);
         SetTransmission(TransmissionMode.Single, NearChannel);
         await JoinPositionalAsync(NearChannel, props);
     }
