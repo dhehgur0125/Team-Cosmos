@@ -67,7 +67,7 @@ public sealed class Floor5Intro : MonoBehaviour
             tip + "권총을 든 채 <b>[" + GameKeys.Label(GameAction.Flashlight) + "]</b> 손전등 켜기·끄기",
             tip + "<b>[" + GameKeys.Label(GameAction.Interact) + "]</b> 줍기·장치 사용 · <b>[" + GameKeys.Label(GameAction.Crouch) + "]</b> 앉으면 발소리가 나지 않아요",
             tip + "달리면 지구력이 줄어요 (HP 아래 막대). 다 쓰면 잠시 달릴 수 없어요",
-            tip + "쓰러진 몬스터는 2~3분 뒤 다시 일어나요. 꿈틀거리며 으르렁대면 곧 일어난다는 신호",
+            tip + MonsterDownTip(),
             tip + "계단에서 살아 있는 대원이 모두 모여 <b>[" + GameKeys.Label(GameAction.Interact) + "]</b>를 누르면 함께 이동해요",
         };
         foreach (var t in tips)
@@ -76,6 +76,22 @@ public sealed class Floor5Intro : MonoBehaviour
             yield return new WaitForSeconds(ToastGap);
         }
         try { PlayerPrefs.SetInt(TipsKey, 1); PlayerPrefs.Save(); } catch { }
+    }
+
+    /// <summary>쓰러진 몬스터 도움말. 밸런스 설정(monstersRevive)에 맞춰 문구를 고른다.</summary>
+    static string MonsterDownTip()
+    {
+        var b = GameBalance.Current;
+        if (b == null || !b.monstersRevive)
+            return b != null && b.monsterRegen
+                ? "쓰러진 몬스터는 다시 일어나지 않아요. 안 맞으면 체력이 차오르니 한 번에 몰아서 쏘세요"
+                : "쓰러진 몬스터는 다시 일어나지 않아요";
+        float lo = Mathf.Min(b.groggyMinSeconds, b.groggyMaxSeconds), hi = Mathf.Max(b.groggyMinSeconds, b.groggyMaxSeconds);
+        bool minutes = lo >= 60;
+        int min = Mathf.RoundToInt(minutes ? lo / 60f : lo), max = Mathf.RoundToInt(minutes ? hi / 60f : hi);
+        string unit = minutes ? "분" : "초";
+        string when = min == max ? min + unit : min + "~" + max + unit;
+        return "쓰러진 몬스터는 " + when + " 뒤 다시 일어나요. 꿈틀거리며 으르렁대면 곧 일어난다는 신호";
     }
 
     static int Pref(string key) { try { return PlayerPrefs.GetInt(key, 0); } catch { return 0; } }

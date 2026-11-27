@@ -111,7 +111,7 @@ Assets/
 ├─ Monster/            몬스터 AI·프리팹
 ├─ VoiceChat/          음성 채팅 (Vivox)
 └─ Resources/          밸런스 수치(GameBalance), 아이템 프리팹
-Docs/                  작업 인수인계 문서
+Docs/                  기획서, 작업 인수인계 문서
 Backups/               큰 변경 전 백업한 씬·스크립트
 ```
 
@@ -119,12 +119,7 @@ Backups/               큰 변경 전 백업한 씬·스크립트
 
 ## 문서
 
-- [층별 임무 인수인계](Assets/Map/Scenes/Floors/HANDOFF_floor_missions.md)
-- [몬스터](Docs/MONSTER_HANDOFF.md)
-- [파밍 아이템](Docs/LOOT_HANDOFF.md)
-- [시나리오 안내](Docs/SCENARIO_GUIDE_HANDOFF.md)
-- [통합 작업](Docs/INTEGRATION_HANDOFF.md)
-- [구급상자 변경 내용](Assets/Player/Validation/MedicalKitChanges.md)
+- [게임 기획서](Docs/GAME_DESIGN.md): 기획 의도, 배경 이야기, 대원·아이템·몬스터, 소리 규칙, 층별 임무, 인원별 난이도, 멀티플레이
 
 ## 팀
 
