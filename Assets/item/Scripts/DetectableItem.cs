@@ -179,6 +179,8 @@ public class DetectableItem : MonoBehaviour
     private void Update()
     {
         if (!glowing) return;
+        var crate=GetComponent<VoidLast.Player.LootContainer>();
+        if(crate!=null && !crate.CanScan){StopGlow();return;}
 
         float now = Time.time;
         if (now < glowStart) return; // 스캔 파동이 아직 도달하지 않음

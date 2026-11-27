@@ -39,6 +39,7 @@ namespace VoidLast.Player
         public float ChargeProgress => Online ? network.ChargeProgress : charging ? Mathf.Clamp01((Time.time - started) / Mathf.Max(0.01f, chargeDuration)) : 0;
         public int RemainingUses => Mathf.Max(0, maxUses - (Online ? network.Spent : spent));
         public float CooldownRemaining => Online ? network.CooldownRemaining : Mathf.Max(0, readyAt - Time.time);
+        public bool RechargeOffline() { if (Online || RemainingUses >= maxUses) return false; spent=0; return true; }
         public int LastStunnedCount { get; private set; }
         public FpsFlashEmitterView View => view;
 

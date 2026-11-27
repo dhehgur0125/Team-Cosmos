@@ -6,7 +6,7 @@ namespace VoidLast.Player
 {
     // 프리팹·씬에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
     // 씬·프리팹에 번호로 저장되므로 새 종류는 맨 뒤에만 추가한다
-    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler, Scanner, AdminCard, ToolKit, PowerCell, AmmoPack }
+    public enum FarmingItemKind { None, Syringe, Radio, Battery, QuarantineCard, Cutter, PowerModule, FuelCoupler, Scanner, AdminCard, ToolKit, PowerCell, AmmoPack, Map, MapFloor1, MapFloor3, MapFloor4, MapFloor5 }
 
     [DefaultExecutionOrder(-50)]
     public sealed class FpsInventory : MonoBehaviour
@@ -27,24 +27,29 @@ namespace VoidLast.Player
         FpsHealth recipient;
         FpsPistol pistol;
         int usingIndex = -1;
+        int batteryPendingSlot = -1;
+        uint batteryRequestId;
+        float batteryPendingSince;
+        public const float BatteryResponseTimeout = 8f;
+        public bool BatteryRequestPending => batteryPendingSlot >= 0;
         float elapsed;
         public event Action Changed;
         public event Action Activity;
         public int SelectedIndex => equipment == null ? -1 : (int)equipment.SelectedSlot >= 4 ? (int)equipment.SelectedSlot - 4 : -1;
-        public bool IsUsing => usingIndex >= 0;
-        public bool IsUsingOnOther => IsUsing && (IsNetworkProxy ? networkUsingOnOther : recipient != health);
+        public bool IsUsing => usingIndex >= 0 || BatteryRequestPending;
+        public bool IsUsingOnOther => !BatteryRequestPending && IsUsing && (IsNetworkProxy ? networkUsingOnOther : recipient != health);
         /// <summary>멀티플레이 복제본이면 입력 대신 네트워크 상태를 받는다 (아이템 획득·사용·드랍 불가).</summary>
         public bool IsNetworkProxy { get; set; }
         bool networkUsingOnOther;
         public bool HasItem(FarmingItemKind kind) => Array.IndexOf(items, kind) >= 0;
         public bool IsAlive => health != null && !health.IsDead && !motor.IsDead;
-        public float UseProgress => IsUsing ? Mathf.Clamp01(elapsed / DurationFor(ItemAt(usingIndex))) : 0;
+        public float UseProgress => BatteryRequestPending ? 1f : IsUsing ? Mathf.Clamp01(elapsed / DurationFor(ItemAt(usingIndex))) : 0;
         /// <summary>지금 사용 중인(없으면 선택된) 아이템의 사용 시간</summary>
         public float UseDuration => DurationFor(IsUsing ? ItemAt(usingIndex) : ItemAt(SelectedIndex));
         /// <summary>사용 중인 아이템 종류 (사용 중이 아니면 None)</summary>
-        public FarmingItemKind UsingItem => IsUsing ? ItemAt(usingIndex) : FarmingItemKind.None;
+        public FarmingItemKind UsingItem => BatteryRequestPending ? FarmingItemKind.Battery : IsUsing ? ItemAt(usingIndex) : FarmingItemKind.None;
         float DurationFor(FarmingItemKind kind) => kind == FarmingItemKind.AmmoPack ? ammoPackUseDuration : useDuration;
-        static bool IsUsable(FarmingItemKind kind) => kind == FarmingItemKind.Syringe || kind == FarmingItemKind.AmmoPack;
+        static bool IsUsable(FarmingItemKind kind) => kind == FarmingItemKind.Syringe || kind == FarmingItemKind.AmmoPack || kind == FarmingItemKind.Battery;
         public bool IsFull => Array.IndexOf(items, FarmingItemKind.None) < 0;
         public FarmingItemKind ItemAt(int index) => index >= 0 && index < Capacity ? items[index] : FarmingItemKind.None;
 
@@ -55,9 +60,10 @@ namespace VoidLast.Player
             interactor = GetComponent<FpsItemInteractor>();
             view = GetComponent<FpsItemView>();
             pistol = GetComponent<FpsPistol>();
+            if (GetComponent<FpsMapItem>() == null) gameObject.AddComponent<FpsMapItem>();
         }
         void OnEnable() { equipment.SlotChanged += SelectionChanged; health.Died += CancelUse; }
-        void OnDisable() { equipment.SlotChanged -= SelectionChanged; health.Died -= CancelUse; CancelUse(); }
+        void OnDisable() { equipment.SlotChanged -= SelectionChanged; health.Died -= CancelUse; CancelUse(); batteryPendingSlot=-1; }
         void Update()
         {
             if (IsNetworkProxy) return;
@@ -145,6 +151,12 @@ namespace VoidLast.Player
         {
             target = target == null ? health : target;
             var kind = ItemAt(SelectedIndex);
+            if (kind == FarmingItemKind.Battery)
+            {
+                if (!IsAlive || IsUsing || target != health || equipment.IsSwitching) return false;
+                if (!FpsBattery.CanRecharge(gameObject)) { LootFeedback.Show("고유 아이템이 이미 충전됐거나 배터리 대상이 아닙니다. 무전기는 충전하지 않습니다."); return false; }
+                recipient=health; usingIndex=SelectedIndex; elapsed=0; Changed?.Invoke(); ShowHotbar(); return true;
+            }
             if (kind == FarmingItemKind.AmmoPack)
             {
                 // Ammo goes into the user's own pistol only; it is held up and pressed to the body like the syringe.
@@ -162,6 +174,12 @@ namespace VoidLast.Player
         }
         public void TickUse(float deltaTime, bool selfHeld, bool otherHeld)
         {
+            if (BatteryRequestPending)
+            {
+                if(!IsAlive || !FpsBattery.UsesNetwork(gameObject) || Time.realtimeSinceStartup-batteryPendingSince>=BatteryResponseTimeout)
+                    CompleteBatteryRecharge(false,batteryRequestId);
+                return;
+            }
             if (!IsUsing) return;
             bool onOther = recipient != health;
             if (!IsAlive || recipient == null || recipient.IsDead || usingIndex != SelectedIndex || !IsUsable(ItemAt(usingIndex)) ||
@@ -170,6 +188,18 @@ namespace VoidLast.Player
             if (elapsed < DurationFor(ItemAt(usingIndex))) return;
             int completedIndex = usingIndex;
             usingIndex = -1; elapsed = 0;
+            if (items[completedIndex] == FarmingItemKind.Battery)
+            {
+                bool online=FpsBattery.UsesNetwork(gameObject);
+                uint request=++batteryRequestId;
+                if (online) { batteryPendingSlot=completedIndex; batteryPendingSince=Time.realtimeSinceStartup; }
+                bool accepted;
+                try { accepted=FpsBattery.Recharge(gameObject,request); }
+                catch(System.Exception e) { Debug.LogException(e,this);accepted=false; }
+                if(!online && accepted) { items[completedIndex]=FarmingItemKind.None; PlayLog.ItemUsed(this,FarmingItemKind.Battery); LootFeedback.Show("고유 아이템 사용 횟수를 충전했습니다."); }
+                if(online && !accepted) CompleteBatteryRecharge(false,request);
+                recipient=null; Changed?.Invoke(); ShowHotbar(); return;
+            }
             if (items[completedIndex] == FarmingItemKind.AmmoPack)
             {
                 pistol.AddReserve(ammoPackRounds);
@@ -183,6 +213,14 @@ namespace VoidLast.Player
             if (recipient.Heal(recipient.Maximum * syringeHealFraction)) { items[completedIndex] = FarmingItemKind.None; PlayLog.ItemUsed(this, FarmingItemKind.Syringe); }
             recipient = null;
             Changed?.Invoke(); ShowHotbar();
+        }
+        public void CompleteBatteryRecharge(bool success, uint requestId)
+        {
+            if(batteryPendingSlot<0 || requestId!=batteryRequestId)return;
+            int slot=batteryPendingSlot;batteryPendingSlot=-1; usingIndex=-1;elapsed=0;recipient=null;
+            if(success && items[slot]==FarmingItemKind.Battery) { items[slot]=FarmingItemKind.None;PlayLog.ItemUsed(this,FarmingItemKind.Battery); }
+            LootFeedback.Show(success ? "고유 아이템 사용 횟수를 충전했습니다." : "충전하지 못했습니다. 배터리는 소비하지 않았습니다.");
+            Changed?.Invoke();ShowHotbar();
         }
         public void CancelUse()
         {

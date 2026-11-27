@@ -20,6 +20,7 @@ namespace VoidLast.Player
         int remaining;
         float elapsed;
         bool Online => network != null && network.IsSpawned;
+        public bool RechargeOffline() { if (Online || remaining >= maximumUses) return false; remaining=maximumUses; return true; }
         public int MaximumUses => maximumUses;
         public int StartingUses => Mathf.Clamp(startingUses, 0, maximumUses);
         public int RemainingUses => Online ? network.RemainingUses : remaining;

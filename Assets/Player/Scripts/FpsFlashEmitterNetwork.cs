@@ -27,6 +27,22 @@ namespace VoidLast.Player
         public override void OnNetworkDespawn() => holding = false;
         /// <summary>방장 전용: 층을 옮기거나 다시 참가한 대원이 이미 쓴 횟수를 되돌린다 (Rejoin 명단에 기억해 둔 값)</summary>
         public void ServerRestoreSpent(int value) { if (IsServer && IsSpawned) spent.Value = Mathf.Max(0, value); }
+        public bool RequestBatteryRecharge(uint requestId)
+        {
+            if (!IsOwner || !IsSpawned || Spent <= 0) return false;
+            RechargeBatteryRpc(requestId); return true;
+        }
+        [Rpc(SendTo.Server, RequireOwnership = true)]
+        void RechargeBatteryRpc(uint requestId, RpcParams rpc=default)
+        {
+            var inventory=GetComponent<FpsInventory>();
+            bool valid=rpc.Receive.SenderClientId==OwnerClientId && inventory!=null && inventory.IsAlive
+                && inventory.HasItem(FarmingItemKind.Battery) && FpsUniqueItem.For(gameObject).Has(UniqueItemKind.Stun) && spent.Value>0;
+            if(valid) { spent.Value=0; }
+            BatteryRechargeResultRpc(valid,requestId);
+        }
+        [Rpc(SendTo.Owner)]
+        void BatteryRechargeResultRpc(bool success,uint requestId) => GetComponent<FpsInventory>().CompleteBatteryRecharge(success,requestId);
         public bool BeginCharge()
         {
             if (!IsSpawned || !IsOwner || holding || emitter == null || !emitter.CanOperate || emitter.RemainingUses <= 0 || CooldownRemaining > 0) return false;

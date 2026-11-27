@@ -26,6 +26,22 @@ namespace VoidLast.Player
         /// <summary>방장 전용: 층을 옮기거나 다시 참가한 대원의 남은 횟수를 되돌린다 (Rejoin 명단에 기억해 둔 값)</summary>
         public void ServerRestoreUses(int remaining) { if (IsServer && IsSpawned) uses.Value = Mathf.Clamp(remaining, 0, kit != null ? kit.MaximumUses : remaining); }
         public override void OnNetworkDespawn() { pending = awaitingResult = false; recipient = null; lastApplied.Clear(); }
+        public bool RequestBatteryRecharge(uint requestId)
+        {
+            if(!IsOwner || !IsSpawned || kit==null || RemainingUses>=kit.MaximumUses) return false;
+            RechargeBatteryRpc(requestId);return true;
+        }
+        [Rpc(SendTo.Server, RequireOwnership = true)]
+        void RechargeBatteryRpc(uint requestId, RpcParams rpc=default)
+        {
+            var inventory=GetComponent<FpsInventory>();
+            bool valid=rpc.Receive.SenderClientId==OwnerClientId && inventory!=null && inventory.IsAlive
+                && inventory.HasItem(FarmingItemKind.Battery) && FpsUniqueItem.For(gameObject).Has(UniqueItemKind.Healer) && kit!=null && uses.Value<kit.MaximumUses;
+            if(valid) { uses.Value=kit.MaximumUses; }
+            BatteryRechargeResultRpc(valid,requestId);
+        }
+        [Rpc(SendTo.Owner)]
+        void BatteryRechargeResultRpc(bool success,uint requestId) => GetComponent<FpsInventory>().CompleteBatteryRecharge(success,requestId);
         public bool RequestUse(FpsHealth target)
         {
             if (!IsSpawned || !IsOwner || IsUsing || kit == null || !kit.CanTreat(target)) return false;

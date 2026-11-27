@@ -15,7 +15,7 @@ using VoidLast.Player;
 public class ItemDetector : MonoBehaviour
 {
     [Header("탐지기 설정")]
-    public float detectRadius = 30f; // 감지 반경 (30m)
+    public float detectRadius = 50f; // 감지 반경 (30m)
     public float glowDuration = 3f;  // 발광 유지 시간
 
     [Tooltip("비워두면(Nothing) 모든 DetectableItem을 감지합니다. 지정하면 해당 레이어의 아이템만 감지합니다.")]
@@ -32,7 +32,7 @@ public class ItemDetector : MonoBehaviour
     [Tooltip("스캐너 아이템으로 스캔한 뒤 다시 쓸 수 있을 때까지의 시간(초)")]
     [Min(0f)] public float scannerCooldown = 15f;
     [Tooltip("스캐너 아이템으로 스캔할 때의 탐지 반경(m). 파동도 이 반경까지 퍼집니다. detectRadius는 Z 키·검사 도구용입니다.")]
-    [Min(1f)] public float scannerRadius = 30f;
+    [Min(1f)] public float scannerRadius = 50f;
 
     [Header("스캔 파동")]
     [Tooltip("파동이 퍼지는 속도(m/s). 아이템은 파동이 닿는 순간 발광합니다. 0이면 반경 안의 아이템이 동시에 발광합니다.")]
@@ -62,7 +62,7 @@ public class ItemDetector : MonoBehaviour
 
 
     [Header("임무 아이템 탐색")]
-    [Min(1f)] public float missionScanRadius = 30f;
+    [Min(1f)] public float missionScanRadius = 50f;
     [Tooltip("다른 층의 목표가 섞이지 않도록 플레이어와의 높이 차이를 제한합니다.")]
     [Min(0f)] public float missionHeightTolerance = 4f;
     [Min(1f)] public float missionGlowDuration = 8f;
@@ -70,6 +70,10 @@ public class ItemDetector : MonoBehaviour
     private sealed class MissionMarker
     {
         public FpsWorldPickup pickup;
+        public Transform target;
+        public LootContainer container;
+        public MissionInteractable device;
+        public string label;
         public float startsAt, expiresAt;
     }
     private readonly List<MissionMarker> missionMarkers = new List<MissionMarker>();
@@ -81,11 +85,19 @@ public class ItemDetector : MonoBehaviour
     {
         foreach (var pickup in FindObjectsByType<FpsWorldPickup>(FindObjectsSortMode.None))
         {
-            if (!pickup.isActiveAndEnabled || pickup.IsClaimed || !FarmingItems.IsMissionItem(pickup.Item)) continue;
+            if (pickup.storedInContainer || !pickup.isActiveAndEnabled || pickup.IsClaimed || !FarmingItems.IsScannable(pickup.Item)) continue;
             if (pickup.gameObject.scene != gameObject.scene) continue;
             if (pickup.GetComponentInChildren<DetectableItem>() == null)
                 pickup.gameObject.AddComponent<DetectableItem>();
         }
+    }
+
+    private void RegisterInteractionTargets()
+    {
+        foreach(var box in FindObjectsByType<LootContainer>(FindObjectsSortMode.None))
+            if(box.gameObject.scene==gameObject.scene && box.CanScan && box.GetComponent<DetectableItem>()==null) box.gameObject.AddComponent<DetectableItem>();
+        foreach(var device in FindObjectsByType<MissionInteractable>(FindObjectsSortMode.None))
+            if(device.gameObject.scene==gameObject.scene && device.GetComponent<DetectableItem>()==null) device.gameObject.AddComponent<DetectableItem>();
     }
 
     private void OnGUI()
@@ -105,15 +117,15 @@ public class ItemDetector : MonoBehaviour
         {
             var marker = missionMarkers[i];
             var pickup = marker.pickup;
-            if (pickup == null || !pickup.isActiveAndEnabled || pickup.IsClaimed || Time.time > marker.expiresAt)
+            if (marker.target == null || !marker.target.gameObject.activeInHierarchy || (pickup != null && pickup.IsClaimed) || (marker.container != null && !marker.container.CanScan) || Time.time > marker.expiresAt)
             {
                 missionMarkers.RemoveAt(i);
                 continue;
             }
             if (Time.time < marker.startsAt) continue;
-            Vector3 point = markerCamera.WorldToViewportPoint(pickup.transform.position);
-            string label = FarmingItems.HudLabel(pickup.Item) + "\n" +
-                Mathf.RoundToInt(Vector3.Distance(transform.position, pickup.transform.position)) + " m";
+            Vector3 point = markerCamera.WorldToViewportPoint(marker.target.position);
+            string label = marker.label + "\n" +
+                Mathf.RoundToInt(Vector3.Distance(transform.position, marker.target.position)) + " m";
             // 화면 밖·뒤에 있으면 화면 가장자리에 그 방(목표)이 있는 쪽을 가리키는 화살표를 띄운다
             if (point.z <= 0f || point.x < 0f || point.x > 1f || point.y < 0f || point.y > 1f)
             {
@@ -208,6 +220,10 @@ public class ItemDetector : MonoBehaviour
     private static readonly int IntensityId = Shader.PropertyToID("_Intensity");
 
     private readonly List<Wave> waves = new List<Wave>();
+    [Min(1)] public int scannerMaxUses = 3;
+    int scannerSpent;
+    public int ScannerUsesRemaining => Mathf.Max(0, scannerMaxUses-scannerSpent);
+    public void RechargeScanner() { scannerSpent=0; }
     private float nextReadyTime;
     private FpsInventory inventory;
 
@@ -269,15 +285,16 @@ private void Update()
             Debug.Log($"<color=grey>[탐지기] 재사용 대기 중 ({CooldownRemaining:F1}초)</color>");
             return;
         }
-        Scan(cooldown, detectRadius);
+        Scan(cooldown, 50f);
     }
 
     /// <summary>스캐너 아이템 좌클릭: 스캐너를 가지고 있고 쿨타임이 끝났을 때만 스캔한다 (쿨타임 scannerCooldown)</summary>
     public bool TryUseScanner()
     {
-        if (!isActiveAndEnabled || !IsReady) return false;
+        if (!isActiveAndEnabled || !IsReady || ScannerUsesRemaining<=0) return false;
         if (inventory != null && (!inventory.IsAlive || !(inventory.HasItem(FarmingItemKind.Scanner) || FpsUniqueItem.For(gameObject).Has(UniqueItemKind.Scanner)))) return false;
-        Scan(scannerCooldown, scannerRadius);
+        scannerSpent++;
+        Scan(scannerCooldown, 50f);
         return true;
     }
 
@@ -288,6 +305,7 @@ private void Update()
 
         Vector3 origin = transform.position;
         RegisterMissionItems();
+        RegisterInteractionTargets();
         missionMarkers.Clear();
         int found = 0;
 
@@ -304,22 +322,27 @@ private void Update()
 
             if (item.gameObject.scene != gameObject.scene) continue;
             var pickup = item.GetComponentInParent<FpsWorldPickup>();
-            if (pickup != null && (pickup.IsClaimed || !pickup.isActiveAndEnabled)) continue;
-            bool mission = pickup != null && FarmingItems.IsMissionItem(pickup.Item);
+            if (pickup != null && (pickup.storedInContainer || pickup.IsClaimed || !pickup.isActiveAndEnabled)) continue;
+            var container=item.GetComponent<LootContainer>();
+            var device=item.GetComponent<MissionInteractable>();
+            if(container!=null && !container.CanScan)continue;
+            bool mission = (pickup != null && FarmingItems.IsMissionItem(pickup.Item)) || container!=null || device!=null;
             // Mission objectives must remain detectable regardless of ordinary loot layer filters.
             if (!mission && itemLayer.value != 0 && (itemLayer.value & (1 << item.gameObject.layer)) == 0) continue;
             Vector3 offset = item.WorldCenter - origin;
             float sqrDist = offset.sqrMagnitude;
-            float range = mission ? Mathf.Max(radius, missionScanRadius) : radius;
+            float range = 50f;
             if (sqrDist > range * range) continue;
-            if (mission && Mathf.Abs(pickup.transform.position.y - origin.y) > missionHeightTolerance) continue;
+            if (mission && Mathf.Abs(item.transform.position.y - origin.y) > missionHeightTolerance) continue;
             float delay = waveSpeed > 0f ? Mathf.Sqrt(sqrDist) / waveSpeed : 0f;
             // Long-range objective locator responds promptly; the nearby sonar wave stays unchanged.
             if (mission) delay = Mathf.Min(delay, 1.5f);
             float duration = mission ? missionGlowDuration : glowDuration;
             item.StartGlow(duration, delay);
-            if (mission)
-                missionMarkers.Add(new MissionMarker { pickup = pickup, startsAt = Time.time + delay, expiresAt = Time.time + delay + duration });
+            if (pickup!=null || container!=null || device!=null)
+                missionMarkers.Add(new MissionMarker { pickup=pickup, container=container, device=device, target=item.transform,
+                    label=container!=null ? "CRATE: "+FarmingItems.HudLabel(container.MissionReward.Item) : device!=null ? "MISSION: "+device.kind : FarmingItems.HudLabel(pickup.Item),
+                    startsAt=Time.time+delay, expiresAt=Time.time+delay+duration });
             found++;
         }
 

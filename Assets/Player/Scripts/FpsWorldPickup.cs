@@ -13,6 +13,7 @@ namespace VoidLast.Player
         FpsInventory dropper;
         bool claimed, dropped, dropperLeftRange;
         float availableAt;
+        [HideInInspector] public bool storedInContainer;
         public bool IsDropped => dropped;
         public bool DropperLeftRange => dropperLeftRange;
         public bool IsClaimed => claimed;
@@ -22,6 +23,13 @@ namespace VoidLast.Player
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics() => Collected = null;
 
+        void OnEnable()
+        {
+            if(!storedInContainer)return;
+            foreach(var renderer in GetComponentsInChildren<Renderer>(true))renderer.enabled=false;
+            foreach(var collider in GetComponentsInChildren<Collider>(true))collider.enabled=false;
+            foreach(var detectable in GetComponentsInChildren<DetectableItem>(true))detectable.enabled=false;
+        }
         public void ConfigureDrop(FpsInventory owner)
         {
             dropped = true; dropper = owner; dropperLeftRange = false;
@@ -47,6 +55,7 @@ namespace VoidLast.Player
         {
             if (claimed || inventory == null || inventory.IsNetworkProxy || !inventory.IsAlive) return false;
             if (dropped && (Time.time < availableAt || inventory == dropper && !dropperLeftRange)) return false;
+            if (inventory.IsFull) { LootFeedback.Show("인벤토리가 가득 찼습니다. 칸을 비우고 다시 상호작용해 주세요."); return false; }
             if (!inventory.TryAdd(item)) return false;
             claimed = true;
             Collected?.Invoke(this, inventory);

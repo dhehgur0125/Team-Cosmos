@@ -19,6 +19,7 @@ namespace VoidLast.Player
         public bool AimPressed { get; private set; }
         public bool Jump { get; private set; }
         public bool Interact { get; private set; }
+        public bool InteractHeld { get; private set; }
         public bool Drop { get; private set; }
         public bool Reload { get; private set; }
         public bool HalveHealth { get; private set; }
@@ -69,6 +70,7 @@ namespace VoidLast.Player
                 Crouch = GameKeys.Held(GameAction.Crouch);
                 Jump = GameKeys.Down(GameAction.Jump);
                 Interact = GameKeys.Down(GameAction.Interact);
+                InteractHeld = GameKeys.Held(GameAction.Interact);
                 Drop = GameKeys.Down(GameAction.Drop);
                 Reload = GameKeys.Down(GameAction.Reload);
                 HalveHealth = keyboard.hKey.wasPressedThisFrame;
@@ -97,6 +99,7 @@ namespace VoidLast.Player
             AimPressed = Input.GetMouseButtonDown(1);
             Jump = Input.GetKeyDown(KeyCode.Space);
             Interact = Input.GetKeyDown(KeyCode.F);
+            InteractHeld = Input.GetKey(KeyCode.F);
             Drop = Input.GetKeyDown(KeyCode.Q);
             Reload = Input.GetKeyDown(KeyCode.R);
             HalveHealth = Input.GetKeyDown(KeyCode.H);
@@ -110,7 +113,7 @@ namespace VoidLast.Player
         {
             Move = Look = Vector2.zero;
             Sprint = Crouch = Aim = Attack = Jump = ReleaseCursor = CaptureCursor = false;
-            Interact = Drop = Reload = HalveHealth = Flashlight = false;
+            InteractHeld = Interact = Drop = Reload = HalveHealth = Flashlight = false;
             AttackHeld = AimPressed = false;
             Slot = 0;
         }

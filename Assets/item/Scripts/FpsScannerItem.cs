@@ -204,7 +204,7 @@ public sealed class FpsScannerItem : MonoBehaviour
         }
         else
         {
-            hudText.text = "SCAN READY  [LMB]";
+            hudText.text = "SCAN " + detector.ScannerUsesRemaining + "/" + detector.scannerMaxUses + (detector.ScannerUsesRemaining>0 ? "  [LMB]" : "  NEED BATTERY");
             hudText.color = new Color(0.55f, 0.95f, 1f, 1f);
             hudFill.fillAmount = 1f;
             hudFill.color = new Color(0.3f, 0.85f, 1f, 0.9f);

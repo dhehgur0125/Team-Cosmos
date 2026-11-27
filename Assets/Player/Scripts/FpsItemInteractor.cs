@@ -21,32 +21,63 @@ namespace VoidLast.Player
         CharacterController capsule;
         FpsHealth health;
         public FpsWorldPickup Target { get; private set; }
+        public LootContainer ContainerTarget { get; private set; }
         public FpsWorldPickup LastDropped { get; private set; }
         public float PickupDistance => pickupDistance;
+        [SerializeField, Range(1f, 2f)] float containerSearchSeconds = 1.5f;
+        LootContainer heldContainer;
+        float containerHold;
+        bool containerHoldCompleted;
+        public float ContainerSearchProgress => Mathf.Clamp01(containerHold / containerSearchSeconds);
+        public float ContainerSearchSeconds => containerSearchSeconds;
+        public bool ContainerHoldCompleted => containerHoldCompleted;
+        public void TickContainerSearch(float delta, bool held, bool pressed)
+        {
+            if (!held || !isActiveAndEnabled || !inventory.IsAlive || inventory.IsNetworkProxy ||
+                FpsInput.Blocked || PauseMenu.IsOpen || LoadingScreen.IsShowing || inventory.IsUsing || ContainerTarget == null)
+            { heldContainer=null; containerHold=0; containerHoldCompleted=false; return; }
+            if(heldContainer!=ContainerTarget) { heldContainer=ContainerTarget; containerHold=0; containerHoldCompleted=false; }
+            if(containerHoldCompleted)return;
+            if(inventory.IsFull)
+            {
+                containerHold=0;
+                if(pressed)LootFeedback.Show("인벤토리가 가득 찼습니다. 칸을 비우고 다시 시도해 주세요.");
+                return;
+            }
+            if(!ContainerTarget.seedReady){containerHold=0;return;}
+            containerHold+=Mathf.Max(0,delta);
+            if(containerHold<containerSearchSeconds)return;
+            containerHold=containerSearchSeconds;
+            containerHoldCompleted=true;
+            ContainerTarget.TrySearch(inventory);
+        }
         /// <summary>Q로 아이템을 바닥에 내려놓았을 때 (멀티플레이: 다른 대원 화면에도 생성하기 위해 사용)</summary>
         public static event Action<FpsItemInteractor, FpsWorldPickup> Dropped;
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics() => Dropped = null;
         public FpsWorldPickup PickupPrefabFor(FarmingItemKind kind) => kind == FarmingItemKind.Radio ? radioPickupPrefab : kind == FarmingItemKind.Syringe ? syringePickupPrefab : FarmingItems.PickupPrefab(kind);
-        void Awake() { input = GetComponent<FpsInput>(); inventory = GetComponent<FpsInventory>(); capsule = GetComponent<CharacterController>(); health = GetComponent<FpsHealth>(); }
+        void Awake() { input = GetComponent<FpsInput>(); inventory = GetComponent<FpsInventory>(); capsule = GetComponent<CharacterController>(); health = GetComponent<FpsHealth>(); if(GetComponent<ContainerSearchHud>()==null)gameObject.AddComponent<ContainerSearchHud>(); }
         void OnEnable() { if (health != null) health.Died += DropAllOnDeath; }
         void OnDisable() { if (health != null) health.Died -= DropAllOnDeath; }
         void Update()
         {
             UpdateTarget();
-            if (input.Interact) TryPickup();
+            TickContainerSearch(Time.deltaTime, input.InteractHeld, input.Interact);
+            if (input.Interact && ContainerTarget == null) TryPickup();
             if (input.Drop) TryDrop();
         }
         public void UpdateTarget()
         {
-            Target = null;
+            Target = null; ContainerTarget = null;
             if (!inventory.IsAlive || viewCamera == null) return;
             Ray ray = viewCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f));
             foreach (var hit in Physics.SphereCastAll(ray, pickupAssistRadius, pickupDistance, ~0, QueryTriggerInteraction.Ignore).OrderBy(h => h.distance))
             {
                 if (hit.collider.transform.IsChildOf(transform)) continue;
+                var container = hit.collider.GetComponentInParent<LootContainer>();
+                if (container != null && VisibleCollider(hit.collider,container.transform)) { ContainerTarget=container; return; }
                 var pickup = hit.collider.GetComponentInParent<FpsWorldPickup>();
-                if (pickup != null && VisibleCollider(hit.collider, pickup.transform)) { Target = pickup; return; }
+                if (pickup != null && !pickup.storedInContainer && VisibleCollider(hit.collider, pickup.transform)) { Target = pickup; return; }
             }
         }
         bool VisibleCollider(Collider target, Transform owner)
@@ -82,6 +113,7 @@ namespace VoidLast.Player
         public bool TryPickup()
         {
             UpdateTarget();
+            if (ContainerTarget != null) return false; // Container rewards require a completed hold.
             return Target != null && Target.TryCollect(inventory);
         }
         public bool TryDrop()
@@ -108,6 +140,7 @@ namespace VoidLast.Player
         void DropAllOnDeath()
         {
             if (inventory == null || inventory.IsNetworkProxy) return;
+            if(inventory.BatteryRequestPending) { StartCoroutine(DropAfterBattery()); return; }
             Vector3 center = transform.position + Vector3.up * 0.6f;
             for (int i = 0; i < FpsInventory.Capacity; i++)
             {
@@ -123,6 +156,11 @@ namespace VoidLast.Player
                 LastDropped = pickup;
                 Dropped?.Invoke(this, pickup);
             }
+        }
+        System.Collections.IEnumerator DropAfterBattery()
+        {
+            while(inventory.BatteryRequestPending) yield return null;
+            DropAllOnDeath();
         }
     }
 }

@@ -169,3 +169,6 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+Assets/Resources/FarmingItems/Icons/*.png !filter !diff !merge text=auto
+Assets/Resources/FloorPlans/*.png !filter !diff !merge text=auto

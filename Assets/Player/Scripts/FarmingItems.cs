@@ -21,11 +21,17 @@ namespace VoidLast.Player
         public static bool IsHeavy(FarmingItemKind kind) => kind == FarmingItemKind.PowerCell;
 
         /// <summary>Resources에서 읽어 오는 아이템인지 (주사기·무전기는 대원 프리팹에 직접 연결되어 있음)</summary>
-        public static bool IsCatalogItem(FarmingItemKind kind) => kind == FarmingItemKind.Battery || kind == FarmingItemKind.Scanner || kind == FarmingItemKind.AmmoPack || IsMissionItem(kind);
+        public static bool IsCatalogItem(FarmingItemKind kind) => kind == FarmingItemKind.Battery || kind == FarmingItemKind.Scanner || kind == FarmingItemKind.AmmoPack || IsMap(kind) || IsMissionItem(kind);
 
         /// <summary>스캔에 표시되는지: 배터리는 직접 찾아야 한다</summary>
-        public static bool IsScannable(FarmingItemKind kind) => kind != FarmingItemKind.Battery;
+        public static bool IsScannable(FarmingItemKind kind) => kind != FarmingItemKind.None;
 
+        public static int MapFloor(FarmingItemKind kind) => kind == FarmingItemKind.Map ? 2 :
+            kind == FarmingItemKind.MapFloor1 ? 1 : kind == FarmingItemKind.MapFloor3 ? 3 :
+            kind == FarmingItemKind.MapFloor4 ? 4 : kind == FarmingItemKind.MapFloor5 ? 5 : 0;
+        public static bool IsMap(FarmingItemKind kind) => MapFloor(kind) > 0;
+        public static bool CanLootOnFloor(FarmingItemKind kind, string sceneName)
+            => !IsMap(kind) || sceneName == "Stage2_Ship_" + MapFloor(kind) + "f";
         public static string HudLabel(FarmingItemKind kind)
         {
             switch (kind)
@@ -42,6 +48,11 @@ namespace VoidLast.Player
                 case FarmingItemKind.ToolKit: return "TOOL KIT";
                 case FarmingItemKind.PowerCell: return "POWER CELL";
                 case FarmingItemKind.AmmoPack: return "AMMO PACK";
+                case FarmingItemKind.Map: return "건물도면 · 2층";
+                case FarmingItemKind.MapFloor1: return "건물도면 · 1층";
+                case FarmingItemKind.MapFloor3: return "건물도면 · 3층";
+                case FarmingItemKind.MapFloor4: return "건물도면 · 4층";
+                case FarmingItemKind.MapFloor5: return "건물도면 · 5층";
                 default: return "ITEM";
             }
         }
@@ -63,7 +74,7 @@ namespace VoidLast.Player
             if (!IsCatalogItem(kind)) return null;
             if (!Icons.TryGetValue(kind, out var sprite))
             {
-                sprite = Resources.Load<Sprite>("FarmingItems/Icons/" + kind);
+                sprite = Resources.Load<Sprite>("FarmingItems/Icons/" + (IsMap(kind) ? FarmingItemKind.Map : kind));
                 Icons[kind] = sprite;
             }
             return sprite;

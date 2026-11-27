@@ -15,7 +15,7 @@ using VoidLast.Player;
 ///  - 게임을 나간 대원이 들고 있던 물건은 마지막 위치에 떨어뜨린다 (모든 층, MissionLeaverDrops)
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class NetworkPickupRegistry : NetworkBehaviour
+public sealed partial class NetworkPickupRegistry : NetworkBehaviour
 {
     [Tooltip("다른 대원이 내려놓은 아이템을 내 화면에 만들 때 쓰는 프리팹")]
     public FpsWorldPickup syringePickupPrefab;
@@ -30,6 +30,7 @@ public sealed class NetworkPickupRegistry : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         RegisterScenePickups();
+        StartLootSession();
         FpsWorldPickup.Collected += OnCollected;
         FpsItemInteractor.Dropped += OnDropped;
         if (IsServer)
@@ -45,6 +46,7 @@ public sealed class NetworkPickupRegistry : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        LootContainer.Searched -= OnContainerSearched;
         FpsWorldPickup.Collected -= OnCollected;
         FpsItemInteractor.Dropped -= OnDropped;
         if (NetworkManager != null)
@@ -83,6 +85,7 @@ public sealed class NetworkPickupRegistry : NetworkBehaviour
     void OnLateJoin(ulong clientId)
     {
         if (!IsServer || clientId == NetworkManager.ServerClientId) return;
+        LootStateRpc(lootSeed,string.Join("\n",searchedContainers),RpcTarget.Single(clientId,RpcTargetUse.Temp));
         var scene = new List<int>();
         var dropIds = new List<int>(); var dropKinds = new List<byte>(); var dropPos = new List<Vector3>();
         foreach (var kv in _byId)
